@@ -63,6 +63,19 @@ async function tryRefresh(): Promise<boolean> {
   return refreshInFlight
 }
 
+// Выполняет запрос через переданный thunk; на 401 однократно обновляет сессию
+// и повторяет его. thunk должен строить fetch заново (чтобы подхватить новый
+// access-токен в заголовке). skipRefresh отключает повтор — для самих auth-запросов.
+async function fetchWithRefresh(
+  doFetch: () => Promise<Response>,
+  skipRefresh = false,
+): Promise<Response> {
+  const res = await doFetch()
+  if (res.status !== 401 || skipRefresh) return res
+  const refreshed = await tryRefresh()
+  return refreshed ? doFetch() : res
+}
+
 async function rawRequest(path: string, options: RequestOptions): Promise<Response> {
   const { body, headers, skipAuthRefresh: _s, ...rest } = options
   return fetch(`${BASE_URL}${path}`, {
@@ -88,13 +101,7 @@ export async function apiRequestFull<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<ApiEnvelope<T>> {
-  let res = await rawRequest(path, options)
-
-  // Истёк access-токен → однократный refresh + повтор исходного запроса.
-  if (res.status === 401 && !options.skipAuthRefresh) {
-    const refreshed = await tryRefresh()
-    if (refreshed) res = await rawRequest(path, options)
-  }
+  const res = await fetchWithRefresh(() => rawRequest(path, options), options.skipAuthRefresh)
 
   const json = await res.json().catch(() => null)
 
@@ -118,30 +125,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 // ── Сырые тела (CSV import/export) ──────────────────────────────────────────
 
 async function rawTextRequest(path: string, method: string, body?: string, contentType?: string) {
-  let res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    credentials: 'include',
-    headers: {
-      ...(contentType ? { 'Content-Type': contentType } : {}),
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body,
-  })
-  if (res.status === 401) {
-    const refreshed = await tryRefresh()
-    if (refreshed) {
-      res = await fetch(`${BASE_URL}${path}`, {
-        method,
-        credentials: 'include',
-        headers: {
-          ...(contentType ? { 'Content-Type': contentType } : {}),
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body,
-      })
-    }
-  }
-  return res
+  return fetchWithRefresh(() =>
+    fetch(`${BASE_URL}${path}`, {
+      method,
+      credentials: 'include',
+      headers: {
+        ...(contentType ? { 'Content-Type': contentType } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body,
+    }),
+  )
 }
 
 /** POST CSV в теле, разворачивает JSON-envelope ответа (сводка импорта). */
@@ -167,15 +161,14 @@ export async function apiGetText(path: string): Promise<string> {
 
 /** POST multipart/form-data. Content-Type ставит браузер (с boundary). Разворачивает envelope. */
 export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
-  const send = () =>
+  const res = await fetchWithRefresh(() =>
     fetch(`${BASE_URL}${path}`, {
       method: 'POST',
       credentials: 'include',
       headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       body: form,
-    })
-  let res = await send()
-  if (res.status === 401 && (await tryRefresh())) res = await send()
+    }),
+  )
   const json = await res.json().catch(() => null)
   if (!res.ok) {
     throw new ApiRequestError(

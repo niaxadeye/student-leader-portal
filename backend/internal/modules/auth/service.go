@@ -62,23 +62,36 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*TokenPair, *User, 
 // issueSession создаёт сессию с новым token family и первым refresh-токеном.
 func (s *Service) issueSession(ctx context.Context, userID, role, ua, ip string) (*TokenPair, error) {
 	familyID := uuid.NewString()
-	jti := uuid.NewString()
-	refresh, err := security.GenerateRefreshToken()
+	jti, refresh, refreshExp, err := s.newRefreshCredentials()
 	if err != nil {
 		return nil, err
 	}
-	refreshExp := s.now().Add(s.refTTL)
 	sess := &Session{UserID: userID, UserAgent: ua, IPHash: security.HashIP(ip), ExpiresAt: refreshExp}
 	if err := s.repo.CreateSession(ctx, sess, familyID, jti, security.HashToken(refresh), refreshExp); err != nil {
 		return nil, err
 	}
-	access, accessExp, err := s.jwt.Issue(userID, role, sess.ID, jti)
+	return s.mintTokenPair(userID, role, sess.ID, jti, refresh, refreshExp)
+}
+
+// newRefreshCredentials генерирует jti, сырой refresh-токен и срок его действия
+// для нового звена цепочки. Персистит его вызывающий (CreateSession/RotateRefresh).
+func (s *Service) newRefreshCredentials() (jti, refresh string, exp time.Time, err error) {
+	refresh, err = security.GenerateRefreshToken()
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	return uuid.NewString(), refresh, s.now().Add(s.refTTL), nil
+}
+
+// mintTokenPair выпускает access-JWT для уже сохранённого refresh-звена и собирает пару.
+func (s *Service) mintTokenPair(userID, role, sessionID, jti, refresh string, refreshExp time.Time) (*TokenPair, error) {
+	access, accessExp, err := s.jwt.Issue(userID, role, sessionID, jti)
 	if err != nil {
 		return nil, err
 	}
 	return &TokenPair{
 		AccessToken: access, AccessExp: accessExp,
-		RefreshToken: refresh, RefreshExp: refreshExp, SessionID: sess.ID,
+		RefreshToken: refresh, RefreshExp: refreshExp, SessionID: sessionID,
 	}, nil
 }
 
