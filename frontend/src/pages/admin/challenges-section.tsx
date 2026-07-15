@@ -10,8 +10,8 @@ import { formatDate } from '@/shared/lib/format'
 import { challengeStatusMeta } from './challenge-status'
 import { CreateChallengeDialog } from './create-challenge-dialog'
 
-/** Список испытаний конкурса + вход в конструктор. */
-export function ChallengesSection({ contestId }: { contestId: string }) {
+/** Список испытаний конкурса + вход в конструктор. canEdit скрывает создание (VIEW-режим). */
+export function ChallengesSection({ contestId, canEdit }: { contestId: string; canEdit: boolean }) {
   const { data, isLoading, isError, refetch } = useAdminChallenges(contestId)
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -19,9 +19,11 @@ export function ChallengesSection({ contestId }: { contestId: string }) {
     <section>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[20px] font-semibold text-ink">Испытания</h2>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" /> Новое испытание
-        </Button>
+        {canEdit && (
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" /> Новое испытание
+          </Button>
+        )}
       </div>
 
       {isLoading && <Skeleton className="h-32 w-full" />}

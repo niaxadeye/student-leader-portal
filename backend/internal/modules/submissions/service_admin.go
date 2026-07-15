@@ -34,13 +34,14 @@ func (s *Service) AdminGet(ctx context.Context, a Actor, submissionID string) (*
 	return sub, revs, nil
 }
 
-// ensureAdmin — доступ к конкурсу испытания (SUPER_ADMIN ∨ ADMIN scoped).
+// ensureAdmin — доступ к конкурсу испытания на чтение. Просмотр и проверка работ
+// доступны и на уровне VIEW (§1.3): владелец, назначенный ADMIN (EDIT|VIEW), мега.
 func (s *Service) ensureAdmin(ctx context.Context, a Actor, challengeID string) error {
 	info, err := s.source.ChallengeInfo(ctx, challengeID)
 	if err != nil {
 		return err
 	}
-	ok, err := s.source.HasContestAccess(ctx, a.UserID, info.ContestID, a.IsSuper)
+	ok, err := s.source.ContestViewable(ctx, a.UserID, info.ContestID, a.IsMega)
 	if err != nil {
 		return err
 	}

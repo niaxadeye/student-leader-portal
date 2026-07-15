@@ -23,6 +23,14 @@ func actorID(r *http.Request) string {
 	return ""
 }
 
+// actorOf собирает субъект операции (id + роль) из принципала запроса.
+func actorOf(r *http.Request) Actor {
+	if p := middleware.PrincipalFrom(r.Context()); p != nil {
+		return Actor{UserID: p.UserID, Role: p.Role}
+	}
+	return Actor{}
+}
+
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	temp, err := h.svc.ResetPassword(r.Context(), actorID(r), chi.URLParam(r, "userId"))
 	if err != nil {
@@ -58,6 +66,8 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		httpserver.WriteError(w, r, http.StatusConflict, "LOGIN_TAKEN", "Логин уже занят", nil)
 	case errors.Is(err, ErrValidation):
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Проверьте заполнение полей", nil)
+	case errors.Is(err, ErrForbidden):
+		httpserver.WriteError(w, r, http.StatusForbidden, "FORBIDDEN", "Недостаточно прав", nil)
 	default:
 		httpserver.WriteError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка", nil)
 	}

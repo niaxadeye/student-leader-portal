@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Trophy, Users, ChevronRight, Plus } from 'lucide-react'
 import { useAuth } from '@/entities/auth/auth-context'
+import { isMega, isSuper } from '@/entities/auth/roles'
 import { useAdminContests } from '@/entities/contest/queries'
 import { Card } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -14,7 +15,8 @@ import type { AdminContest } from '@/entities/contest/types'
 
 export function AdminContestsPage() {
   const { user } = useAuth()
-  const isSuper = !!user?.roles.includes('SUPER_ADMIN')
+  // Создавать конкурсы могут организатор (SUPER_ADMIN) и мега (§1.3).
+  const canCreate = isSuper(user) || isMega(user)
   const { data: contests, isLoading, isError, refetch } = useAdminContests()
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -25,7 +27,7 @@ export function AdminContestsPage() {
           <h1 className="text-[28px] font-bold tracking-tight text-ink">Конкурсы</h1>
           <p className="mt-1 text-[15px] text-muted">Управление конкурсами и испытаниями.</p>
         </div>
-        {isSuper && (
+        {canCreate && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> Новый конкурс
           </Button>
@@ -45,7 +47,7 @@ export function AdminContestsPage() {
           icon={Trophy}
           title="Конкурсов пока нет"
           description={
-            isSuper
+            canCreate
               ? 'Создайте первый конкурс, чтобы начать.'
               : 'Вам не назначено ни одного конкурса. Обратитесь к суперадмину.'
           }
@@ -58,7 +60,7 @@ export function AdminContestsPage() {
         </div>
       )}
 
-      {isSuper && <CreateContestDialog open={createOpen} onOpenChange={setCreateOpen} />}
+      {canCreate && <CreateContestDialog open={createOpen} onOpenChange={setCreateOpen} />}
     </div>
   )
 }

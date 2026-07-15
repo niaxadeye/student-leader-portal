@@ -17,13 +17,17 @@ import { useAdminUser, useAssignRole, useRemoveRole } from '@/entities/user/quer
 import { useAdminContests } from '@/entities/contest/queries'
 import { ApiRequestError } from '@/shared/api/client'
 import type { RoleCode } from '@/entities/auth/types'
-import type { RoleAssignment } from '@/entities/user/types'
+import type { AccessLevel, RoleAssignment } from '@/entities/user/types'
 
 const roleLabels: Record<RoleCode, string> = {
+  MEGA_ADMIN: 'Мегаадмин',
   SUPER_ADMIN: 'Суперадмин',
   ADMIN: 'Админ',
   CONTESTANT: 'Конкурсант',
 }
+
+// Роли, назначаемые через этот диалог (мега/супер создаются иначе).
+const assignableRoles: RoleCode[] = ['ADMIN', 'CONTESTANT']
 
 export function ManageRolesDialog({
   userId,
@@ -47,7 +51,9 @@ export function ManageRolesDialog({
 
 function scopeLabel(a: RoleAssignment, contestName?: string): string {
   if (a.scope_type === 'GLOBAL') return 'Глобально'
-  return contestName ? `Конкурс: ${contestName}` : `Конкурс ${a.scope_id.slice(0, 8)}`
+  const base = contestName ? `Конкурс: ${contestName}` : `Конкурс ${a.scope_id.slice(0, 8)}`
+  const lvl = a.access_level === 'EDIT' ? 'EDIT' : a.access_level === 'VIEW' ? 'VIEW' : ''
+  return lvl ? `${base} · ${lvl}` : base
 }
 
 function RolesBody({ userId }: { userId: string }) {
@@ -59,7 +65,11 @@ function RolesBody({ userId }: { userId: string }) {
 
   const [role, setRole] = useState<RoleCode>('ADMIN')
   const [scopeId, setScopeId] = useState<string>('')
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>('EDIT')
   const [error, setError] = useState<string>()
+
+  // Уровень доступа задаётся только для ADMIN на конкретный конкурс (§3.4).
+  const needsAccessLevel = role === 'ADMIN' && scopeId !== ''
 
   const contestName = (id: string) => contests.data?.find((c) => c.id === id)?.name
 
@@ -77,7 +87,12 @@ function RolesBody({ userId }: { userId: string }) {
     setError(undefined)
     const scopeType = scopeId ? 'CONTEST' : 'GLOBAL'
     assign.mutate(
-      { role, scope_type: scopeType, scope_id: scopeId || undefined },
+      {
+        role,
+        scope_type: scopeType,
+        scope_id: scopeId || undefined,
+        access_level: needsAccessLevel ? accessLevel : undefined,
+      },
       {
         onSuccess: () => {
           toast({ title: 'Роль назначена', tone: 'success' })
@@ -131,7 +146,7 @@ function RolesBody({ userId }: { userId: string }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(roleLabels) as RoleCode[]).map((r) => (
+                  {assignableRoles.map((r) => (
                     <SelectItem key={r} value={r}>
                       {roleLabels[r]}
                     </SelectItem>
@@ -157,6 +172,21 @@ function RolesBody({ userId }: { userId: string }) {
               </Select>
             )}
           </Field>
+          {needsAccessLevel && (
+            <Field label="Уровень доступа" helpText="EDIT — правка контента; VIEW — только просмотр. Участниками управляет только владелец.">
+              {(p) => (
+                <Select value={accessLevel} onValueChange={(v) => setAccessLevel(v as AccessLevel)}>
+                  <SelectTrigger id={p.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EDIT">Редактирование</SelectItem>
+                    <SelectItem value="VIEW">Только просмотр</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          )}
           <div className="flex justify-end">
             <Button size="sm" onClick={onAssign} loading={assign.isPending}>
               <Plus className="h-4 w-4" /> Назначить

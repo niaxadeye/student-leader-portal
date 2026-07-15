@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Users, Calendar, Rocket, Flag, Archive, Pencil, PencilRuler } from 'lucide-react'
-import { useAuth } from '@/entities/auth/auth-context'
 import { useAdminContest, useTransitionContest } from '@/entities/contest/queries'
 import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -13,7 +12,11 @@ import { contestStatusMeta } from './contest-status'
 import { ContestantsTable } from './contestants-table'
 import { ChallengesSection } from './challenges-section'
 import { EditContestDialog } from './edit-contest-dialog'
-import type { ContestStatus } from '@/entities/contest/types'
+import {
+  canEditContest,
+  canManageParticipants,
+  type ContestStatus,
+} from '@/entities/contest/types'
 
 /** Доступные переходы по статусу (зеркалит матрицу бэкенда). */
 const actionsByStatus: Record<ContestStatus, Array<'publish' | 'finish' | 'archive'>> = {
@@ -31,8 +34,6 @@ const actionMeta = {
 
 export function AdminContestDetailPage() {
   const { contestId } = useParams()
-  const { user } = useAuth()
-  const isSuper = !!user?.roles.includes('SUPER_ADMIN')
   const { data: contest, isLoading, isError, refetch } = useAdminContest(contestId)
   const transition = useTransitionContest(contestId!)
   const toast = useToast()
@@ -55,6 +56,8 @@ export function AdminContestDetailPage() {
 
   const status = contestStatusMeta[contest.status]
   const actions = actionsByStatus[contest.status]
+  const canEdit = canEditContest(contest.access_level)
+  const canManage = canManageParticipants(contest.access_level)
 
   function runTransition(action: 'publish' | 'finish' | 'archive') {
     transition.mutate(action, {
@@ -85,12 +88,12 @@ export function AdminContestDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {contest.status !== 'ARCHIVED' && (
+          {canEdit && contest.status !== 'ARCHIVED' && (
             <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Редактировать
             </Button>
           )}
-          {isSuper &&
+          {canEdit &&
             actions.map((a) => {
               const Icon = actionMeta[a].icon
               return (
@@ -134,11 +137,11 @@ export function AdminContestDetailPage() {
       </div>
 
       <div className="mb-8">
-        <ChallengesSection contestId={contest.id} />
+        <ChallengesSection contestId={contest.id} canEdit={canEdit} />
       </div>
 
       <h2 className="mb-3 text-[20px] font-semibold text-ink">Конкурсанты</h2>
-      <ContestantsTable contestId={contest.id} />
+      <ContestantsTable contestId={contest.id} canManage={canManage} />
 
       <EditContestDialog contest={contest} open={editOpen} onOpenChange={setEditOpen} />
     </div>

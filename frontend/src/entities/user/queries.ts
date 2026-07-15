@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { assignRole, createUser, getUser, listUsers, removeRole, updateUser } from './api'
 import { blockUser, resetPassword, unblockUser } from './admin-actions'
-import type { CreateUserInput, RoleAssignment, UsersFilter } from './types'
-import type { RoleCode } from '@/entities/auth/types'
+import type { AssignRoleInput, CreateUserInput, RoleAssignment, UsersFilter } from './types'
 
 /** Реестр пользователей — только SUPER_ADMIN (гард на роуте). */
 export function useAdminUsers(filter: UsersFilter, enabled = true) {
@@ -58,8 +57,7 @@ export function useResetPassword() {
 export function useAssignRole(userId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { role: RoleCode; scope_type: 'GLOBAL' | 'CONTEST'; scope_id?: string }) =>
-      assignRole(userId, body),
+    mutationFn: (body: AssignRoleInput) => assignRole(userId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'user', userId] })
       qc.invalidateQueries({ queryKey: ['admin', 'users'] })

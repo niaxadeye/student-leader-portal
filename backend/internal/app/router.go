@@ -44,7 +44,9 @@ func (a *App) Router() http.Handler {
 		// Scope конкретного конкурса проверяется в сервис-слое (SITE.md §6 п.5).
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(d.authn.Require)
-			r.Use(middleware.RequireRole("ADMIN"))
+			// ADMIN и SUPER_ADMIN попадают в админ-раздел; MEGA_ADMIN проходит всегда.
+			// Тонкая изоляция (владение, EDIT/VIEW) — в сервис-слое, не здесь.
+			r.Use(middleware.RequireRole("ADMIN", "SUPER_ADMIN"))
 
 			r.Route("/contests", func(r chi.Router) {
 				r.Get("/", d.contestsHandler.List)
@@ -101,7 +103,7 @@ func (a *App) Router() http.Handler {
 
 			// Реестр пользователей и управление ролями — только SUPER_ADMIN (SITE.md §5.1).
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("SUPER_ADMIN"))
+				r.Use(middleware.RequireRole("SUPER_ADMIN", "MEGA_ADMIN"))
 				r.Get("/users", d.userAdminHandler.ListUsers)
 				r.Post("/users", d.userAdminHandler.CreateUser)
 				r.Get("/users/{userId}", d.userAdminHandler.GetUser)

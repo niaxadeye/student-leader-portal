@@ -2,11 +2,23 @@ import type { RoleCode } from '@/entities/auth/types'
 
 export type UserStatus = 'ACTIVE' | 'BLOCKED'
 
+/** Уровень доступа ADMIN к конкурсу (§1.2). */
+export type AccessLevel = 'EDIT' | 'VIEW'
+
 /** Назначение роли со scope (бэкенд: useradmin.RoleAssignment). */
 export interface RoleAssignment {
   code: RoleCode
   scope_type: 'GLOBAL' | 'CONTEST'
   scope_id: string
+  access_level: AccessLevel | null
+}
+
+/** Тело назначения роли (бэкенд: useradmin.AssignRoleInput). */
+export interface AssignRoleInput {
+  role: RoleCode
+  scope_type: 'GLOBAL' | 'CONTEST'
+  scope_id?: string
+  access_level?: AccessLevel
 }
 
 /** Пользователь реестра SUPER_ADMIN (SITE.md §19). */
@@ -16,6 +28,7 @@ export interface AdminUser {
   full_name: string
   email: string | null
   organization: string | null
+  org_name: string | null
   status: UserStatus
   must_change_password: boolean
   last_login_at: string | null
@@ -45,9 +58,11 @@ export interface CreateUserInput {
   full_name: string
   email?: string
   organization?: string
+  org_name?: string
   role?: RoleCode
   scope_type?: 'GLOBAL' | 'CONTEST'
   scope_id?: string
+  access_level?: AccessLevel
 }
 
 /** Ответ создания: временный пароль показать один раз. */

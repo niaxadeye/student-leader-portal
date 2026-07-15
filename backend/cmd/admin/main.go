@@ -17,7 +17,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: admin <migrate|create-superadmin|create-user>")
+		fmt.Println("usage: admin <migrate|create-megaadmin|create-superadmin|create-user>")
 		os.Exit(2)
 	}
 	cfg, err := config.Load()
@@ -36,9 +36,11 @@ func main() {
 		} else {
 			fmt.Printf("applied: %v\n", applied)
 		}
-	case "create-superadmin":
-		must(createSuperadmin(ctx, pool))
-		fmt.Println("superadmin ready")
+	case "create-superadmin", "create-megaadmin":
+		// Bootstrap-аккаунт из env — платформенный MEGA_ADMIN (docs/RBAC_MULTITENANCY.md §5).
+		// Псевдоним create-superadmin сохранён для совместимости с deploy.sh.
+		must(createMegaadmin(ctx, pool))
+		fmt.Println("megaadmin ready")
 	case "create-user":
 		must(createUser(ctx, pool, os.Args[2:]))
 	default:
@@ -47,9 +49,9 @@ func main() {
 	}
 }
 
-// createSuperadmin идемпотентно создаёт/обновляет суперадмина из env
+// createMegaadmin идемпотентно создаёт/обновляет платформенного MEGA_ADMIN из env
 // (BOOTSTRAP_SUPERADMIN_LOGIN / _PASSWORD). Логин уникален — при повторе обновляет пароль.
-func createSuperadmin(ctx context.Context, pool *pgxpool.Pool) error {
+func createMegaadmin(ctx context.Context, pool *pgxpool.Pool) error {
 	login := os.Getenv("BOOTSTRAP_SUPERADMIN_LOGIN")
 	password := os.Getenv("BOOTSTRAP_SUPERADMIN_PASSWORD")
 	if login == "" || password == "" {
@@ -72,7 +74,7 @@ func createSuperadmin(ctx context.Context, pool *pgxpool.Pool) error {
 	var userID string
 	err = tx.QueryRow(ctx, `
 		INSERT INTO users (login, password_hash, full_name, status, must_change_password)
-		VALUES ($1, $2, 'Суперадминистратор', 'ACTIVE', FALSE)
+		VALUES ($1, $2, 'Мегаадминистратор', 'ACTIVE', FALSE)
 		ON CONFLICT (login) DO UPDATE
 		SET password_hash = EXCLUDED.password_hash, status = 'ACTIVE',
 		    must_change_password = FALSE, updated_at = now()
@@ -83,7 +85,7 @@ func createSuperadmin(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err = tx.Exec(ctx, `
 		INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
 		SELECT $1, r.id, 'GLOBAL', '00000000-0000-0000-0000-000000000000'
-		FROM roles r WHERE r.code = 'SUPER_ADMIN'
+		FROM roles r WHERE r.code = 'MEGA_ADMIN'
 		ON CONFLICT DO NOTHING`, userID); err != nil {
 		return err
 	}

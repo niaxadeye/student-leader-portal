@@ -6,6 +6,8 @@ import {
   useChallengeFields,
   useTransitionChallenge,
 } from '@/entities/challenge/admin-queries'
+import { useAdminContest } from '@/entities/contest/queries'
+import { canEditContest } from '@/entities/contest/types'
 import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
@@ -38,6 +40,7 @@ export function ChallengeBuilderPage() {
   const { challengeId } = useParams()
   const challengeQ = useAdminChallenge(challengeId)
   const fieldsQ = useChallengeFields(challengeId)
+  const { data: contest } = useAdminContest(challengeQ.data?.contest_id)
   const transition = useTransitionChallenge(challengeId!, challengeQ.data?.contest_id ?? '')
   const toast = useToast()
   const [tab, setTab] = useState<'build' | 'preview' | 'submissions'>('build')
@@ -58,6 +61,8 @@ export function ChallengeBuilderPage() {
   const meta = challengeStatusMeta[challenge.status]
   const actions = actionsByStatus[challenge.status]
   const fields = fieldsQ.data ?? []
+  // Уровень доступа берём с родительского конкурса (испытание его не несёт).
+  const canEdit = canEditContest(contest?.access_level)
 
   function runTransition(action: 'publish' | 'close' | 'archive') {
     transition.mutate(action, {
@@ -102,20 +107,21 @@ export function ChallengeBuilderPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {actions.map((a) => {
-            const Icon = actionMeta[a].icon
-            return (
-              <Button
-                key={a}
-                size="sm"
-                variant={actionMeta[a].variant}
-                loading={transition.isPending}
-                onClick={() => runTransition(a)}
-              >
-                <Icon className="h-4 w-4" /> {actionMeta[a].label}
-              </Button>
-            )
-          })}
+          {canEdit &&
+            actions.map((a) => {
+              const Icon = actionMeta[a].icon
+              return (
+                <Button
+                  key={a}
+                  size="sm"
+                  variant={actionMeta[a].variant}
+                  loading={transition.isPending}
+                  onClick={() => runTransition(a)}
+                >
+                  <Icon className="h-4 w-4" /> {actionMeta[a].label}
+                </Button>
+              )
+            })}
         </div>
       </header>
 
@@ -142,9 +148,11 @@ export function ChallengeBuilderPage() {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[18px] font-semibold text-ink">Поля формы</h2>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Добавить поле
-            </Button>
+            {canEdit && (
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Добавить поле
+              </Button>
+            )}
           </div>
           {fieldsQ.isLoading && <Skeleton className="h-32 w-full" />}
           {fields.length === 0 && !fieldsQ.isLoading ? (
@@ -153,7 +161,7 @@ export function ChallengeBuilderPage() {
               description="Добавьте первое поле — оно сразу появится в превью."
             />
           ) : (
-            <FieldsList challengeId={challenge.id} fields={fields} onEdit={openEdit} />
+            <FieldsList challengeId={challenge.id} fields={fields} onEdit={openEdit} canEdit={canEdit} />
           )}
         </div>
       ) : tab === 'preview' ? (

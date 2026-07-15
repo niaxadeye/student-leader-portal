@@ -10,6 +10,7 @@ import type { RoleCode } from '@/entities/auth/types'
 import type { AdminUser } from '@/entities/user/types'
 
 const roleBadge: Record<RoleCode, { label: string; tone: 'brand' | 'neutral' | 'success' }> = {
+  MEGA_ADMIN: { label: 'Мегаадмин', tone: 'brand' },
   SUPER_ADMIN: { label: 'Суперадмин', tone: 'brand' },
   ADMIN: { label: 'Админ', tone: 'success' },
   CONTESTANT: { label: 'Конкурсант', tone: 'neutral' },

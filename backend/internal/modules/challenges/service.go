@@ -11,9 +11,11 @@ type Auditor interface {
 	Log(ctx context.Context, actorUserID, action, entityType, entityID string, meta map[string]any)
 }
 
-// ContestAccess проверяет админский доступ к конкурсу (реализуется contests.Repo).
+// ContestAccess проверяет уровень доступа к конкурсу (реализуется contests.Repo).
+// isMega — принципал MEGA_ADMIN (полный доступ, §3.1).
 type ContestAccess interface {
-	HasContestAccess(ctx context.Context, userID, contestID string, isSuper bool) (bool, error)
+	ContestViewable(ctx context.Context, userID, contestID string, isMega bool) (bool, error)
+	ContestEditable(ctx context.Context, userID, contestID string, isMega bool) (bool, error)
 }
 
 type Service struct {
@@ -30,11 +32,12 @@ func NewService(repo *Repo, access ContestAccess, audit Auditor) *Service {
 type Actor struct {
 	UserID  string
 	IsSuper bool
+	IsMega  bool
 }
 
-// ensureAdmin проверяет админский доступ к конкурсу испытания.
-func (s *Service) ensureAdmin(ctx context.Context, a Actor, contestID string) error {
-	ok, err := s.access.HasContestAccess(ctx, a.UserID, contestID, a.IsSuper)
+// ensureView — доступ к конкурсу хотя бы на чтение (EDIT|VIEW).
+func (s *Service) ensureView(ctx context.Context, a Actor, contestID string) error {
+	ok, err := s.access.ContestViewable(ctx, a.UserID, contestID, a.IsMega)
 	if err != nil {
 		return err
 	}
@@ -44,21 +47,45 @@ func (s *Service) ensureAdmin(ctx context.Context, a Actor, contestID string) er
 	return nil
 }
 
-// AdminList — испытания конкурса для админа (все статусы).
+// ensureEdit — доступ к конкурсу на редактирование (владелец, EDIT-админ, мега).
+func (s *Service) ensureEdit(ctx context.Context, a Actor, contestID string) error {
+	ok, err := s.access.ContestEditable(ctx, a.UserID, contestID, a.IsMega)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrForbidden
+	}
+	return nil
+}
+
+// AdminList — испытания конкурса для админа (все статусы). Доступ на чтение.
 func (s *Service) AdminList(ctx context.Context, a Actor, contestID string) ([]Challenge, error) {
-	if err := s.ensureAdmin(ctx, a, contestID); err != nil {
+	if err := s.ensureView(ctx, a, contestID); err != nil {
 		return nil, err
 	}
 	return s.repo.List(ctx, contestID, false)
 }
 
-// AdminGet — испытание для админа (с проверкой доступа к его конкурсу).
+// AdminGet — испытание для админа (проверка доступа на чтение к его конкурсу).
 func (s *Service) AdminGet(ctx context.Context, a Actor, challengeID string) (*Challenge, error) {
 	c, err := s.repo.ByID(ctx, challengeID)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.ensureAdmin(ctx, a, c.ContestID); err != nil {
+	if err := s.ensureView(ctx, a, c.ContestID); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// adminGetForEdit — как AdminGet, но требует доступ на редактирование (для мутаций).
+func (s *Service) adminGetForEdit(ctx context.Context, a Actor, challengeID string) (*Challenge, error) {
+	c, err := s.repo.ByID(ctx, challengeID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureEdit(ctx, a, c.ContestID); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -78,7 +105,7 @@ type CreateInput struct {
 
 // Create создаёт испытание в статусе DRAFT (нужен доступ к конкурсу).
 func (s *Service) Create(ctx context.Context, a Actor, contestID string, in CreateInput) (*Challenge, error) {
-	if err := s.ensureAdmin(ctx, a, contestID); err != nil {
+	if err := s.ensureEdit(ctx, a, contestID); err != nil {
 		return nil, err
 	}
 	title := strings.TrimSpace(in.Title)
@@ -107,7 +134,7 @@ func (s *Service) Create(ctx context.Context, a Actor, contestID string, in Crea
 
 // Update редактирует мету испытания и, если оно опубликовано, версионирует схему.
 func (s *Service) Update(ctx context.Context, a Actor, challengeID string, in CreateInput) (*Challenge, error) {
-	if _, err := s.AdminGet(ctx, a, challengeID); err != nil {
+	if _, err := s.adminGetForEdit(ctx, a, challengeID); err != nil {
 		return nil, err
 	}
 	title := strings.TrimSpace(in.Title)

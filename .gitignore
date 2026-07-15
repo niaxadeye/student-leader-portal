@@ -2,6 +2,9 @@
 .env.*
 !.env.example
 
+# Локальные оверрайды docker-compose (порты и т.п.)
+docker-compose.override.yml
+
 # Go
 /backend/bin/
 *.test

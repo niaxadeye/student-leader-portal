@@ -24,7 +24,8 @@ type ImportResult struct {
 // ImportContestants парсит CSV (login,full_name,organization; заголовок опционален)
 // и добавляет конкурсантов построчно. Скелет Этапа 2: синхронно, без файлов/фоновых задач.
 func (s *Service) ImportContestants(ctx context.Context, a Actor, contestID, csv string) (*ImportResult, error) {
-	if err := s.ensureAccess(ctx, a, contestID); err != nil {
+	// Импорт = массовое создание участников → только владелец или мега (§3.6).
+	if err := s.ensureOwnerOrMega(ctx, a, contestID); err != nil {
 		return nil, err
 	}
 	res := &ImportResult{Rows: []ImportRow{}}
@@ -78,7 +79,7 @@ func splitCSV(line string) []string {
 
 // ExportContestants формирует CSV активных конкурсантов конкурса.
 func (s *Service) ExportContestants(ctx context.Context, a Actor, contestID string) (string, error) {
-	if err := s.ensureAccess(ctx, a, contestID); err != nil {
+	if err := s.ensureView(ctx, a, contestID); err != nil {
 		return "", err
 	}
 	list, err := s.repo.Participants(ctx, contestID)

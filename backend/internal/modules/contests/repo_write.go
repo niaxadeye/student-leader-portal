@@ -28,9 +28,10 @@ func (r *Repo) SetImageKey(ctx context.Context, id string, key *string, actorID 
 // Create вставляет конкурс в статусе DRAFT, возвращает id.
 func (r *Repo) Create(ctx context.Context, c *Contest, actorID string) (string, error) {
 	var id string
+	// owner_user_id = создатель: владелец получает неявный EDIT (§2.2, §3.5).
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO contests (name, slug, description, status, start_at, end_at, timezone, created_by, updated_by)
-		VALUES ($1,$2,$3,'DRAFT',$4,$5,$6,$7,$7)
+		INSERT INTO contests (name, slug, description, status, start_at, end_at, timezone, created_by, updated_by, owner_user_id)
+		VALUES ($1,$2,$3,'DRAFT',$4,$5,$6,$7,$7,$7)
 		RETURNING id`,
 		c.Name, c.Slug, c.Description, c.StartAt, c.EndAt, c.Timezone, actorID).Scan(&id)
 	if isUniqueViolation(err) {

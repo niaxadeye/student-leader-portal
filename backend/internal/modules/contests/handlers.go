@@ -35,7 +35,7 @@ func actorOf(r *http.Request) Actor {
 	if p == nil {
 		return Actor{}
 	}
-	return Actor{UserID: p.UserID, IsSuper: p.Role == "SUPER_ADMIN"}
+	return Actor{UserID: p.UserID, IsSuper: p.Role == "SUPER_ADMIN", IsMega: p.Role == "MEGA_ADMIN"}
 }
 
 // contestJSON сериализует конкурс. image_url — presigned-ссылка (или null),
@@ -52,9 +52,18 @@ func (h *Handler) contestJSON(ctx context.Context, c *Contest) map[string]any {
 		"status": c.Status, "start_at": c.StartAt, "end_at": c.EndAt,
 		"timezone": c.Timezone, "participants_count": c.ParticipantsCount,
 		"challenges_count": c.ChallengesCount,
+		"access_level":     emptyToNil(c.AccessLevel),
 		"image_url":  imageURL,
 		"created_at": c.CreatedAt, "updated_at": c.UpdatedAt, "archived_at": c.ArchivedAt,
 	}
+}
+
+// emptyToNil отдаёт nil вместо пустой строки (чтобы в JSON был null, а не "").
+func emptyToNil(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {

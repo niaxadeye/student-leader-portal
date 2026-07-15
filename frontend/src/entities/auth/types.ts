@@ -1,4 +1,4 @@
-export type RoleCode = 'SUPER_ADMIN' | 'ADMIN' | 'CONTESTANT'
+export type RoleCode = 'MEGA_ADMIN' | 'SUPER_ADMIN' | 'ADMIN' | 'CONTESTANT'
 
 /** Ответ /api/v1/auth/me (SITE.md §20). */
 export interface CurrentUser {

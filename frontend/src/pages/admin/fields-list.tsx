@@ -10,10 +10,12 @@ interface Props {
   challengeId: string
   fields: AdminField[]
   onEdit: (field: AdminField) => void
+  /** VIEW-режим: скрывает перестановку/редактирование/удаление. */
+  canEdit: boolean
 }
 
 /** Список полей с перестановкой (↑↓), редактированием и удалением. */
-export function FieldsList({ challengeId, fields, onEdit }: Props) {
+export function FieldsList({ challengeId, fields, onEdit, canEdit }: Props) {
   const reorder = useReorderFields(challengeId)
   const del = useDeleteField(challengeId)
   const toast = useToast()
@@ -50,20 +52,22 @@ export function FieldsList({ challengeId, fields, onEdit }: Props) {
               </div>
               <p className="mt-0.5 font-mono text-[12px] text-muted">{f.key}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-0.5">
-              <IconBtn label="Выше" disabled={i === 0} onClick={() => move(i, -1)}>
-                <ChevronUp className="h-4 w-4" />
-              </IconBtn>
-              <IconBtn label="Ниже" disabled={i === fields.length - 1} onClick={() => move(i, 1)}>
-                <ChevronDown className="h-4 w-4" />
-              </IconBtn>
-              <IconBtn label="Редактировать" onClick={() => onEdit(f)}>
-                <Pencil className="h-4 w-4" />
-              </IconBtn>
-              <IconBtn label="Удалить" danger onClick={() => remove(f)}>
-                <Trash2 className="h-4 w-4" />
-              </IconBtn>
-            </div>
+            {canEdit && (
+              <div className="flex shrink-0 items-center gap-0.5">
+                <IconBtn label="Выше" disabled={i === 0} onClick={() => move(i, -1)}>
+                  <ChevronUp className="h-4 w-4" />
+                </IconBtn>
+                <IconBtn label="Ниже" disabled={i === fields.length - 1} onClick={() => move(i, 1)}>
+                  <ChevronDown className="h-4 w-4" />
+                </IconBtn>
+                <IconBtn label="Редактировать" onClick={() => onEdit(f)}>
+                  <Pencil className="h-4 w-4" />
+                </IconBtn>
+                <IconBtn label="Удалить" danger onClick={() => remove(f)}>
+                  <Trash2 className="h-4 w-4" />
+                </IconBtn>
+              </div>
+            )}
           </CardBody>
         </Card>
       ))}

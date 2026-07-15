@@ -11,7 +11,9 @@ import { useToast } from '@/shared/ui/toast'
 import { AddContestantDialog } from './add-contestant-dialog'
 import type { Contestant } from '@/entities/contestant/types'
 
-export function ContestantsTable({ contestId }: { contestId: string }) {
+// canManage — управление составом участников доступно только владельцу/меге (§3.6).
+// Экспорт read-only и доступен всем с доступом к конкурсу.
+export function ContestantsTable({ contestId, canManage }: { contestId: string; canManage: boolean }) {
   const { data, isLoading, isError, refetch } = useContestants(contestId)
   const [addOpen, setAddOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -53,18 +55,24 @@ export function ContestantsTable({ contestId }: { contestId: string }) {
 
   const Toolbar = (
     <div className="flex flex-wrap gap-2">
-      <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImportFile} />
-      <Button size="sm" variant="outline" loading={importer.isPending} onClick={() => fileRef.current?.click()}>
-        <Upload className="h-4 w-4" /> Импорт CSV
-      </Button>
+      {canManage && (
+        <>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImportFile} />
+          <Button size="sm" variant="outline" loading={importer.isPending} onClick={() => fileRef.current?.click()}>
+            <Upload className="h-4 w-4" /> Импорт CSV
+          </Button>
+        </>
+      )}
       {!!data?.length && (
         <Button size="sm" variant="outline" onClick={onExport}>
           <Download className="h-4 w-4" /> Экспорт
         </Button>
       )}
-      <Button size="sm" onClick={() => setAddOpen(true)}>
-        <UserPlus className="h-4 w-4" /> Добавить
-      </Button>
+      {canManage && (
+        <Button size="sm" onClick={() => setAddOpen(true)}>
+          <UserPlus className="h-4 w-4" /> Добавить
+        </Button>
+      )}
     </div>
   )
 
@@ -74,8 +82,12 @@ export function ContestantsTable({ contestId }: { contestId: string }) {
         <EmptyState
           icon={UserPlus}
           title="Конкурсантов пока нет"
-          description="Добавьте участников вручную или импортом из CSV."
-          action={Toolbar}
+          description={
+            canManage
+              ? 'Добавьте участников вручную или импортом из CSV.'
+              : 'Список участников пуст.'
+          }
+          action={canManage ? Toolbar : undefined}
         />
       ) : (
         <Card className="overflow-hidden">
@@ -88,12 +100,12 @@ export function ContestantsTable({ contestId }: { contestId: string }) {
               <tr className="border-b border-border">
                 <th className="px-4 py-2 font-medium">Конкурсант</th>
                 <th className="px-4 py-2 font-medium">Статус</th>
-                <th className="px-4 py-2 text-right font-medium">Действия</th>
+                {canManage && <th className="px-4 py-2 text-right font-medium">Действия</th>}
               </tr>
             </thead>
             <tbody>
               {data.map((c) => (
-                <ContestantRow key={c.user_id} c={c} contestId={contestId} />
+                <ContestantRow key={c.user_id} c={c} contestId={contestId} canManage={canManage} />
               ))}
             </tbody>
           </table>
@@ -104,7 +116,7 @@ export function ContestantsTable({ contestId }: { contestId: string }) {
   )
 }
 
-function ContestantRow({ c, contestId }: { c: Contestant; contestId: string }) {
+function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: string; canManage: boolean }) {
   const toast = useToast()
   const reset = useResetPassword()
   const status = useUserStatusMutation()
@@ -154,19 +166,21 @@ function ContestantRow({ c, contestId }: { c: Contestant; contestId: string }) {
       <td className="px-4 py-3">
         {blocked ? <Badge tone="danger">Заблокирован</Badge> : <Badge tone="success">Активен</Badge>}
       </td>
-      <td className="px-4 py-3">
-        <div className="flex justify-end gap-1">
-          <IconBtn title="Сбросить пароль" onClick={onReset} disabled={reset.isPending}>
-            <KeyRound className="h-4 w-4" />
-          </IconBtn>
-          <IconBtn title={blocked ? 'Разблокировать' : 'Заблокировать'} onClick={onToggleBlock} disabled={status.isPending} danger>
-            {blocked ? <RotateCcw className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-          </IconBtn>
-          <IconBtn title="Убрать из конкурса" onClick={onRemove} disabled={remove.isPending} danger>
-            <Trash2 className="h-4 w-4" />
-          </IconBtn>
-        </div>
-      </td>
+      {canManage && (
+        <td className="px-4 py-3">
+          <div className="flex justify-end gap-1">
+            <IconBtn title="Сбросить пароль" onClick={onReset} disabled={reset.isPending}>
+              <KeyRound className="h-4 w-4" />
+            </IconBtn>
+            <IconBtn title={blocked ? 'Разблокировать' : 'Заблокировать'} onClick={onToggleBlock} disabled={status.isPending} danger>
+              {blocked ? <RotateCcw className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+            </IconBtn>
+            <IconBtn title="Убрать из конкурса" onClick={onRemove} disabled={remove.isPending} danger>
+              <Trash2 className="h-4 w-4" />
+            </IconBtn>
+          </div>
+        </td>
+      )}
     </tr>
   )
 }

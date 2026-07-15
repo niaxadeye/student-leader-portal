@@ -15,6 +15,7 @@ var (
 	ErrUserNotFound = errors.New("user not found")
 	ErrRoleNotFound = errors.New("role not found")
 	ErrValidation   = errors.New("validation error")
+	ErrForbidden    = errors.New("forbidden")
 )
 
 // Auditor пишет события аудита.

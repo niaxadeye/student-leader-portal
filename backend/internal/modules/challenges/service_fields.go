@@ -43,7 +43,7 @@ func (s *Service) ListFields(ctx context.Context, a Actor, challengeID string) (
 
 // AddField добавляет поле; на опубликованном испытании версионирует схему.
 func (s *Service) AddField(ctx context.Context, a Actor, challengeID string, in FieldInput) (*Field, error) {
-	c, err := s.AdminGet(ctx, a, challengeID)
+	c, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *Service) AddField(ctx context.Context, a Actor, challengeID string, in 
 
 // UpdateField меняет поле; на опубликованном испытании версионирует схему.
 func (s *Service) UpdateField(ctx context.Context, a Actor, challengeID, fieldID string, in FieldInput) error {
-	c, err := s.AdminGet(ctx, a, challengeID)
+	c, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (s *Service) UpdateField(ctx context.Context, a Actor, challengeID, fieldID
 
 // DeleteField — soft delete; на опубликованном испытании версионирует схему.
 func (s *Service) DeleteField(ctx context.Context, a Actor, challengeID, fieldID string) error {
-	c, err := s.AdminGet(ctx, a, challengeID)
+	c, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (s *Service) DeleteField(ctx context.Context, a Actor, challengeID, fieldID
 
 // ReorderFields переставляет поля по списку id.
 func (s *Service) ReorderFields(ctx context.Context, a Actor, challengeID string, orderedIDs []string) error {
-	c, err := s.AdminGet(ctx, a, challengeID)
+	c, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return err
 	}

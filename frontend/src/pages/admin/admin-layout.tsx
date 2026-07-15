@@ -14,8 +14,9 @@ function initials(fullName: string): string {
     .join('')
 }
 
-/** Наивысшая роль для бейджа: SUPER_ADMIN > ADMIN > CONTESTANT. */
+/** Наивысшая роль для бейджа: MEGA_ADMIN > SUPER_ADMIN > ADMIN > CONTESTANT. */
 function topRole(roles: RoleCode[]): RoleCode {
+  if (roles.includes('MEGA_ADMIN')) return 'MEGA_ADMIN'
   if (roles.includes('SUPER_ADMIN')) return 'SUPER_ADMIN'
   if (roles.includes('ADMIN')) return 'ADMIN'
   return 'CONTESTANT'

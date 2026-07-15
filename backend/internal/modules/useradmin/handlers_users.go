@@ -14,7 +14,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	offset, _ := strconv.Atoi(q.Get("offset"))
-	res, err := h.svc.List(r.Context(), ListFilter{
+	res, err := h.svc.List(r.Context(), actorOf(r), ListFilter{
 		Search: q.Get("search"), Role: q.Get("role"), Status: q.Get("status"),
 		Limit: limit, Offset: offset,
 	})
@@ -44,6 +44,8 @@ type createUserReq struct {
 	Role         string `json:"role"`
 	ScopeType    string `json:"scope_type"`
 	ScopeID      string `json:"scope_id"`
+	AccessLevel  string `json:"access_level"`
+	OrgName      string `json:"org_name"`
 }
 
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
@@ -52,9 +54,10 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Некорректный запрос", nil)
 		return
 	}
-	res, err := h.svc.Create(r.Context(), actorID(r), CreateInput{
+	res, err := h.svc.Create(r.Context(), actorOf(r), CreateInput{
 		Login: req.Login, FullName: req.FullName, Email: req.Email, Organization: req.Organization,
-		Role: req.Role, ScopeType: req.ScopeType, ScopeID: req.ScopeID,
+		Role: req.Role, ScopeType: req.ScopeType, ScopeID: req.ScopeID, AccessLevel: req.AccessLevel,
+		OrgName: req.OrgName,
 	})
 	if err != nil {
 		writeErr(w, r, err)

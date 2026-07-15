@@ -12,5 +12,9 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Локальная разработка: проксируем API на нативный Go-бэкенд (в проде это делает nginx).
+    proxy: {
+      '/api': 'http://127.0.0.1:8080',
+    },
   },
 })

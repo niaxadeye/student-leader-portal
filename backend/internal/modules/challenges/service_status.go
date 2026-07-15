@@ -16,7 +16,7 @@ var allowedTransitions = map[string]map[string]bool{
 
 // Transition меняет статус испытания. При публикации фиксирует снапшот схемы.
 func (s *Service) Transition(ctx context.Context, a Actor, challengeID, target string) (*Challenge, error) {
-	c, err := s.AdminGet(ctx, a, challengeID)
+	c, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,8 @@ func (s *Service) snapshot(ctx context.Context, challengeID string, version int,
 
 // Duplicate копирует испытание (мета + активные поля) в новый DRAFT того же конкурса.
 func (s *Service) Duplicate(ctx context.Context, a Actor, challengeID string) (*Challenge, error) {
-	src, err := s.AdminGet(ctx, a, challengeID)
+	// Дублирование создаёт новое испытание в конкурсе → требует EDIT.
+	src, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return nil, err
 	}

@@ -20,8 +20,10 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 				httpserver.WriteError(w, r, http.StatusUnauthorized, "AUTH_SESSION_EXPIRED", "Требуется авторизация", nil)
 				return
 			}
-			// SUPER_ADMIN имеет полный доступ (SITE.md §5.1).
-			if p.Role == "SUPER_ADMIN" || allowed[p.Role] {
+			// MEGA_ADMIN проходит везде (docs/RBAC_MULTITENANCY.md §3.1). SUPER_ADMIN
+			// больше НЕ имеет универсального прохода — его область ограничена фильтром
+			// владения в репозиториях; на роль-гейт он попадает только через allowed[].
+			if p.Role == "MEGA_ADMIN" || allowed[p.Role] {
 				next.ServeHTTP(w, r)
 				return
 			}

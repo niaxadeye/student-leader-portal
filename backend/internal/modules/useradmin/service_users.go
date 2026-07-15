@@ -20,8 +20,9 @@ type ListResult struct {
 	Offset int
 }
 
-// List отдаёт страницу реестра с нормализованными лимитами.
-func (s *Service) List(ctx context.Context, f ListFilter) (*ListResult, error) {
+// List отдаёт страницу реестра с нормализованными лимитами. Реестр изолирован по
+// владению (§3.3): мега видит всех, SUPER_ADMIN — только созданных им (created_by).
+func (s *Service) List(ctx context.Context, a Actor, f ListFilter) (*ListResult, error) {
 	if f.Limit <= 0 {
 		f.Limit = defaultLimit
 	}
@@ -34,6 +35,8 @@ func (s *Service) List(ctx context.Context, f ListFilter) (*ListResult, error) {
 	f.Search = strings.TrimSpace(f.Search)
 	f.Role = strings.ToUpper(strings.TrimSpace(f.Role))
 	f.Status = strings.ToUpper(strings.TrimSpace(f.Status))
+	f.AllOwners = a.IsMega()
+	f.OwnerID = a.UserID
 	users, total, err := s.repo.List(ctx, f)
 	if err != nil {
 		return nil, err
@@ -58,6 +61,8 @@ type CreateInput struct {
 	Role         string
 	ScopeType    string
 	ScopeID      string
+	AccessLevel  string // EDIT|VIEW для роли ADMIN на конкурс
+	OrgName      string // организация-арендатор (§2.3); задаёт мега для SUPER_ADMIN, иначе наследуется
 }
 
 // CreateResult — созданный пользователь и его временный пароль (показать один раз).
@@ -67,8 +72,22 @@ type CreateResult struct {
 	TempPassword string
 }
 
+// canCreateRole проверяет, вправе ли актор создать пользователя с данной ролью (§3.3):
+// MEGA_ADMIN — любую; SUPER_ADMIN — только ADMIN/CONTESTANT; прочие — никакую.
+func canCreateRole(a Actor, role string) bool {
+	switch {
+	case a.IsMega():
+		return true
+	case a.IsSuper():
+		return role == "" || role == "ADMIN" || role == "CONTESTANT"
+	default:
+		return false
+	}
+}
+
 // Create создаёт пользователя с временным паролем и опциональной ролью.
-func (s *Service) Create(ctx context.Context, actorID string, in CreateInput) (*CreateResult, error) {
+// Проставляет created_by = актор; для роли ADMIN наследует org_name создателя (§3.3).
+func (s *Service) Create(ctx context.Context, a Actor, in CreateInput) (*CreateResult, error) {
 	login := strings.TrimSpace(in.Login)
 	name := strings.TrimSpace(in.FullName)
 	if login == "" || name == "" {
@@ -76,11 +95,15 @@ func (s *Service) Create(ctx context.Context, actorID string, in CreateInput) (*
 	}
 	role, scopeType, scopeID := "", "", ""
 	if strings.TrimSpace(in.Role) != "" {
-		norm, ok := normScope(AssignRoleInput{Role: in.Role, ScopeType: in.ScopeType, ScopeID: in.ScopeID})
+		norm, ok := normScope(AssignRoleInput{Role: in.Role, ScopeType: in.ScopeType, ScopeID: in.ScopeID, AccessLevel: in.AccessLevel})
 		if !ok {
 			return nil, ErrValidation
 		}
 		role, scopeType, scopeID = norm.Role, norm.ScopeType, norm.ScopeID
+	}
+	// Guard: кто кого может создавать (§3.3).
+	if !canCreateRole(a, role) {
+		return nil, ErrForbidden
 	}
 	temp, err := security.GenerateTempPassword()
 	if err != nil {
@@ -90,14 +113,20 @@ func (s *Service) Create(ctx context.Context, actorID string, in CreateInput) (*
 	if err != nil {
 		return nil, err
 	}
+	accessLevel := ""
+	if strings.TrimSpace(in.Role) != "" {
+		norm, _ := normScope(AssignRoleInput{Role: in.Role, ScopeType: in.ScopeType, ScopeID: in.ScopeID, AccessLevel: in.AccessLevel})
+		accessLevel = norm.AccessLevel
+	}
 	id, err := s.repo.Create(ctx, NewUser{
 		Login: login, FullName: name, PasswordHash: hash,
 		Email: optStr(in.Email), Organization: optStr(in.Organization),
-	}, role, scopeType, scopeID)
+		CreatedBy: a.UserID, OrgName: optStr(in.OrgName),
+	}, role, scopeType, scopeID, accessLevel)
 	if err != nil {
 		return nil, err
 	}
-	s.audit.Log(ctx, actorID, "USER_CREATED", "user", id, map[string]any{"login": login, "role": role})
+	s.audit.Log(ctx, a.UserID, "USER_CREATED", "user", id, map[string]any{"login": login, "role": role})
 	return &CreateResult{UserID: id, Login: login, TempPassword: temp}, nil
 }
 

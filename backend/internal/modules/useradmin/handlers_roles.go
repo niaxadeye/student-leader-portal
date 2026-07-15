@@ -10,9 +10,10 @@ import (
 )
 
 type roleReq struct {
-	Role      string `json:"role"`
-	ScopeType string `json:"scope_type"`
-	ScopeID   string `json:"scope_id"`
+	Role        string `json:"role"`
+	ScopeType   string `json:"scope_type"`
+	ScopeID     string `json:"scope_id"`
+	AccessLevel string `json:"access_level"`
 }
 
 func (h *Handler) AssignRole(w http.ResponseWriter, r *http.Request) {
@@ -21,8 +22,8 @@ func (h *Handler) AssignRole(w http.ResponseWriter, r *http.Request) {
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Некорректный запрос", nil)
 		return
 	}
-	err := h.svc.AssignRole(r.Context(), actorID(r), chi.URLParam(r, "userId"),
-		AssignRoleInput{Role: req.Role, ScopeType: req.ScopeType, ScopeID: req.ScopeID})
+	err := h.svc.AssignRole(r.Context(), actorOf(r), chi.URLParam(r, "userId"),
+		AssignRoleInput{Role: req.Role, ScopeType: req.ScopeType, ScopeID: req.ScopeID, AccessLevel: req.AccessLevel})
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -33,7 +34,7 @@ func (h *Handler) AssignRole(w http.ResponseWriter, r *http.Request) {
 // RemoveRole принимает role/scope из query (?role=ADMIN&scope_type=CONTEST&scope_id=...).
 func (h *Handler) RemoveRole(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	err := h.svc.RemoveRole(r.Context(), actorID(r), chi.URLParam(r, "userId"),
+	err := h.svc.RemoveRole(r.Context(), actorOf(r), chi.URLParam(r, "userId"),
 		AssignRoleInput{Role: q.Get("role"), ScopeType: q.Get("scope_type"), ScopeID: q.Get("scope_id")})
 	if err != nil {
 		writeErr(w, r, err)

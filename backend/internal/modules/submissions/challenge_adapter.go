@@ -59,6 +59,6 @@ func (a *challengeAdapter) IsParticipant(ctx context.Context, userID, contestID 
 	return a.ch.IsParticipant(ctx, userID, contestID)
 }
 
-func (a *challengeAdapter) HasContestAccess(ctx context.Context, userID, contestID string, isSuper bool) (bool, error) {
-	return a.contests.HasContestAccess(ctx, userID, contestID, isSuper)
+func (a *challengeAdapter) ContestViewable(ctx context.Context, userID, contestID string, isMega bool) (bool, error) {
+	return a.contests.ContestViewable(ctx, userID, contestID, isMega)
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/eazytech/student-leader-cabinet/internal/platform/security"
 )
 
-var validRoles = map[string]bool{"SUPER_ADMIN": true, "ADMIN": true, "CONTESTANT": true}
+var validRoles = map[string]bool{"MEGA_ADMIN": true, "SUPER_ADMIN": true, "ADMIN": true, "CONTESTANT": true}
 
 // createUser: admin create-user <login> <password> <role> [full_name] [--must-change]
 // Идемпотентна по login (повторный запуск обновляет пароль/роль). Роль — GLOBAL scope.
@@ -33,7 +33,7 @@ func createUser(ctx context.Context, pool *pgxpool.Pool, args []string) error {
 		fullName = pos[3]
 	}
 	if !validRoles[role] {
-		return fmt.Errorf("role must be one of SUPER_ADMIN|ADMIN|CONTESTANT")
+		return fmt.Errorf("role must be one of MEGA_ADMIN|SUPER_ADMIN|ADMIN|CONTESTANT")
 	}
 	if len(password) < 10 {
 		return fmt.Errorf("password must be at least 10 characters")

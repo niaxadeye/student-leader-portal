@@ -49,6 +49,8 @@ type Contest struct {
 	// Агрегаты (заполняются в списках).
 	ParticipantsCount int
 	ChallengesCount   int
+	// AccessLevel — уровень доступа текущего актора: OWNER|EDIT|VIEW (для UI, §4).
+	AccessLevel string
 }
 
 // Participant — строка участника с данными пользователя для отображения.

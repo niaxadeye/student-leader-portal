@@ -25,7 +25,7 @@ func actorOf(r *http.Request) Actor {
 	if p == nil {
 		return Actor{}
 	}
-	return Actor{UserID: p.UserID, IsSuper: p.Role == "SUPER_ADMIN"}
+	return Actor{UserID: p.UserID, IsSuper: p.Role == "SUPER_ADMIN", IsMega: p.Role == "MEGA_ADMIN"}
 }
 
 func writeErr(w http.ResponseWriter, r *http.Request, err error) {

@@ -84,8 +84,8 @@ func (s *Service) issueSession(ctx context.Context, userID, role, ua, ip string)
 
 func (s *Service) primaryRole(ctx context.Context, userID string) string {
 	roles, _ := s.repo.RolesByUser(ctx, userID)
-	// Приоритет: SUPER_ADMIN > ADMIN > CONTESTANT.
-	rank := map[string]int{"SUPER_ADMIN": 3, "ADMIN": 2, "CONTESTANT": 1}
+	// Приоритет: MEGA_ADMIN > SUPER_ADMIN > ADMIN > CONTESTANT (docs/RBAC_MULTITENANCY.md §3.1).
+	rank := map[string]int{"MEGA_ADMIN": 4, "SUPER_ADMIN": 3, "ADMIN": 2, "CONTESTANT": 1}
 	best, bestRank := "CONTESTANT", 0
 	for _, r := range roles {
 		if rank[r.Code] > bestRank {

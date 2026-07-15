@@ -35,6 +35,7 @@ const (
 type Actor struct {
 	UserID  string
 	IsSuper bool
+	IsMega  bool
 }
 
 // Submission — работа конкурсанта по испытанию.
@@ -115,7 +116,8 @@ type ChallengeSource interface {
 	ChallengeInfo(ctx context.Context, challengeID string) (*ChallengeInfo, error)
 	SchemaFields(ctx context.Context, challengeID string) ([]FieldInfo, error)
 	IsParticipant(ctx context.Context, userID, contestID string) (bool, error)
-	HasContestAccess(ctx context.Context, userID, contestID string, isSuper bool) (bool, error)
+	// ContestViewable — доступ к конкурсу хотя бы на чтение (EDIT|VIEW); isMega — MEGA_ADMIN.
+	ContestViewable(ctx context.Context, userID, contestID string, isMega bool) (bool, error)
 }
 
 // Auditor пишет события аудита.

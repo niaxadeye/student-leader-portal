@@ -9,7 +9,7 @@ import (
 
 // Participants возвращает участников конкурса (нужен доступ к конкурсу).
 func (s *Service) Participants(ctx context.Context, a Actor, contestID string) ([]Participant, error) {
-	if err := s.ensureAccess(ctx, a, contestID); err != nil {
+	if err := s.ensureView(ctx, a, contestID); err != nil {
 		return nil, err
 	}
 	return s.repo.Participants(ctx, contestID)
@@ -31,7 +31,8 @@ type AddContestantResult struct {
 
 // AddContestant создаёт конкурсанта с временным паролем и привязывает к конкурсу.
 func (s *Service) AddContestant(ctx context.Context, a Actor, contestID string, in AddContestantInput) (*AddContestantResult, error) {
-	if err := s.ensureAccess(ctx, a, contestID); err != nil {
+	// Управление составом участников — только владелец или мега (§3.6): EDIT-админ получает 403.
+	if err := s.ensureOwnerOrMega(ctx, a, contestID); err != nil {
 		return nil, err
 	}
 	login := strings.TrimSpace(in.Login)
@@ -60,7 +61,7 @@ func (s *Service) AddContestant(ctx context.Context, a Actor, contestID string, 
 
 // RemoveContestant отвязывает участника от конкурса (soft).
 func (s *Service) RemoveContestant(ctx context.Context, a Actor, contestID, userID string) error {
-	if err := s.ensureAccess(ctx, a, contestID); err != nil {
+	if err := s.ensureOwnerOrMega(ctx, a, contestID); err != nil {
 		return err
 	}
 	if err := s.repo.RemoveParticipant(ctx, contestID, userID); err != nil {

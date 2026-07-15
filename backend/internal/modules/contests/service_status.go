@@ -7,7 +7,7 @@ import (
 
 // Update редактирует конкурс (нужен доступ к конкурсу).
 func (s *Service) Update(ctx context.Context, a Actor, id string, in CreateInput) (*Contest, error) {
-	if err := s.ensureAccess(ctx, a, id); err != nil {
+	if err := s.ensureEdit(ctx, a, id); err != nil {
 		return nil, err
 	}
 	name := strings.TrimSpace(in.Name)
@@ -36,7 +36,7 @@ var allowedTransitions = map[string]map[string]bool{
 
 // Transition меняет статус конкурса с проверкой допустимости перехода.
 func (s *Service) Transition(ctx context.Context, a Actor, id, target string) (*Contest, error) {
-	if err := s.ensureAccess(ctx, a, id); err != nil {
+	if err := s.ensureEdit(ctx, a, id); err != nil {
 		return nil, err
 	}
 	cur, err := s.repo.ByID(ctx, id)

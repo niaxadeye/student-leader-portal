@@ -2,6 +2,7 @@ import { apiRequest, apiRequestFull } from '@/shared/api/client'
 import type { RoleCode } from '@/entities/auth/types'
 import type {
   AdminUser,
+  AssignRoleInput,
   CreateUserInput,
   CreateUserResult,
   UsersFilter,
@@ -41,10 +42,7 @@ export function updateUser(
   return apiRequest<AdminUser>(`/admin/users/${id}`, { method: 'PATCH', body: input })
 }
 
-export function assignRole(
-  userId: string,
-  body: { role: RoleCode; scope_type: 'GLOBAL' | 'CONTEST'; scope_id?: string },
-): Promise<void> {
+export function assignRole(userId: string, body: AssignRoleInput): Promise<void> {
   return apiRequest(`/admin/users/${userId}/roles`, { method: 'POST', body })
 }
 
