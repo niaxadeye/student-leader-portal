@@ -47,12 +47,14 @@ if [ package-lock.json -nt node_modules/.package-lock.json ] 2>/dev/null || [ ! 
 fi
 npm run build
 
-# 5. Рестарт сервисов
+# 5. Рестарт сервисов (pm2, см. ecosystem.config.js)
 log "рестарт сервисов"
-sudo systemctl restart eazytech-api eazytech-worker
+cd "$ROOT"
+pm2 startOrRestart ecosystem.config.js
+pm2 save
 sleep 2
-systemctl is-active --quiet eazytech-api    || fail "eazytech-api не поднялся (journalctl -u eazytech-api)"
-systemctl is-active --quiet eazytech-worker || fail "eazytech-worker не поднялся (journalctl -u eazytech-worker)"
+pm2 describe eazytech-api    | grep -q 'status.*online' || fail "eazytech-api не поднялся (pm2 logs eazytech-api)"
+pm2 describe eazytech-worker | grep -q 'status.*online' || fail "eazytech-worker не поднялся (pm2 logs eazytech-worker)"
 
 # 6. Health-check (роуты вне версионированного префикса, см. router.go)
 log "health-check"
