@@ -1,0 +1,22 @@
+[Unit]
+Description=Student Leader Cabinet API
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/student-leader-portal/backend
+EnvironmentFile=/var/www/student-leader-portal/.env
+ExecStart=/var/www/student-leader-portal/backend/bin/api
+Restart=on-failure
+RestartSec=5
+# Безопасность процесса
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

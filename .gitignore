@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+
+# Go
+/backend/bin/
+*.test
+*.out
+
+# Node (frontend has its own .gitignore too)
+node_modules/
+dist/
+
+.DS_Store
+*.log

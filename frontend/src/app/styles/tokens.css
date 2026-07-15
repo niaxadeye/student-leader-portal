@@ -1,0 +1,23 @@
+/* Design tokens — источник истины DESIGN.md (Kraken-inspired).
+   Цвета в HSL для совместимости с Tailwind alpha-модификаторами. */
+:root {
+  /* Brand — Kraken Purple #7132f5 / #5741d8 / #5b1ecf */
+  --brand: 258 90% 58%;
+  --brand-dark: 248 63% 55%;
+  --brand-deep: 262 76% 46%;
+
+  /* Text / neutrals */
+  --ink: 228 12% 8%; /* #101114 */
+  --muted: 232 10% 46%; /* #686b82 */
+  --muted-2: 230 11% 62%; /* #9497a9 */
+  --border: 240 11% 89%; /* #dedee5 */
+
+  /* Surfaces */
+  --surface: 0 0% 100%; /* #ffffff */
+  --surface-2: 240 20% 98%;
+
+  /* Semantic */
+  --success: 152 76% 35%; /* #149e61 */
+  --success-dark: 154 96% 21%; /* #026b3f */
+  --danger: 358 68% 52%;
+}

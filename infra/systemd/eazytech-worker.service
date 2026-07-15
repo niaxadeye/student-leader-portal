@@ -1,0 +1,20 @@
+[Unit]
+Description=Student Leader Cabinet Worker
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/student-leader-portal/backend
+EnvironmentFile=/var/www/student-leader-portal/.env
+ExecStart=/var/www/student-leader-portal/backend/bin/worker
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

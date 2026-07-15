@@ -1,0 +1,108 @@
+openapi: 3.0.3
+info:
+  title: Student Leader Cabinet API
+  version: 0.1.0
+  description: >
+    REST API личного кабинета студенческого лидера. Все ответы обёрнуты в envelope
+    {data, meta, request_id} либо {error, request_id} (SITE.md §20, §50).
+servers:
+  - url: https://eazytech.ru/api/v1
+    description: production
+  - url: http://localhost:8080/api/v1
+    description: local
+
+paths:
+  /config:
+    get:
+      summary: Публичная конфигурация и feature flags
+      operationId: getConfig
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AppConfig'
+
+components:
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {}
+        meta:
+          type: object
+          nullable: true
+        request_id:
+          type: string
+          format: uuid
+    ErrorEnvelope:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - AUTH_INVALID_CREDENTIALS
+                - AUTH_SESSION_EXPIRED
+                - AUTH_REFRESH_REUSED
+                - AUTH_ACCOUNT_BLOCKED
+                - AUTH_PASSWORD_CHANGE_REQUIRED
+                - FORBIDDEN
+                - CONTEST_ACCESS_DENIED
+                - RESOURCE_NOT_FOUND
+                - SUBMISSION_LOCKED
+                - SUBMISSION_DEADLINE_PASSED
+                - SUBMISSION_VERSION_CONFLICT
+                - SUBMISSION_ALREADY_SUBMITTED
+                - UPLOAD_NOT_COMPLETED
+                - FILE_TYPE_NOT_ALLOWED
+                - FILE_TOO_LARGE
+                - IDEMPOTENCY_CONFLICT
+                - RATE_LIMIT_EXCEEDED
+                - TELEGRAM_DELIVERY_FAILED
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+        request_id:
+          type: string
+    AppConfig:
+      type: object
+      properties:
+        app_name:
+          type: string
+        env:
+          type: string
+        features:
+          $ref: '#/components/schemas/Features'
+    Features:
+      type: object
+      properties:
+        reference_cms: { type: boolean }
+        email_notifications: { type: boolean }
+        participant_cabinet: { type: boolean }
+        attendance: { type: boolean }
+        points: { type: boolean }
+        merch: { type: boolean }
+        predictions: { type: boolean }
+        jury: { type: boolean }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
