@@ -59,37 +59,39 @@ export function OrganizersPage() {
         />
       ) : (
         <Card className="overflow-hidden">
-          <table className="w-full text-left text-[14px]">
-            <thead className="text-[12px] uppercase tracking-wide text-muted-2">
-              <tr className="border-b border-border">
-                <th className="px-4 py-2 font-medium">Организатор</th>
-                <th className="px-4 py-2 font-medium">Организация</th>
-                <th className="hidden px-4 py-2 font-medium md:table-cell">Создан</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.users.map((u) => (
-                <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/5">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{u.full_name}</p>
-                    <p className="text-[13px] text-muted-2">{u.login}</p>
-                  </td>
-                  <td className="px-4 py-3 text-muted">{u.org_name ?? '—'}</td>
-                  <td className="hidden px-4 py-3 text-muted md:table-cell">
-                    {formatDate(u.created_at)}
-                  </td>
-                  <td className="px-4 py-3">
-                    {u.status === 'BLOCKED' ? (
-                      <Badge tone="danger">Заблокирован</Badge>
-                    ) : (
-                      <Badge tone="success">Активен</Badge>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-[14px]">
+              <thead className="text-[12px] uppercase tracking-wide text-muted-2">
+                <tr className="border-b border-border">
+                  <th className="px-4 py-2 font-medium">Организатор</th>
+                  <th className="px-4 py-2 font-medium">Организация</th>
+                  <th className="hidden px-4 py-2 font-medium md:table-cell">Создан</th>
+                  <th className="px-4 py-2 font-medium">Статус</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.users.map((u) => (
+                  <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/5">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-ink">{u.full_name}</p>
+                      <p className="text-[13px] text-muted-2">{u.login}</p>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{u.org_name ?? '—'}</td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-muted md:table-cell">
+                      {formatDate(u.created_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.status === 'BLOCKED' ? (
+                        <Badge tone="danger">Заблокирован</Badge>
+                      ) : (
+                        <Badge tone="success">Активен</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 

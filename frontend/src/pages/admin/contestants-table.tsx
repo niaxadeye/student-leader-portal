@@ -95,20 +95,22 @@ export function ContestantsTable({ contestId, canManage }: { contestId: string; 
             <span className="text-[13px] text-muted">{data.length} участников</span>
             {Toolbar}
           </div>
-          <table className="w-full text-left text-[14px]">
-            <thead className="text-[12px] uppercase tracking-wide text-muted-2">
-              <tr className="border-b border-border">
-                <th className="px-4 py-2 font-medium">Конкурсант</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-                {canManage && <th className="px-4 py-2 text-right font-medium">Действия</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((c) => (
-                <ContestantRow key={c.user_id} c={c} contestId={contestId} canManage={canManage} />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-[14px]">
+              <thead className="text-[12px] uppercase tracking-wide text-muted-2">
+                <tr className="border-b border-border">
+                  <th className="px-4 py-2 font-medium">Конкурсант</th>
+                  <th className="px-4 py-2 font-medium">Статус</th>
+                  {canManage && <th className="px-4 py-2 text-right font-medium">Действия</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((c) => (
+                  <ContestantRow key={c.user_id} c={c} contestId={contestId} canManage={canManage} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
       <AddContestantDialog contestId={contestId} open={addOpen} onOpenChange={setAddOpen} />

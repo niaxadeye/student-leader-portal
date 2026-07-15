@@ -24,22 +24,24 @@ function roleCodes(u: AdminUser): RoleCode[] {
 export function UsersTable({ users }: { users: AdminUser[] }) {
   return (
     <Card className="overflow-hidden">
-      <table className="w-full text-left text-[14px]">
-        <thead className="text-[12px] uppercase tracking-wide text-muted-2">
-          <tr className="border-b border-border">
-            <th className="px-4 py-2 font-medium">Пользователь</th>
-            <th className="px-4 py-2 font-medium">Роли</th>
-            <th className="hidden px-4 py-2 font-medium md:table-cell">Вход</th>
-            <th className="px-4 py-2 font-medium">Статус</th>
-            <th className="px-4 py-2 text-right font-medium">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <UserRow key={u.id} u={u} />
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-left text-[14px]">
+          <thead className="text-[12px] uppercase tracking-wide text-muted-2">
+            <tr className="border-b border-border">
+              <th className="px-4 py-2 font-medium">Пользователь</th>
+              <th className="px-4 py-2 font-medium">Роли</th>
+              <th className="hidden px-4 py-2 font-medium md:table-cell">Вход</th>
+              <th className="px-4 py-2 font-medium">Статус</th>
+              <th className="px-4 py-2 text-right font-medium">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <UserRow key={u.id} u={u} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   )
 }
@@ -89,7 +91,7 @@ function UserRow({ u }: { u: AdminUser }) {
           ))}
         </div>
       </td>
-      <td className="hidden px-4 py-3 text-muted md:table-cell">
+      <td className="hidden whitespace-nowrap px-4 py-3 text-muted md:table-cell">
         {u.last_login_at ? formatDate(u.last_login_at) : '—'}
       </td>
       <td className="px-4 py-3">
