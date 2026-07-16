@@ -154,6 +154,10 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # Лимит совпадает с DEFAULT_MAX_FILE_SIZE_MB (по умолчанию nginx режет тело на 1m).
+        client_max_body_size 1024m;
+        proxy_read_timeout 20m;
+        proxy_send_timeout 20m;
     }
 
     location / {

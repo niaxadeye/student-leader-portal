@@ -12,12 +12,15 @@ import (
 )
 
 type Handler struct {
-	svc   *Service
-	store FileStore
+	svc            *Service
+	store          FileStore
+	maxUploadBytes int64
 }
 
-func NewHandler(svc *Service, store FileStore) *Handler {
-	return &Handler{svc: svc, store: store}
+// NewHandler создаёт хендлер модуля. maxFileSizeMB ограничивает тело multipart-запроса
+// загрузки файла (SITE.md §29, DEFAULT_MAX_FILE_SIZE_MB); поле-лимит проверяется отдельно в Service.
+func NewHandler(svc *Service, store FileStore, maxFileSizeMB int) *Handler {
+	return &Handler{svc: svc, store: store, maxUploadBytes: int64(maxFileSizeMB) << 20}
 }
 
 func actorOf(r *http.Request) Actor {

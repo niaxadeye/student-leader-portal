@@ -19,8 +19,9 @@ func Load() (*Config, error) {
 		HTTP: HTTP{
 			Host:         env("HTTP_HOST", "127.0.0.1"),
 			Port:         env("HTTP_PORT", "8080"),
-			ReadTimeout:  envDur("HTTP_READ_TIMEOUT", 15*time.Second),
-			WriteTimeout: envDur("HTTP_WRITE_TIMEOUT", 30*time.Second),
+			// Таймауты подняты под загрузку крупных файлов (до DEFAULT_MAX_FILE_SIZE_MB) на медленных каналах.
+			ReadTimeout:  envDur("HTTP_READ_TIMEOUT", 20*time.Minute),
+			WriteTimeout: envDur("HTTP_WRITE_TIMEOUT", 20*time.Minute),
 			IdleTimeout:  envDur("HTTP_IDLE_TIMEOUT", 60*time.Second),
 		},
 		Postgres: Postgres{
@@ -51,7 +52,7 @@ func Load() (*Config, error) {
 			DefaultThreadID: env("TELEGRAM_DEFAULT_THREAD_ID", ""), Enabled: envBool("TELEGRAM_NOTIFICATIONS_ENABLED", false),
 		},
 		Limits: Limits{
-			MaxJSONBodyMB: envInt("MAX_JSON_BODY_MB", 2), MaxFileSizeMB: envInt("DEFAULT_MAX_FILE_SIZE_MB", 2048),
+			MaxJSONBodyMB: envInt("MAX_JSON_BODY_MB", 2), MaxFileSizeMB: envInt("DEFAULT_MAX_FILE_SIZE_MB", 1024),
 			MaxSubmissionSizeMB: envInt("DEFAULT_MAX_SUBMISSION_SIZE_MB", 10240),
 		},
 		Features: loadFeatures(),

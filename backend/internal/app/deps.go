@@ -77,7 +77,7 @@ func (a *App) build() *deps {
 		contestsHandler:    contests.NewHandler(contestsSvc, imageStore),
 		challengesHandler:  challenges.NewHandler(challengesSvc),
 		userAdminHandler:   useradmin.NewHandler(userAdminSvc),
-		submissionsHandler: submissions.NewHandler(submissionsSvc, fileStore),
+		submissionsHandler: submissions.NewHandler(submissionsSvc, fileStore, a.cfg.Limits.MaxFileSizeMB),
 	}
 }
 

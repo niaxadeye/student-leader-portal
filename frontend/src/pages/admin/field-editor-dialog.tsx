@@ -39,6 +39,7 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
   const [options, setOptions] = useState<EditableOption[]>([])
   const [multiple, setMultiple] = useState(false)
   const [extensions, setExtensions] = useState('')
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState('')
   const [error, setError] = useState<string>()
 
   const add = useAddField(challengeId)
@@ -60,6 +61,7 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
       setOptions(Array.isArray(s.options) ? (s.options as EditableOption[]) : [])
       setMultiple(!!s.multiple)
       setExtensions(Array.isArray(s.allowed_extensions) ? s.allowed_extensions.join(', ') : '')
+      setMaxFileSizeMb(typeof s.max_file_size_mb === 'number' ? String(s.max_file_size_mb) : '')
     } else {
       setKey('')
       setType('SHORT_TEXT')
@@ -70,6 +72,7 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
       setOptions([])
       setMultiple(false)
       setExtensions('')
+      setMaxFileSizeMb('')
     }
   }, [open, field])
 
@@ -82,7 +85,12 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
         .split(',')
         .map((e) => e.trim().replace(/^\./, '').toLowerCase())
         .filter(Boolean)
-      return { multiple, allowed_extensions: exts }
+      const maxMb = Number(maxFileSizeMb)
+      return {
+        multiple,
+        allowed_extensions: exts,
+        max_file_size_mb: maxFileSizeMb.trim() && maxMb > 0 ? maxMb : undefined,
+      }
     }
     return {}
   }
@@ -215,7 +223,7 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
             <>
               <Field
                 label="Разрешённые расширения"
-                helpText="Через запятую, например: pdf, docx, mp4"
+                helpText="Через запятую, например: pdf, docx, mp4. Оставьте пустым — разрешены любые форматы"
               >
                 {(p) => (
                   <Textarea
@@ -223,6 +231,22 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
                     value={extensions}
                     onChange={(e) => setExtensions(e.target.value)}
                     placeholder="pdf, pptx, mp4, png, zip"
+                  />
+                )}
+              </Field>
+              <Field
+                label="Максимальный размер файла, МБ"
+                helpText="Оставьте пустым — без ограничения размера"
+              >
+                {(p) => (
+                  <Input
+                    {...p}
+                    type="number"
+                    min={1}
+                    max={1048576}
+                    value={maxFileSizeMb}
+                    onChange={(e) => setMaxFileSizeMb(e.target.value)}
+                    placeholder="1024"
                   />
                 )}
               </Field>

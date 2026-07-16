@@ -159,20 +159,22 @@ function FieldControl({
           </SelectContent>
         </Select>
       )
-    case 'FILE_GROUP':
+    case 'FILE_GROUP': {
+      const exts = field.settings?.allowed_extensions
+      const formatsHint =
+        exts && exts.length > 0 ? `Разрешено: ${exts.join(', ')}` : 'Разрешены любые форматы'
+      const maxMb = field.settings?.max_file_size_mb
+      const sizeHint = maxMb ? `до ${maxMb} МБ` : undefined
       return (
         <FileUpload
           files={files}
-          hint={
-            field.settings?.allowed_extensions
-              ? `Разрешено: ${field.settings.allowed_extensions.join(', ')}`
-              : undefined
-          }
-          accept={field.settings?.allowed_extensions?.map((e) => `.${e}`).join(',')}
+          hint={[formatsHint, sizeHint].filter(Boolean).join(', ')}
+          accept={exts?.map((e) => `.${e}`).join(',')}
           onAdd={onAddFiles}
           onRemove={onRemoveFile}
         />
       )
+    }
     default:
       // SHORT_TEXT, URL, EMAIL, PHONE, DATE
       return (
