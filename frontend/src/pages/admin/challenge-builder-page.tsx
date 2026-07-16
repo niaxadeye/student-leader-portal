@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Rocket, Lock, Archive, Eye, PencilRuler, Inbox } from 'lucide-react'
+import { ArrowLeft, Plus, Rocket, Lock, Archive, Eye, PencilRuler, Inbox, Pencil } from 'lucide-react'
 import {
   useAdminChallenge,
   useChallengeFields,
@@ -19,6 +19,7 @@ import type { AdminField, ChallengeStatus } from '@/entities/challenge/admin-typ
 import { challengeStatusMeta } from './challenge-status'
 import { FieldsList } from './fields-list'
 import { FieldEditorDialog } from './field-editor-dialog'
+import { EditChallengeDialog } from './edit-challenge-dialog'
 import { ChallengePreview } from './challenge-preview'
 import { SubmissionsSection } from './submissions-section'
 
@@ -45,6 +46,7 @@ export function ChallengeBuilderPage() {
   const [tab, setTab] = useState<'build' | 'preview' | 'submissions'>('build')
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<AdminField | null>(null)
+  const [metaOpen, setMetaOpen] = useState(false)
 
   if (challengeQ.isLoading) return <Skeleton className="h-64 w-full" />
   if (challengeQ.isError) return <ErrorState onRetry={() => challengeQ.refetch()} />
@@ -106,6 +108,11 @@ export function ChallengeBuilderPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {canEdit && challenge.status !== 'ARCHIVED' && (
+            <Button size="sm" variant="secondary" onClick={() => setMetaOpen(true)}>
+              <Pencil className="h-4 w-4" /> Редактировать
+            </Button>
+          )}
           {canEdit &&
             actions.map((a) => {
               const Icon = actionMeta[a].icon
@@ -179,6 +186,8 @@ export function ChallengeBuilderPage() {
         open={editorOpen}
         onOpenChange={setEditorOpen}
       />
+
+      <EditChallengeDialog challenge={challenge} open={metaOpen} onOpenChange={setMetaOpen} />
     </div>
   )
 }

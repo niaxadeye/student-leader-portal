@@ -6,6 +6,7 @@ import { Input, Textarea } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
 import { toast } from 'sonner'
 import { useCreateChallenge } from '@/entities/challenge/admin-queries'
+import { localInputToIso } from '@/shared/lib/format'
 import { ApiRequestError } from '@/shared/api/client'
 
 export function CreateChallengeDialog({
@@ -19,6 +20,7 @@ export function CreateChallengeDialog({
 }) {
   const [title, setTitle] = useState('')
   const [shortDescription, setShortDescription] = useState('')
+  const [deadlineAt, setDeadlineAt] = useState('')
   const [error, setError] = useState<string>()
   const create = useCreateChallenge(contestId)
   const navigate = useNavigate()
@@ -31,13 +33,18 @@ export function CreateChallengeDialog({
       return
     }
     create.mutate(
-      { title: title.trim(), short_description: shortDescription.trim() || null },
+      {
+        title: title.trim(),
+        short_description: shortDescription.trim() || null,
+        deadline_at: localInputToIso(deadlineAt),
+      },
       {
         onSuccess: (c) => {
           toast.success('Испытание создано')
           onOpenChange(false)
           setTitle('')
           setShortDescription('')
+          setDeadlineAt('')
           navigate(`/admin/challenges/${c.id}`)
         },
         onError: (err) => {
@@ -73,6 +80,16 @@ export function CreateChallengeDialog({
                 value={shortDescription}
                 onChange={(e) => setShortDescription(e.target.value)}
                 placeholder="Одно-два предложения для карточки испытания"
+              />
+            )}
+          </Field>
+          <Field label="Дедлайн сдачи" helpText="Можно задать позже в конструкторе.">
+            {(p) => (
+              <Input
+                {...p}
+                type="datetime-local"
+                value={deadlineAt}
+                onChange={(e) => setDeadlineAt(e.target.value)}
               />
             )}
           </Field>
