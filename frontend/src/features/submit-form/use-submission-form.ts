@@ -35,7 +35,6 @@ export function useSubmissionForm(challenge: Challenge | undefined, sub: Submiss
   const [saveState, setSaveState] = useState<SaveState>('idle')
   // Локально загружаемые файлы (оптимистично, до ответа сервера), по ключу поля.
   const [pending, setPending] = useState<Record<string, UploadedFile[]>>({})
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const idByKey = useMemo(() => {
     const m: Record<string, string> = {}
     challenge?.fields.forEach((f) => (m[f.key] = f.id))
@@ -61,39 +60,22 @@ export function useSubmissionForm(challenge: Challenge | undefined, sub: Submiss
     return merged
   }, [serverFiles, pending])
 
-  const persist = useCallback(
-    (next: Record<string, AnswerValue>) => {
-      setSaveState('saving')
-      clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => {
-        saveMut.mutate(next, {
-          onSuccess: () => setSaveState('saved'),
-          onError: () => setSaveState('idle'),
-        })
-      }, 800)
-    },
-    [saveMut],
-  )
-
-  const setAnswer = useCallback(
-    (key: string, value: AnswerValue) => {
-      setAnswers((prev) => {
-        const next = { ...prev, [key]: value }
-        persist(next)
-        return next
-      })
-      setErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
-    },
-    [persist],
-  )
+  const setAnswer = useCallback((key: string, value: AnswerValue) => {
+    setAnswers((prev) => ({ ...prev, [key]: value }))
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+    // Правка поля означает несохранённые изменения — сбрасываем индикатор «сохранено».
+    setSaveState('idle')
+  }, [])
 
   const saveNow = useCallback(() => {
-    clearTimeout(debounceRef.current)
     setSaveState('saving')
     return saveMut
       .mutateAsync(answers)
       .then(() => setSaveState('saved'))
-      .catch(() => setSaveState('idle'))
+      .catch((e) => {
+        setSaveState('idle')
+        throw e
+      })
   }, [answers, saveMut])
 
   const addFiles = useCallback(

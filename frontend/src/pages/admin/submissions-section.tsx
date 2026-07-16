@@ -18,35 +18,14 @@ const statusMeta: Record<
   LOCKED: { label: 'Заблокировано', tone: 'warning' },
 }
 
-const filters: Array<{ key: string; label: string }> = [
-  { key: '', label: 'Все' },
-  { key: 'SUBMITTED', label: 'Отправленные' },
-  { key: 'DRAFT', label: 'Черновики' },
-  { key: 'LOCKED', label: 'Заблокированные' },
-]
-
 export function SubmissionsSection({ challengeId }: { challengeId: string }) {
-  const [status, setStatus] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
-  const q = useAdminSubmissions(challengeId, status)
+  // Дирекция видит только отправленные работы — черновики конкурсантов не показываем.
+  const q = useAdminSubmissions(challengeId, 'SUBMITTED')
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatus(f.key)}
-              className={
-                'rounded-pill px-3 py-1 text-[13px] transition-colors ' +
-                (status === f.key ? 'bg-brand text-white' : 'bg-surface-2 text-muted hover:text-ink')
-              }
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+      <div className="mb-3 flex items-center justify-end">
         {q.data && <p className="text-[13px] text-muted">Всего: {q.data.total}</p>}
       </div>
 
