@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Clock, ChevronRight } from 'lucide-react'
 import { Card } from '@/shared/ui/card'
 import { StatusBadge } from '@/entities/submission/status-badge'
-import { timeUntil } from '@/shared/lib/format'
+import { formatDateTime, timeUntil } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/cn'
 import type { Challenge, SubmissionStatus } from '@/entities/challenge/types'
 
@@ -37,7 +37,9 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
             >
               <Clock className="h-4 w-4" />
               <span>
-                {deadline.overdue ? 'Дедлайн истёк' : `До дедлайна: ${deadline.text}`}
+                {deadline.overdue
+                  ? `Дедлайн истёк ${formatDateTime(challenge.deadline_at!)}`
+                  : `Срок сдачи: ${formatDateTime(challenge.deadline_at!)}`}
               </span>
             </div>
           )}
