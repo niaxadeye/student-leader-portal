@@ -1,13 +1,15 @@
 # Student Leader Cabinet
 
 Личный кабинет и административная панель конкурса «Студенческий лидер».
-Модульный монолит: **Go** (API + worker) + **React/Vite/TS** (SPA) + **PostgreSQL / Redis / MinIO**.
+Модульный монолит: **Go** (API + worker) + **React/Vite/TS** (SPA) + **PostgreSQL / Redis / S3**.
 
 Полная спецификация — [SITE.md](./SITE.md). Визуальные правила — [DESIGN.md](./DESIGN.md).
 
 ## Стек и рантайм (этот сервер)
 
-- Зависимости (Postgres, Redis, MinIO) — в Docker Compose, порты только на `127.0.0.1`.
+- Зависимости (Postgres, Redis) — в Docker Compose, порты только на `127.0.0.1`.
+- Файлы — во внешнем S3 (Timeweb Cloud), не в Docker. Локально для разработки
+  можно поднять MinIO вместо него (профиль `dev`, см. «Быстрый старт»).
 - Go `api` и `worker` — нативные бинарники под systemd (`infra/systemd/`).
 - nginx раздаёт `frontend/dist` и проксирует `/api/` на `127.0.0.1:8080`.
 - Домен: **eazytech.ru** (SSL через Certbot).
@@ -16,7 +18,7 @@
 
 ```bash
 cp .env.example .env      # заполнить секреты
-make up                   # поднять postgres/redis/minio
+make up                   # поднять postgres/redis/minio (только для dev)
 make api-run              # запустить API (:8080)
 make frontend-dev         # фронтенд (:5173)
 ```
