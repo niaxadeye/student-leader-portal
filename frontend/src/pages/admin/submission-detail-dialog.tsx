@@ -7,7 +7,7 @@ import type { AnswerValue } from '@/entities/submission/types'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Badge } from '@/shared/ui/badge'
 import { Skeleton } from '@/shared/ui/states'
-import { formatDate, formatBytes } from '@/shared/lib/format'
+import { formatDateTime, formatBytes } from '@/shared/lib/format'
 
 function renderValue(v: AnswerValue): string {
   if (v === null || v === undefined || v === '') return '—'
@@ -53,8 +53,10 @@ export function SubmissionDetailDialog({ submissionId, open, onOpenChange }: Pro
               <Badge tone={d.status === 'SUBMITTED' ? 'success' : d.status === 'LOCKED' ? 'warning' : 'neutral'}>
                 {d.status}
               </Badge>
-              <span>Ревизия №{d.current_revision_number} · версия {d.version}</span>
-              {d.submitted_at && <span>· отправлено {formatDate(d.submitted_at)}</span>}
+              <span>Ревизия №{d.current_revision_number}</span>
+              {(d.last_resubmitted_at ?? d.submitted_at) && (
+                <span>· отправлено {formatDateTime(d.last_resubmitted_at ?? d.submitted_at!)}</span>
+              )}
             </div>
 
             {/* Ответы */}
@@ -126,7 +128,7 @@ export function SubmissionDetailDialog({ submissionId, open, onOpenChange }: Pro
                       <span className="text-ink">
                         №{rev.revision_number} · {rev.action_type === 'SUBMIT' ? 'Отправка' : 'Обновление'}
                       </span>
-                      <span className="text-muted">{formatDate(rev.created_at)}</span>
+                      <span className="text-muted">{formatDateTime(rev.created_at)}</span>
                     </li>
                   ))}
                 </ol>

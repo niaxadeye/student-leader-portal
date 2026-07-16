@@ -66,6 +66,7 @@ export function ChallengeFormPage() {
         status={sub.status}
         saveState={form.saveState}
         revision={revision}
+        revisionAt={sub.last_resubmitted_at ?? sub.submitted_at}
       />
 
       <Card>
@@ -92,12 +93,16 @@ export function ChallengeFormPage() {
             <p className="hidden text-[13px] text-muted sm:block">
               {form.hasUploading
                 ? 'Дождитесь окончания загрузки файлов'
-                : 'Черновик не является отправкой'}
+                : revision > 0
+                  ? ''
+                  : 'Черновик не является отправкой'}
             </p>
             <div className="flex w-full gap-3 sm:w-auto">
-              <Button variant="outline" onClick={saveDraft} className="flex-1 sm:flex-none">
-                <Save className="h-4 w-4" /> Сохранить черновик
-              </Button>
+              {revision === 0 && (
+                <Button variant="outline" onClick={saveDraft} className="flex-1 sm:flex-none">
+                  <Save className="h-4 w-4" /> Сохранить черновик
+                </Button>
+              )}
               <Dialog>
                 <DialogTrigger asChild>
                   <Button disabled={form.hasUploading} className="flex-1 sm:flex-none">

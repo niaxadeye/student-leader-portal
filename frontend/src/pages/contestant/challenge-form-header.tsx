@@ -11,11 +11,13 @@ export function ChallengeFormHeader({
   status,
   saveState,
   revision,
+  revisionAt,
 }: {
   challenge: Challenge
   status: SubmissionStatus
   saveState: SaveState
   revision: number
+  revisionAt?: string | null
 }) {
   const navigate = useNavigate()
   const deadline = challenge.deadline_at ? timeUntil(challenge.deadline_at) : null
@@ -41,7 +43,12 @@ export function ChallengeFormHeader({
         </div>
         <div className="flex flex-col items-end gap-1.5 text-[13px]">
           <SaveIndicator state={saveState} />
-          {revision > 0 && <span className="text-muted">Ревизия №{revision}</span>}
+          {revision > 0 && (
+            <span className="text-muted">
+              Ревизия №{revision}
+              {revisionAt && ` · ${formatDateTime(revisionAt)}`}
+            </span>
+          )}
           {deadline && (
             <span
               className={cn(
