@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Download, FileText, History } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAdminSubmissionDetail } from '@/entities/submission/admin-queries'
-import { fileDownloadUrl } from '@/entities/submission/admin-api'
+import { getFileDownloadUrl } from '@/entities/submission/admin-api'
 import type { AnswerValue } from '@/entities/submission/types'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Badge } from '@/shared/ui/badge'
@@ -23,6 +25,20 @@ interface Props {
 export function SubmissionDetailDialog({ submissionId, open, onOpenChange }: Props) {
   const q = useAdminSubmissionDetail(open ? submissionId ?? undefined : undefined)
   const d = q.data
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  async function onDownload(fileId: string) {
+    if (!d) return
+    setDownloadingId(fileId)
+    try {
+      const url = await getFileDownloadUrl(d.id, fileId)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      toast.error('Не удалось скачать файл')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,14 +96,15 @@ export function SubmissionDetailDialog({ submissionId, open, onOpenChange }: Pro
                           </span>
                         )}
                       </span>
-                      <a
-                        href={fileDownloadUrl(d.id, f.file_id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[13px] text-brand hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => onDownload(f.file_id)}
+                        disabled={downloadingId === f.file_id}
+                        className="inline-flex items-center gap-1 text-[13px] text-brand hover:underline disabled:opacity-50"
                       >
-                        <Download className="h-4 w-4" /> Скачать
-                      </a>
+                        <Download className="h-4 w-4" />
+                        {downloadingId === f.file_id ? 'Загрузка…' : 'Скачать'}
+                      </button>
                     </li>
                   ))}
                 </ul>

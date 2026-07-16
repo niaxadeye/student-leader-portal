@@ -63,8 +63,11 @@ export function getSubmissionDetail(submissionId: string): Promise<AdminSubmissi
   return apiRequest<AdminSubmissionDetail>(`/admin/submissions/${submissionId}`)
 }
 
-// Ссылка на скачивание файла (эндпоинт отдаёт 302 на presigned-URL).
-export function fileDownloadUrl(submissionId: string, fileId: string): string {
-  const base = import.meta.env.VITE_API_URL ?? '/api/v1'
-  return `${base}/admin/submissions/${submissionId}/files/${fileId}`
+// Запрашивает presigned-URL для скачивания файла (эндпоинт за Bearer-авторизацией).
+// Возвращённый URL авторизуется подписью и открывается браузером напрямую.
+export async function getFileDownloadUrl(submissionId: string, fileId: string): Promise<string> {
+  const { download_url } = await apiRequest<{ download_url: string }>(
+    `/admin/submissions/${submissionId}/files/${fileId}`,
+  )
+  return download_url
 }

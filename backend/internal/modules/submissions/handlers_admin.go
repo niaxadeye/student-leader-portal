@@ -74,7 +74,9 @@ func (h *Handler) AdminGet(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
-// DownloadFile — GET /admin/submissions/{submissionId}/files/{fileId} → 302 на presigned-URL.
+// DownloadFile — GET /admin/submissions/{submissionId}/files/{fileId}.
+// Возвращает presigned-URL как JSON (эндпоинт за Bearer-авторизацией; сам presigned-URL
+// авторизуется подписью и открывается браузером напрямую — SITE.md §7.6).
 func (h *Handler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	url, err := h.svc.PresignFile(r.Context(), actorOf(r),
 		chi.URLParam(r, "submissionId"), chi.URLParam(r, "fileId"))
@@ -82,5 +84,5 @@ func (h *Handler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	http.Redirect(w, r, url, http.StatusFound)
+	httpserver.WriteJSON(w, r, http.StatusOK, map[string]string{"download_url": url}, nil)
 }
