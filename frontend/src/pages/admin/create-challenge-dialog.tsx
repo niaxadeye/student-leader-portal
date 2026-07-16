@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input, Textarea } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useCreateChallenge } from '@/entities/challenge/admin-queries'
 import { ApiRequestError } from '@/shared/api/client'
 
@@ -21,7 +21,6 @@ export function CreateChallengeDialog({
   const [shortDescription, setShortDescription] = useState('')
   const [error, setError] = useState<string>()
   const create = useCreateChallenge(contestId)
-  const toast = useToast()
   const navigate = useNavigate()
 
   function submit(e: React.FormEvent) {
@@ -35,7 +34,7 @@ export function CreateChallengeDialog({
       { title: title.trim(), short_description: shortDescription.trim() || null },
       {
         onSuccess: (c) => {
-          toast({ title: 'Испытание создано', tone: 'success' })
+          toast.success('Испытание создано')
           onOpenChange(false)
           setTitle('')
           setShortDescription('')

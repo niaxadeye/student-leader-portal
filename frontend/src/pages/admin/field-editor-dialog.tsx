@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui/select'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { ApiRequestError } from '@/shared/api/client'
 import { useAddField, useUpdateField } from '@/entities/challenge/admin-queries'
 import type { AdminField, FieldInput } from '@/entities/challenge/admin-types'
@@ -43,7 +43,6 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
 
   const add = useAddField(challengeId)
   const update = useUpdateField(challengeId)
-  const toast = useToast()
   const pending = add.isPending || update.isPending
 
   // Заполняем форму при открытии (редактирование) или сбрасываем (создание).
@@ -120,7 +119,7 @@ export function FieldEditorDialog({ challengeId, field, open, onOpenChange }: Pr
       }
     }
     const onSuccess = () => {
-      toast({ title: field ? 'Поле обновлено' : 'Поле добавлено', tone: 'success' })
+      toast.success(field ? 'Поле обновлено' : 'Поле добавлено')
       onOpenChange(false)
     }
     if (field) {

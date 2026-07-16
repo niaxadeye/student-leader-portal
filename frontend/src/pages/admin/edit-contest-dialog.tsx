@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input, Textarea } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useUpdateContest } from '@/entities/contest/queries'
 import { isoToLocalInput, localInputToIso } from '@/shared/lib/format'
 import type { AdminContest } from '@/entities/contest/types'
@@ -24,7 +24,6 @@ export function EditContestDialog({
   const [timezone, setTimezone] = useState(contest.timezone)
   const [error, setError] = useState<string>()
   const update = useUpdateContest(contest.id)
-  const toast = useToast()
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -49,7 +48,7 @@ export function EditContestDialog({
       },
       {
         onSuccess: () => {
-          toast({ title: 'Конкурс обновлён', tone: 'success' })
+          toast.success('Конкурс обновлён')
           onOpenChange(false)
         },
         onError: () => setError('Не удалось сохранить изменения.'),

@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useAddContestant } from '@/entities/contestant/queries'
 import { TempPasswordNote } from './temp-password-note'
 
@@ -22,7 +22,6 @@ export function AddContestantDialog({
   const [error, setError] = useState<string>()
   const [temp, setTemp] = useState<{ login: string; password: string }>()
   const add = useAddContestant(contestId)
-  const toast = useToast()
 
   function reset() {
     setLogin('')
@@ -43,7 +42,7 @@ export function AddContestantDialog({
       { login: login.trim(), full_name: fullName.trim(), organization: organization.trim() || undefined },
       {
         onSuccess: (r) => {
-          toast({ title: 'Конкурсант добавлен', tone: 'success' })
+          toast.success('Конкурсант добавлен')
           setTemp({ login: r.login, password: r.temp_password })
         },
         onError: () => setError('Не удалось добавить. Возможно, логин занят.'),

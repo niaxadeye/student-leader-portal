@@ -4,7 +4,7 @@ import { useResetPassword, useUserStatusMutation } from '@/entities/user/queries
 import { ManageRolesDialog } from './manage-roles-dialog'
 import { Card } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { formatDate } from '@/shared/lib/format'
 import type { RoleCode } from '@/entities/auth/types'
 import type { AdminUser } from '@/entities/user/types'
@@ -47,7 +47,6 @@ export function UsersTable({ users }: { users: AdminUser[] }) {
 }
 
 function UserRow({ u }: { u: AdminUser }) {
-  const toast = useToast()
   const reset = useResetPassword()
   const status = useUserStatusMutation()
   const [rolesOpen, setRolesOpen] = useState(false)
@@ -56,12 +55,10 @@ function UserRow({ u }: { u: AdminUser }) {
   function onReset() {
     reset.mutate(u.id, {
       onSuccess: (r) =>
-        toast({
-          title: `Пароль сброшен: ${u.login}`,
+        toast.success(`Пароль сброшен: ${u.login}`, {
           description: `Временный пароль: ${r.temp_password}`,
-          tone: 'success',
         }),
-      onError: () => toast({ title: 'Не удалось сбросить пароль', tone: 'error' }),
+      onError: () => toast.error('Не удалось сбросить пароль'),
     })
   }
 
@@ -70,8 +67,8 @@ function UserRow({ u }: { u: AdminUser }) {
       { userId: u.id, block: !blocked },
       {
         onSuccess: () =>
-          toast({ title: blocked ? `Разблокирован: ${u.login}` : `Заблокирован: ${u.login}`, tone: 'info' }),
-        onError: () => toast({ title: 'Не удалось изменить статус', tone: 'error' }),
+          toast.info(blocked ? `Разблокирован: ${u.login}` : `Заблокирован: ${u.login}`),
+        onError: () => toast.error('Не удалось изменить статус'),
       },
     )
   }

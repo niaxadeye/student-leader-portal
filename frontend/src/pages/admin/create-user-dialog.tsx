@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui/select'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useAuth } from '@/entities/auth/auth-context'
 import { isMega } from '@/entities/auth/roles'
 import { useCreateUser } from '@/entities/user/queries'
@@ -42,7 +42,6 @@ export function CreateUserDialog({
   const [error, setError] = useState<string>()
   const [temp, setTemp] = useState<{ login: string; password: string }>()
   const create = useCreateUser()
-  const toast = useToast()
 
   function reset() {
     setLogin('')
@@ -64,7 +63,7 @@ export function CreateUserDialog({
       { login: login.trim(), full_name: fullName.trim(), email: email.trim() || undefined, role },
       {
         onSuccess: (r) => {
-          toast({ title: 'Пользователь создан', tone: 'success' })
+          toast.success('Пользователь создан')
           setTemp({ login: r.login, password: r.temp_password })
         },
         onError: () => setError('Не удалось создать. Возможно, логин занят.'),

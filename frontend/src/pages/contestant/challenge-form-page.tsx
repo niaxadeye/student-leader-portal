@@ -9,14 +9,13 @@ import { Card, CardBody } from '@/shared/ui/card'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/states'
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/shared/ui/dialog'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { ApiRequestError } from '@/shared/api/client'
 
 export function ChallengeFormPage() {
   const { challengeId } = useParams()
   const { data: challenge, isLoading } = useChallenge(challengeId)
   const { data: sub, isLoading: subLoading } = useSubmission(challengeId)
-  const toast = useToast()
   const form = useSubmissionForm(challenge, sub)
   const submitMut = useSubmit(challengeId ?? '')
 
@@ -35,28 +34,27 @@ export function ChallengeFormPage() {
   async function saveDraft() {
     try {
       await form.saveNow()
-      toast({ tone: 'success', title: 'Черновик сохранён' })
+      toast.success('Черновик сохранён')
     } catch {
-      toast({ tone: 'error', title: 'Не удалось сохранить' })
+      toast.error('Не удалось сохранить')
     }
   }
 
   function submit() {
     if (!form.validate()) {
-      toast({ tone: 'error', title: 'Проверьте форму', description: 'Не все обязательные поля заполнены' })
+      toast.error('Проверьте форму', { description: 'Не все обязательные поля заполнены' })
       return
     }
     submitMut.mutate(form.answers, {
       onSuccess: (data) => {
-        toast({
-          tone: 'success',
-          title: data.current_revision_number === 1 ? 'Форма отправлена' : 'Форма обновлена',
-          description: `Создана ревизия №${data.current_revision_number}`,
-        })
+        toast.success(
+          data.current_revision_number === 1 ? 'Форма отправлена' : 'Форма обновлена',
+          { description: `Создана ревизия №${data.current_revision_number}` },
+        )
       },
       onError: (e) => {
         const msg = e instanceof ApiRequestError ? e.message : 'Не удалось отправить'
-        toast({ tone: 'error', title: 'Ошибка отправки', description: msg })
+        toast.error('Ошибка отправки', { description: msg })
       },
     })
   }

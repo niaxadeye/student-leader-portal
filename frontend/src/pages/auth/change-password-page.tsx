@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Field } from '@/shared/ui/field'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { ApiRequestError } from '@/shared/api/client'
 import { changePassword } from '@/entities/auth/api'
 import { useAuth } from '@/entities/auth/auth-context'
@@ -16,7 +16,6 @@ import {
 
 export function ChangePasswordPage() {
   const navigate = useNavigate()
-  const toast = useToast()
   const { user, setUser } = useAuth()
   const [formError, setFormError] = useState('')
   const {
@@ -34,7 +33,7 @@ export function ChangePasswordPage() {
       })
       // Бэкенд отозвал сессии → нужен повторный вход.
       setUser(null)
-      toast({ tone: 'success', title: 'Пароль изменён', description: 'Войдите заново.' })
+      toast.success('Пароль изменён', { description: 'Войдите заново.' })
       navigate('/login', { replace: true })
     } catch (e) {
       const msg =

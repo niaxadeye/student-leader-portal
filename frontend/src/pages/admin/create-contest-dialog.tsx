@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input, Textarea } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useCreateContest } from '@/entities/contest/queries'
 import { ApiRequestError } from '@/shared/api/client'
 
@@ -20,7 +20,6 @@ export function CreateContestDialog({
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string>()
   const create = useCreateContest()
-  const toast = useToast()
   const navigate = useNavigate()
 
   function submit(e: React.FormEvent) {
@@ -34,7 +33,7 @@ export function CreateContestDialog({
       { name: name.trim(), slug: slug.trim() || undefined, description: description.trim() || undefined },
       {
         onSuccess: (c) => {
-          toast({ title: 'Конкурс создан', tone: 'success' })
+          toast.success('Конкурс создан')
           onOpenChange(false)
           setName('')
           setSlug('')

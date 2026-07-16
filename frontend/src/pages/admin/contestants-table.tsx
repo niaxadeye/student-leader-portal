@@ -7,7 +7,7 @@ import { Card } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { EmptyState, Skeleton, ErrorState } from '@/shared/ui/states'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { AddContestantDialog } from './add-contestant-dialog'
 import type { Contestant } from '@/entities/contestant/types'
 
@@ -18,7 +18,6 @@ export function ContestantsTable({ contestId, canManage }: { contestId: string; 
   const [addOpen, setAddOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const importer = useImportContestants(contestId)
-  const toast = useToast()
 
   function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -26,11 +25,10 @@ export function ContestantsTable({ contestId, canManage }: { contestId: string; 
     file.text().then((csv) => {
       importer.mutate(csv, {
         onSuccess: (r) =>
-          toast({
-            title: `Импорт: добавлено ${r.created}, ошибок ${r.failed}`,
-            tone: r.failed ? 'info' : 'success',
-          }),
-        onError: () => toast({ title: 'Не удалось импортировать файл', tone: 'error' }),
+          (r.failed ? toast.info : toast.success)(
+            `Импорт: добавлено ${r.created}, ошибок ${r.failed}`,
+          ),
+        onError: () => toast.error('Не удалось импортировать файл'),
       })
     })
     e.target.value = ''
@@ -46,7 +44,7 @@ export function ContestantsTable({ contestId, canManage }: { contestId: string; 
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast({ title: 'Не удалось выгрузить', tone: 'error' })
+      toast.error('Не удалось выгрузить')
     }
   }
 
@@ -119,7 +117,6 @@ export function ContestantsTable({ contestId, canManage }: { contestId: string; 
 }
 
 function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: string; canManage: boolean }) {
-  const toast = useToast()
   const reset = useResetPassword()
   const status = useUserStatusMutation()
   const remove = useRemoveContestant(contestId)
@@ -128,12 +125,10 @@ function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: 
   function onReset() {
     reset.mutate(c.user_id, {
       onSuccess: (r) =>
-        toast({
-          title: `Пароль сброшен: ${c.login}`,
+        toast.success(`Пароль сброшен: ${c.login}`, {
           description: `Временный пароль: ${r.temp_password}`,
-          tone: 'success',
         }),
-      onError: () => toast({ title: 'Не удалось сбросить пароль', tone: 'error' }),
+      onError: () => toast.error('Не удалось сбросить пароль'),
     })
   }
 
@@ -142,8 +137,8 @@ function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: 
       { userId: c.user_id, block: !blocked },
       {
         onSuccess: () =>
-          toast({ title: blocked ? `Разблокирован: ${c.login}` : `Заблокирован: ${c.login}`, tone: 'info' }),
-        onError: () => toast({ title: 'Не удалось изменить статус', tone: 'error' }),
+          toast.info(blocked ? `Разблокирован: ${c.login}` : `Заблокирован: ${c.login}`),
+        onError: () => toast.error('Не удалось изменить статус'),
       },
     )
   }
@@ -151,8 +146,8 @@ function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: 
   function onRemove() {
     if (!confirm(`Убрать конкурсанта ${c.login} из конкурса?`)) return
     remove.mutate(c.user_id, {
-      onSuccess: () => toast({ title: `Убран: ${c.login}`, tone: 'info' }),
-      onError: () => toast({ title: 'Не удалось убрать', tone: 'error' }),
+      onSuccess: () => toast.info(`Убран: ${c.login}`),
+      onError: () => toast.error('Не удалось убрать'),
     })
   }
 

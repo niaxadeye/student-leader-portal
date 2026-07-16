@@ -12,7 +12,7 @@ import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { EmptyState, Skeleton, ErrorState } from '@/shared/ui/states'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { formatDate } from '@/shared/lib/format'
 import { ApiRequestError } from '@/shared/api/client'
 import type { AdminField, ChallengeStatus } from '@/entities/challenge/admin-types'
@@ -42,7 +42,6 @@ export function ChallengeBuilderPage() {
   const fieldsQ = useChallengeFields(challengeId)
   const { data: contest } = useAdminContest(challengeQ.data?.contest_id)
   const transition = useTransitionChallenge(challengeId!, challengeQ.data?.contest_id ?? '')
-  const toast = useToast()
   const [tab, setTab] = useState<'build' | 'preview' | 'submissions'>('build')
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<AdminField | null>(null)
@@ -66,13 +65,13 @@ export function ChallengeBuilderPage() {
 
   function runTransition(action: 'publish' | 'close' | 'archive') {
     transition.mutate(action, {
-      onSuccess: () => toast({ title: `${actionMeta[action].label}: готово`, tone: 'success' }),
+      onSuccess: () => toast.success(`${actionMeta[action].label}: готово`),
       onError: (err) => {
         const msg =
           err instanceof ApiRequestError && err.code === 'INVALID_TRANSITION'
             ? 'Такой переход статуса недоступен'
             : 'Не удалось изменить статус'
-        toast({ title: msg, tone: 'error' })
+        toast.error(msg)
       },
     })
   }

@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useCreateUser } from '@/entities/user/queries'
 import { TempPasswordNote } from './temp-password-note'
 
@@ -23,7 +23,6 @@ export function CreateOrganizerDialog({
   const [error, setError] = useState<string>()
   const [temp, setTemp] = useState<{ login: string; password: string }>()
   const create = useCreateUser()
-  const toast = useToast()
 
   function reset() {
     setLogin('')
@@ -51,7 +50,7 @@ export function CreateOrganizerDialog({
       },
       {
         onSuccess: (r) => {
-          toast({ title: 'Организатор создан', tone: 'success' })
+          toast.success('Организатор создан')
           setTemp({ login: r.login, password: r.temp_password })
         },
         onError: () => setError('Не удалось создать. Возможно, логин занят.'),

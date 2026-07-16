@@ -6,7 +6,7 @@ import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { EmptyState, Skeleton, ErrorState } from '@/shared/ui/states'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { formatDate } from '@/shared/lib/format'
 import { contestStatusMeta } from './contest-status'
 import { ContestantsTable } from './contestants-table'
@@ -36,7 +36,6 @@ export function AdminContestDetailPage() {
   const { contestId } = useParams()
   const { data: contest, isLoading, isError, refetch } = useAdminContest(contestId)
   const transition = useTransitionContest(contestId!)
-  const toast = useToast()
   const [editOpen, setEditOpen] = useState(false)
 
   if (isLoading) return <Skeleton className="h-64 w-full" />
@@ -61,8 +60,8 @@ export function AdminContestDetailPage() {
 
   function runTransition(action: 'publish' | 'finish' | 'archive') {
     transition.mutate(action, {
-      onSuccess: () => toast({ title: `${actionMeta[action].label}: готово`, tone: 'success' }),
-      onError: () => toast({ title: 'Не удалось изменить статус', tone: 'error' }),
+      onSuccess: () => toast.success(`${actionMeta[action].label}: готово`),
+      onError: () => toast.error('Не удалось изменить статус'),
     })
   }
 

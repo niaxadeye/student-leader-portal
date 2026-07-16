@@ -2,7 +2,7 @@ import { ChevronUp, ChevronDown, Pencil, Trash2, GripVertical } from 'lucide-rea
 import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { useReorderFields, useDeleteField } from '@/entities/challenge/admin-queries'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import type { AdminField } from '@/entities/challenge/admin-types'
 import { fieldTypeLabels } from './challenge-status'
 
@@ -18,7 +18,6 @@ interface Props {
 export function FieldsList({ challengeId, fields, onEdit, canEdit }: Props) {
   const reorder = useReorderFields(challengeId)
   const del = useDeleteField(challengeId)
-  const toast = useToast()
 
   function move(index: number, dir: -1 | 1) {
     const target = index + dir
@@ -26,15 +25,15 @@ export function FieldsList({ challengeId, fields, onEdit, canEdit }: Props) {
     const ids = fields.map((f) => f.id)
     ;[ids[index], ids[target]] = [ids[target], ids[index]]
     reorder.mutate(ids, {
-      onError: () => toast({ title: 'Не удалось изменить порядок', tone: 'error' }),
+      onError: () => toast.error('Не удалось изменить порядок'),
     })
   }
 
   function remove(field: AdminField) {
     if (!window.confirm(`Удалить поле «${field.label}»?`)) return
     del.mutate(field.id, {
-      onSuccess: () => toast({ title: 'Поле удалено', tone: 'success' }),
-      onError: () => toast({ title: 'Не удалось удалить поле', tone: 'error' }),
+      onSuccess: () => toast.success('Поле удалено'),
+      onError: () => toast.error('Не удалось удалить поле'),
     })
   }
 

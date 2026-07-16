@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/shared/ui/select'
 import { Skeleton, ErrorState } from '@/shared/ui/states'
-import { useToast } from '@/shared/ui/toast'
+import { toast } from 'sonner'
 import { useAdminUser, useAssignRole, useRemoveRole } from '@/entities/user/queries'
 import { useAdminContests } from '@/entities/contest/queries'
 import { ApiRequestError } from '@/shared/api/client'
@@ -61,7 +61,6 @@ function RolesBody({ userId }: { userId: string }) {
   const contests = useAdminContests()
   const assign = useAssignRole(userId)
   const remove = useRemoveRole(userId)
-  const toast = useToast()
 
   const [role, setRole] = useState<RoleCode>('ADMIN')
   const [scopeId, setScopeId] = useState<string>('')
@@ -78,8 +77,8 @@ function RolesBody({ userId }: { userId: string }) {
 
   function onRemove(a: RoleAssignment) {
     remove.mutate(a, {
-      onSuccess: () => toast({ title: 'Роль снята', tone: 'info' }),
-      onError: () => toast({ title: 'Не удалось снять роль', tone: 'error' }),
+      onSuccess: () => toast.info('Роль снята'),
+      onError: () => toast.error('Не удалось снять роль'),
     })
   }
 
@@ -95,7 +94,7 @@ function RolesBody({ userId }: { userId: string }) {
       },
       {
         onSuccess: () => {
-          toast({ title: 'Роль назначена', tone: 'success' })
+          toast.success('Роль назначена')
           setScopeId('')
         },
         onError: (err) =>
