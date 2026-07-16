@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, Loader2, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { StatusBadge } from '@/entities/submission/status-badge'
-import { timeUntil } from '@/shared/lib/format'
+import { formatDateTime, timeUntil } from '@/shared/lib/format'
 import type { Challenge, SubmissionStatus } from '@/entities/challenge/types'
 import type { SaveState } from '@/features/submit-form/use-submission-form'
 import { cn } from '@/shared/lib/cn'
@@ -50,7 +50,9 @@ export function ChallengeFormHeader({
               )}
             >
               <Clock className="h-3.5 w-3.5" />
-              {deadline.overdue ? 'Дедлайн истёк' : `Осталось ${deadline.text}`}
+              {deadline.overdue
+                ? `Дедлайн истёк ${formatDateTime(challenge.deadline_at!)}`
+                : `Срок сдачи: ${formatDateTime(challenge.deadline_at!)}`}
             </span>
           )}
         </div>
