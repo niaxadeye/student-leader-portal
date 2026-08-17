@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, type RouteObject } from 'react-router-dom'
 import {
   RequireAuth,
   RequireGuest,
@@ -6,8 +6,9 @@ import {
   RequireParticipantGuest,
   RequireRole,
 } from '@/app/guards'
+import { RouteErrorPage } from '@/app/route-error-page'
 
-export const router = createBrowserRouter([
+const appRoutes: RouteObject[] = [
   { path: '/', element: <Navigate to="/login" replace /> },
   {
     element: <RequireGuest />,
@@ -200,4 +201,12 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <Navigate to="/login" replace /> },
+]
+
+export const router = createBrowserRouter([
+  {
+    element: <Outlet />,
+    errorElement: <RouteErrorPage />,
+    children: appRoutes,
+  },
 ])

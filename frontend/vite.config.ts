@@ -4,6 +4,15 @@ import path from 'node:path'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // iOS Safari older than the Vite 6 default browser baseline still occurs on
+    // event devices. Keep syntax within Safari 14 capabilities.
+    target: ['es2019', 'safari14'],
+    // A user may keep the SPA open while a new release is built. Preserve the
+    // previous hashed chunks so that an already loaded entry module can finish
+    // its lazy imports instead of receiving a 404.
+    emptyOutDir: false,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

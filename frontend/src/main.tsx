@@ -6,7 +6,16 @@ import { router } from '@/app/router'
 import { queryClient } from '@/app/query-client'
 import { AppToaster } from '@/shared/ui/toast'
 import { AuthProvider } from '@/entities/auth/auth-context'
+import { markModuleReloadAttempt } from '@/shared/lib/module-reload'
 import './app/styles/global.css'
+
+// Vite emits this event when a lazy route still references a chunk from the
+// previous release. Refresh once to load the current index/module graph.
+window.addEventListener('vite:preloadError', (event) => {
+  if (!markModuleReloadAttempt()) return
+  event.preventDefault()
+  window.location.reload()
+})
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
