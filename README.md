@@ -1,54 +1,148 @@
-# Student Leader Cabinet
+# Student Leader Portal
 
-Личный кабинет и административная панель конкурса «Студенческий лидер».
-Модульный монолит: **Go** (API + worker) + **React/Vite/TS** (SPA) + **PostgreSQL / S3**.
+Веб-платформа конкурса «Студенческий лидер» и мероприятий: административная
+панель, кабинет конкурсанта и отдельный кабинет участника мероприятия.
 
-Полная спецификация — [SITE.md](./SITE.md). Визуальные правила — [DESIGN.md](./DESIGN.md).
+Production: [eazytech.ru](https://eazytech.ru)
 
-## Стек и рантайм (этот сервер)
+## Возможности
 
-- PostgreSQL — в Docker Compose, порт только на `127.0.0.1`.
-- Файлы — во внешнем S3 (Timeweb Cloud), не в Docker.
-- Go `api` и `worker` — нативные бинарники под systemd (`infra/systemd/`).
-- nginx раздаёт `frontend/dist` и проксирует `/api/` на `127.0.0.1:8080`.
-- Домен: **eazytech.ru** (SSL через Certbot).
+### Административная панель
 
-## Быстрый старт (разработка)
+- JWT-аутентификация, refresh-сессии, RBAC и аудит действий;
+- конкурсы, конкурсанты, испытания и конструктор динамических форм;
+- черновики, отправка работ, immutable-ревизии и приватные файлы;
+- списки участников мероприятий, CSV/XLSX-импорт, экспорт и блокировка;
+- PointsLedger с идемпотентными начислениями и корректировками;
+- лекции, динамические QR-коды, camera/USB/manual attendance scanner;
+- задания, подтверждения выполнения и очередь модерации;
+- каталог мерча, резервирование остатков и баллов, выдача и отмена заказов;
+- transactional outbox и Telegram-уведомления.
+
+### Кабинет участника мероприятия
+
+- вход по ФИО и дате рождения, профсоюзному билету или barcode СКС;
+- баланс и история начислений;
+- короткоживущий QR-код посещения;
+- задания, повторная отправка после отклонения и приватные вложения;
+- магазин, цель накопления и история заказов.
+
+## Архитектура
+
+Модульный монолит:
+
+- `backend` — Go, Chi, pgx, PostgreSQL, AWS SDK for Go v2;
+- `frontend` — React 18, TypeScript, Vite, TanStack Query, Tailwind CSS;
+- `PostgreSQL` — единственный локальный infrastructure-контейнер;
+- `Timeweb Cloud S3` — внешнее приватное файловое хранилище;
+- `nginx` — HTTPS, раздача SPA и проксирование API.
+
+MinIO и Redis проекту не требуются.
+
+## Быстрый старт
+
+Понадобятся Go toolchain из [`backend/go.mod`](./backend/go.mod), Node.js, npm и
+Docker Compose.
+
+1. Создайте локальную конфигурацию и заполните секреты:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Запустите PostgreSQL:
+
+   ```bash
+   docker compose up -d postgres
+   ```
+
+3. Примените миграции и запустите API:
+
+   ```bash
+   set -a
+   . ./.env
+   set +a
+   (cd backend && go run ./cmd/admin migrate)
+   make api-run
+   ```
+
+4. В другом терминале запустите frontend:
+
+   ```bash
+   cd frontend
+   npm ci
+   npm run dev
+   ```
+
+По умолчанию API слушает `127.0.0.1:8080`, Vite — `127.0.0.1:5173`.
+
+## Конфигурация
+
+Все runtime-настройки читаются из окружения. Полный безопасный шаблон находится
+в [`.env.example`](./.env.example). Основные группы переменных:
+
+- `POSTGRES_*` — подключение к PostgreSQL;
+- `JWT_*`, `COOKIE_*` — staff-аутентификация;
+- `PARTICIPANT_*` — participant session, rate limit и QR;
+- `S3_*` — Timeweb Cloud S3 и presigned URL;
+- `TELEGRAM_*` — доставка уведомлений;
+- `FEATURE_*` — модули приложения.
+
+Файл `.env` игнорируется Git. Реальные пароли, JWT-ключи и S3 credentials нельзя
+добавлять в репозиторий.
+
+## Проверки
+
+Backend:
 
 ```bash
-cp .env.example .env      # заполнить секреты
-make up                   # поднять PostgreSQL
-make api-run              # запустить API (:8080)
-make frontend-dev         # фронтенд (:5173)
+cd backend
+go test -race ./...
+go vet ./...
 ```
 
-## Структура
+Frontend:
 
+```bash
+cd frontend
+npm run lint
+npm run build
 ```
-backend/    Go: cmd/{api,worker}, internal/{app,config,platform,modules}, api/openapi.yaml, db/migrations
-frontend/   React SPA (см. frontend/README.md)
-infra/      systemd-юниты, nginx, prometheus, скрипты
-docs/       архитектура, ADR, деплой
+
+Production smoke-сценарии находятся в [`backend/scripts`](./backend/scripts).
+Они создают и изменяют данные, поэтому запускать их следует только в подготовленном
+окружении.
+
+## Структура репозитория
+
+```text
+backend/
+  api/                 OpenAPI-контракт
+  cmd/                 API, admin CLI и worker
+  internal/modules/    бизнес-модули
+  internal/platform/   DB, migrations, security, S3, HTTP
+  scripts/             smoke-сценарии
+frontend/
+  src/app/             router и guards
+  src/entities/        API-клиенты, типы и queries
+  src/pages/           staff, contestant и participant UI
+infra/                 PM2/systemd-конфигурация
+docs/                  архитектура, ADR и эксплуатационные документы
 ```
 
-## Команды
+## Документация
 
-`make help` — полный список. Основные: `up`, `down`, `build`, `api-run`, `worker-run`, `frontend-dev`, `lint`, `fmt`.
+- [SITE.md](./SITE.md) — основная техническая спецификация;
+- [codex_event_platform_spec.md](./codex_event_platform_spec.md) — требования платформы мероприятий;
+- [docs/STATUS.md](./docs/STATUS.md) — текущее состояние проекта;
+- [work_user_func.md](./work_user_func.md) — журнал реализации и следующий шаг;
+- [backend/api/openapi.yaml](./backend/api/openapi.yaml) — OpenAPI 3.0;
+- [deploy_server.md](./deploy_server.md) — развёртывание и обслуживание сервера;
+- [DESIGN.md](./DESIGN.md) — визуальные правила интерфейса.
 
-## Этапы
+## Текущий статус
 
-Разработка идёт по этапам из [SITE.md §47](./SITE.md). Статус ведём здесь — обновлять по мере работы.
-
-| Этап | Что | Статус |
-|------|-----|--------|
-| 0 | Инфраструктура и скелеты | ✅ готово |
-| 1 | Авторизация (JWT, refresh, сессии, RBAC, аудит) | ✅ готово |
-| 2 | Конкурсы и конкурсанты | ✅ готово |
-| 3 | Испытания и конструктор форм | ✅ готово |
-| 4 | Подача ответов (submissions, черновики, ревизии, файлы) | ✅ готово |
-| 5 | Уведомления (outbox + Telegram) | ✅ готово |
-| 6–10 | Справка, аудит/экспорт, hardening, будущие модули | ⬜ не начато |
-
-**Текущий фокус:** ручной прогон в браузере + подключение реального Telegram-бота (токен в `.env`). Дальше — Этап 6 (файлы/справка по дорожной карте SITE.md §47).
-
-Детальное состояние и точки входа между сессиями — [docs/STATUS.md](./docs/STATUS.md).
+Основное бизнес-ядро развёрнуто: участники, баллы, лекции и attendance, задания,
+мерч и Timeweb S3. Ближайший этап — release hardening, browser acceptance и
+расширение интеграционных тестов. Детали и известный технический долг ведутся в
+[`work_user_func.md`](./work_user_func.md).
