@@ -17,8 +17,8 @@ func Load() (*Config, error) {
 			APIURL:  env("API_BASE_URL", "http://localhost:8080"),
 		},
 		HTTP: HTTP{
-			Host:         env("HTTP_HOST", "127.0.0.1"),
-			Port:         env("HTTP_PORT", "8080"),
+			Host: env("HTTP_HOST", "127.0.0.1"),
+			Port: env("HTTP_PORT", "8080"),
 			// Таймауты подняты под загрузку крупных файлов (до DEFAULT_MAX_FILE_SIZE_MB) на медленных каналах.
 			ReadTimeout:  envDur("HTTP_READ_TIMEOUT", 20*time.Minute),
 			WriteTimeout: envDur("HTTP_WRITE_TIMEOUT", 20*time.Minute),
@@ -29,14 +29,11 @@ func Load() (*Config, error) {
 			DB: env("POSTGRES_DB", "student_leader"), User: env("POSTGRES_USER", "student_leader"),
 			Password: env("POSTGRES_PASSWORD", ""), SSLMode: env("POSTGRES_SSLMODE", "disable"),
 		},
-		Redis: Redis{URL: env("REDIS_URL", "redis://127.0.0.1:6379/0")},
 		S3: S3{
-			Endpoint: env("S3_ENDPOINT", "http://127.0.0.1:9000"), Region: env("S3_REGION", "us-east-1"),
-			Bucket: env("S3_BUCKET", "student-leader-files"), AccessKey: env("S3_ACCESS_KEY", "minio"),
+			Endpoint: env("S3_ENDPOINT", "https://s3.twcstorage.ru"), Region: env("S3_REGION", "ru-1"),
+			Bucket: env("S3_BUCKET", ""), AccessKey: env("S3_ACCESS_KEY", ""),
 			SecretKey: env("S3_SECRET_KEY", ""), UsePathStyle: envBool("S3_USE_PATH_STYLE", true),
-			PresignTTL:     envDur("S3_PRESIGN_TTL", 24*time.Hour),
-			PublicEndpoint: env("S3_PUBLIC_ENDPOINT", "eazytech.ru"),
-			PublicSecure:   envBool("S3_PUBLIC_SECURE", true),
+			PresignTTL: envDur("S3_PRESIGN_TTL", 15*time.Minute),
 		},
 		JWT: JWT{
 			Issuer: env("JWT_ISSUER", "student-leader-cabinet"), Audience: env("JWT_AUDIENCE", "student-leader-web"),
@@ -46,6 +43,14 @@ func Load() (*Config, error) {
 		Cookie: Cookie{
 			Domain: env("COOKIE_DOMAIN", "localhost"), Secure: envBool("COOKIE_SECURE", false),
 			SameSite: env("COOKIE_SAMESITE", "lax"),
+		},
+		ParticipantAuth: ParticipantAuth{
+			CookieName:        env("PARTICIPANT_COOKIE_NAME", "slc_participant_session"),
+			SessionTTL:        envDur("PARTICIPANT_SESSION_TTL", 12*time.Hour),
+			RateLimitWindow:   envDur("PARTICIPANT_LOGIN_RATE_WINDOW", 5*time.Minute),
+			RateLimitAttempts: envInt("PARTICIPANT_LOGIN_RATE_ATTEMPTS", 10),
+			QRSecret:          env("PARTICIPANT_QR_SECRET", env("JWT_REFRESH_SECRET", "")),
+			QRTTL:             envDur("PARTICIPANT_QR_TTL", 45*time.Second),
 		},
 		Telegram: Telegram{
 			BotToken: env("TELEGRAM_BOT_TOKEN", ""), DefaultChatID: env("TELEGRAM_DEFAULT_CHAT_ID", ""),

@@ -32,7 +32,6 @@
 - миграции через `goose`, `tern` или аналог;
 - JWT access/refresh;
 - S3-совместимое объектное хранилище;
-- Redis для распределённого rate limit, locks и фоновых задач при необходимости;
 - Telegram Bot API;
 - Prometheus;
 - OpenTelemetry;
@@ -46,9 +45,8 @@
 - HTTPS;
 - CI/CD;
 - staging и production;
-- MinIO в локальной среде;
 - PostgreSQL;
-- Redis;
+- внешний Timeweb Cloud S3;
 - отдельные процессы `api` и `worker`.
 
 Точные версии зависимостей фиксируются в `go.mod`, `package.json` и lock-файлах.
@@ -696,8 +694,7 @@ ADMIN_CORRECTION
 
 ## 13.2. Хранилище
 
-- production: S3-совместимое;
-- development: MinIO;
+- production и development: внешний S3-совместимый сервис;
 - PostgreSQL хранит только метаданные;
 - bucket не публичный.
 
@@ -2053,10 +2050,10 @@ COOKIE_DOMAIN=localhost
 COOKIE_SECURE=false
 COOKIE_SAMESITE=lax
 
-S3_ENDPOINT=http://minio:9000
-S3_REGION=us-east-1
-S3_BUCKET=student-leader-files
-S3_ACCESS_KEY=minio
+S3_ENDPOINT=https://s3.twcstorage.ru
+S3_REGION=ru-1
+S3_BUCKET=3babd9c9-82a4-4c5f-b382-11f24effd682
+S3_ACCESS_KEY=change_me
 S3_SECRET_KEY=change_me
 S3_USE_PATH_STYLE=true
 S3_PRESIGN_TTL=15m
@@ -2065,8 +2062,6 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_DEFAULT_CHAT_ID=
 TELEGRAM_DEFAULT_THREAD_ID=
 TELEGRAM_NOTIFICATIONS_ENABLED=false
-
-REDIS_URL=redis://redis:6379/0
 
 MAX_JSON_BODY_MB=2
 DEFAULT_MAX_FILE_SIZE_MB=2048
@@ -2097,9 +2092,6 @@ frontend
 backend-api
 backend-worker
 postgres
-redis
-minio
-minio-init
 clamav
 prometheus
 grafana
@@ -2552,8 +2544,7 @@ Claude Code обязан:
 - добавить backend;
 - Docker Compose;
 - PostgreSQL;
-- Redis;
-- MinIO;
+- внешний S3;
 - конфигурацию;
 - Makefile;
 - линтеры;
@@ -2618,7 +2609,7 @@ Claude Code обязан:
 
 ## Этап 5. Файлы
 
-- MinIO;
+- внешний S3;
 - presigned upload;
 - multipart upload;
 - progress;
@@ -3171,8 +3162,7 @@ Claude должен создавать проект итеративно:
 - monorepo;
 - Docker Compose;
 - PostgreSQL;
-- Redis;
-- MinIO;
+- внешний S3;
 - backend skeleton;
 - frontend skeleton;
 - Makefile;

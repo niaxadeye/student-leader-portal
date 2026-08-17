@@ -2,10 +2,13 @@ package submissions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
 	"strings"
+
+	"github.com/eazytech/student-leader-cabinet/internal/platform/filevalidation"
 )
 
 // FileStore — часть storage, нужная модулю (запись/удаление объектов).
@@ -25,7 +28,7 @@ type UploadInput struct {
 	KeySuffix    string // уникальный суффикс ключа (передаётся хендлером: без Date/rand в модуле)
 }
 
-// UploadFile сохраняет файл в MinIO и привязывает его к черновику работы (SITE.md §13.3).
+// UploadFile сохраняет файл в S3 и привязывает его к черновику работы (SITE.md §13.3).
 // Разрешено только на открытом окне подачи; тип/размер валидируются по настройкам поля.
 func (s *Service) UploadFile(ctx context.Context, a Actor, in UploadInput, store FileStore) (*SubmissionFile, error) {
 	info, sub, err := s.loadForWrite(ctx, a, in.ChallengeID)
@@ -45,6 +48,9 @@ func (s *Service) UploadFile(ctx context.Context, a Actor, in UploadInput, store
 	}
 	ext := strings.TrimPrefix(strings.ToLower(path.Ext(in.OriginalName)), ".")
 	if err := validateFile(field, ext, in.Size); err != nil {
+		return nil, err
+	}
+	if in, err = inspectImageUpload(in, ext); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +91,23 @@ func (s *Service) UploadFile(ctx context.Context, a Actor, in UploadInput, store
 	return out, nil
 }
 
-// DeleteFile удаляет файл из черновика (soft) и объект из MinIO. Только владелец, только открытое окно.
+func inspectImageUpload(in UploadInput, extension string) (UploadInput, error) {
+	switch extension {
+	case "jpg", "jpeg", "png", "webp", "gif":
+		reader, mime, err := filevalidation.InspectImage(in.Reader, in.ContentType, in.OriginalName)
+		if err != nil {
+			if errors.Is(err, filevalidation.ErrInvalidImage) {
+				return UploadInput{}, fmt.Errorf("%w: содержимое изображения не соответствует его типу", ErrValidation)
+			}
+			return UploadInput{}, err
+		}
+		in.Reader = reader
+		in.ContentType = mime
+	}
+	return in, nil
+}
+
+// DeleteFile удаляет файл из черновика (soft) и объект из S3. Только владелец, только открытое окно.
 func (s *Service) DeleteFile(ctx context.Context, a Actor, challengeID, fileID string, store FileStore) error {
 	info, sub, err := s.loadForWrite(ctx, a, challengeID)
 	if err != nil {

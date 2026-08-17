@@ -1,15 +1,44 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/entities/auth/auth-context'
+import { useParticipantAuth } from '@/entities/event-participant/auth-context'
 import { landingPath } from '@/entities/auth/roles'
 import type { RoleCode } from '@/entities/auth/types'
 import { Loader2 } from 'lucide-react'
 
-function FullscreenLoader() {
+export function FullscreenLoader() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-2">
       <Loader2 className="h-6 w-6 animate-spin text-brand" aria-label="Загрузка" />
     </div>
   )
+}
+
+function participantPath(eventSlug: string, page: 'login' | 'me'): string {
+  return `/event/${encodeURIComponent(eventSlug)}/${page}`
+}
+
+/** Защищает кабинет отдельной participant cookie и проверяет scope мероприятия. */
+export function RequireParticipantAuth() {
+  const { eventSlug = '' } = useParams()
+  const { status, session } = useParticipantAuth()
+
+  if (status === 'loading') return <FullscreenLoader />
+  if (status !== 'authenticated' || !session || session.event.slug !== eventSlug) {
+    return <Navigate to={participantPath(eventSlug, 'login')} replace />
+  }
+  return <Outlet />
+}
+
+/** Уже вошедшего в это мероприятие участника уводит из login в его кабинет. */
+export function RequireParticipantGuest() {
+  const { eventSlug = '' } = useParams()
+  const { status, session } = useParticipantAuth()
+
+  if (status === 'loading') return <FullscreenLoader />
+  if (status === 'authenticated' && session?.event.slug === eventSlug) {
+    return <Navigate to={participantPath(eventSlug, 'me')} replace />
+  }
+  return <Outlet />
 }
 
 /** Требует авторизации. Форсит смену пароля, если она обязательна. */

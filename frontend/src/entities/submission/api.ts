@@ -57,7 +57,7 @@ export function submitSubmission(
   })
 }
 
-// Загрузить файл в поле (multipart → MinIO через API).
+// Загрузить файл в поле (multipart → S3 через API).
 export function uploadSubmissionFile(
   challengeId: string,
   fieldId: string,

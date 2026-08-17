@@ -9,7 +9,7 @@ import (
 	"github.com/eazytech/student-leader-cabinet/internal/platform/httpserver"
 )
 
-// UploadFile — POST .../submission/files (multipart: field_id, file). Проксирует в MinIO.
+// UploadFile — POST .../submission/files (multipart: field_id, file). Проксирует в S3.
 func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		httpserver.WriteError(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "Хранилище файлов недоступно", nil)

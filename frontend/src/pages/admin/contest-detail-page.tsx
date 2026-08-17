@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Users, Calendar, Rocket, Flag, Archive, Pencil, PencilRuler } from 'lucide-react'
+import {
+  ArrowLeft,
+  Users,
+  Calendar,
+  Rocket,
+  Flag,
+  Archive,
+  Pencil,
+  PencilRuler,
+  Copy,
+  ExternalLink,
+} from 'lucide-react'
 import { useAdminContest, useTransitionContest } from '@/entities/contest/queries'
 import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -12,11 +23,11 @@ import { contestStatusMeta } from './contest-status'
 import { ContestantsTable } from './contestants-table'
 import { ChallengesSection } from './challenges-section'
 import { EditContestDialog } from './edit-contest-dialog'
-import {
-  canEditContest,
-  canManageParticipants,
-  type ContestStatus,
-} from '@/entities/contest/types'
+import { EventParticipantsSection } from './event-participants-section'
+import { LecturesSection } from './lectures-section'
+import { EventTasksSection } from './event-tasks-section'
+import { MerchSection } from './merch-section'
+import { canEditContest, canManageParticipants, type ContestStatus } from '@/entities/contest/types'
 
 /** Доступные переходы по статусу (зеркалит матрицу бэкенда). */
 const actionsByStatus: Record<ContestStatus, Array<'publish' | 'finish' | 'archive'>> = {
@@ -87,6 +98,29 @@ export function AdminContestDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button asChild size="sm" variant="subtle">
+            <a
+              href={`/event/${encodeURIComponent(contest.slug)}/login`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="h-4 w-4" /> Вход участника
+            </a>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label="Скопировать ссылку для участников"
+            onClick={() => {
+              const link = `${window.location.origin}/event/${encodeURIComponent(contest.slug)}/login`
+              void navigator.clipboard.writeText(link).then(
+                () => toast.success('Ссылка для участников скопирована'),
+                () => toast.error('Не удалось скопировать ссылку'),
+              )
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
           {canEdit && contest.status !== 'ARCHIVED' && (
             <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Редактировать
@@ -139,7 +173,36 @@ export function AdminContestDetailPage() {
         <ChallengesSection contestId={contest.id} canEdit={canEdit} />
       </div>
 
-      <h2 className="mb-3 text-[20px] font-semibold text-ink">Конкурсанты</h2>
+      {canEdit && (
+        <div className="mb-8">
+          <LecturesSection contestId={contest.id} />
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="mb-8">
+          <EventTasksSection contestId={contest.id} />
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="mb-8">
+          <MerchSection contestId={contest.id} />
+        </div>
+      )}
+
+      {canManage && (
+        <div className="mb-8">
+          <EventParticipantsSection contestId={contest.id} />
+        </div>
+      )}
+
+      <div className="mb-3">
+        <h2 className="text-[20px] font-semibold text-ink">Конкурсные аккаунты</h2>
+        <p className="mt-1 text-[13px] text-muted">
+          Пользователи старого конкурсного кабинета с логином и паролем.
+        </p>
+      </div>
       <ContestantsTable contestId={contest.id} canManage={canManage} />
 
       <EditContestDialog contest={contest} open={editOpen} onOpenChange={setEditOpen} />

@@ -21,7 +21,8 @@ export class ApiRequestError extends Error {
   }
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+const BASE_URL = API_BASE_URL
 
 // ── Хранилище access-токена (in-memory) ─────────────────────────────────────
 let accessToken: string | null = null
@@ -143,7 +144,10 @@ export async function apiPostText<T>(path: string, text: string): Promise<T> {
   const res = await rawTextRequest(path, 'POST', text, 'text/csv')
   const json = await res.json().catch(() => null)
   if (!res.ok) {
-    throw new ApiRequestError(res.status, json?.error ?? { code: 'INTERNAL_ERROR', message: 'Ошибка импорта' })
+    throw new ApiRequestError(
+      res.status,
+      json?.error ?? { code: 'INTERNAL_ERROR', message: 'Ошибка импорта' },
+    )
   }
   return json.data as T
 }
@@ -155,6 +159,19 @@ export async function apiGetText(path: string): Promise<string> {
     throw new ApiRequestError(res.status, { code: 'INTERNAL_ERROR', message: 'Ошибка экспорта' })
   }
   return res.text()
+}
+
+/** GET бинарного файла с тем же staff auth/refresh flow. */
+export async function apiGetBlob(path: string): Promise<Blob> {
+  const res = await rawTextRequest(path, 'GET')
+  if (!res.ok) {
+    const json = await res.json().catch(() => null)
+    throw new ApiRequestError(
+      res.status,
+      json?.error ?? { code: 'INTERNAL_ERROR', message: 'Ошибка экспорта' },
+    )
+  }
+  return res.blob()
 }
 
 // ── Multipart-загрузка (файлы submission) ────────────────────────────────────

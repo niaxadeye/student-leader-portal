@@ -4,17 +4,17 @@ package config
 import "time"
 
 type Config struct {
-	App      App
-	HTTP     HTTP
-	Postgres Postgres
-	Redis    Redis
-	S3       S3
-	JWT      JWT
-	Cookie   Cookie
-	Telegram Telegram
-	Limits   Limits
-	Features Features
-	LogLevel string
+	App             App
+	HTTP            HTTP
+	Postgres        Postgres
+	S3              S3
+	JWT             JWT
+	Cookie          Cookie
+	ParticipantAuth ParticipantAuth
+	Telegram        Telegram
+	Limits          Limits
+	Features        Features
+	LogLevel        string
 }
 
 type App struct {
@@ -36,18 +36,10 @@ type Postgres struct {
 	Host, Port, DB, User, Password, SSLMode string
 }
 
-type Redis struct {
-	URL string
-}
-
 type S3 struct {
 	Endpoint, Region, Bucket, AccessKey, SecretKey string
 	UsePathStyle                                   bool
 	PresignTTL                                     time.Duration
-	// PublicEndpoint — хост, под которым presigned-URL отдаётся браузеру
-	// (nginx проксирует его на внутренний MinIO). PublicSecure=true → https.
-	PublicEndpoint string
-	PublicSecure   bool
 }
 
 type JWT struct {
@@ -59,6 +51,15 @@ type Cookie struct {
 	Domain   string
 	Secure   bool
 	SameSite string
+}
+
+type ParticipantAuth struct {
+	CookieName        string
+	SessionTTL        time.Duration
+	RateLimitWindow   time.Duration
+	RateLimitAttempts int
+	QRSecret          string
+	QRTTL             time.Duration
 }
 
 type Telegram struct {

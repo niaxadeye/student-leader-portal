@@ -1,7 +1,7 @@
 # Dev environment launcher for Windows (PowerShell).
 #   Usage:  ./dev.ps1            - infra + api + worker + frontend
 #           ./dev.ps1 -NoFront   - backend only (api + worker)
-#           ./dev.ps1 -InfraOnly - docker only (Postgres/Redis/MinIO)
+#           ./dev.ps1 -InfraOnly - docker only (PostgreSQL)
 #
 # Each process (api / worker / vite) opens in its own PowerShell window.
 # To stop dev, just close those windows.
@@ -28,7 +28,7 @@ Get-Content $envFile | ForEach-Object {
   [Environment]::SetEnvironmentVariable($name, $value, 'Process')
 }
 
-# --- 1. infrastructure (Postgres/Redis/MinIO) ------------------------------
+# --- 1. infrastructure (PostgreSQL) ----------------------------------------
 Write-Host '==> docker compose up -d' -ForegroundColor Cyan
 docker compose up -d
 if ($LASTEXITCODE -ne 0) { Write-Error 'docker compose failed' }

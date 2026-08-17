@@ -1,6 +1,6 @@
 -- Подача ответов конкурсантом: работы, immutable-ревизии, файлы (SITE.md §21.11–21.14, Этап 4).
 
--- files — метаданные объектов в MinIO. Пишется до привязки к submission (черновик).
+-- files — метаданные объектов в S3. Пишется до привязки к submission (черновик).
 CREATE TABLE files (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_user_id  UUID NOT NULL REFERENCES users (id),

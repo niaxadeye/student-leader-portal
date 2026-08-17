@@ -9,6 +9,13 @@ export function formatDate(iso: string): string {
   return formatDateTime(iso).split(' ')[0]
 }
 
+/** Форматирует календарную дату без timezone-сдвига (например, дату рождения). */
+export function formatDateOnly(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate)
+  if (!match) return isoDate
+  return `${match[3]}.${match[2]}.${match[1]}`
+}
+
 /** ISO → значение для <input type="datetime-local"> (локальное время, без TZ-суффикса). */
 export function isoToLocalInput(iso: string | null): string {
   if (!iso) return ''

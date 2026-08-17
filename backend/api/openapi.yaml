@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Student Leader Cabinet API
-  version: 0.1.0
+  version: 0.6.0
   description: >
     REST API личного кабинета студенческого лидера. Все ответы обёрнуты в envelope
     {data, meta, request_id} либо {error, request_id} (SITE.md §20, §50).
@@ -29,7 +29,980 @@ paths:
                       data:
                         $ref: '#/components/schemas/AppConfig'
 
+  /events/{eventSlug}/participant-auth/fio:
+    parameters: [{ $ref: '#/components/parameters/EventSlug' }]
+    post:
+      tags: [Participant auth]
+      summary: Вход участника по ФИО и дате рождения
+      operationId: participantLoginByName
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParticipantNameLogin' }
+      responses:
+        '200': { $ref: '#/components/responses/ParticipantSession' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /events/{eventSlug}/participant-auth/union-card:
+    parameters: [{ $ref: '#/components/parameters/EventSlug' }]
+    post:
+      tags: [Participant auth]
+      summary: Вход участника по номеру профсоюзного билета
+      operationId: participantLoginByUnionCard
+      requestBody:
+        $ref: '#/components/requestBodies/ParticipantIdentifier'
+      responses:
+        '200': { $ref: '#/components/responses/ParticipantSession' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /events/{eventSlug}/participant-auth/sks:
+    parameters: [{ $ref: '#/components/parameters/EventSlug' }]
+    post:
+      tags: [Participant auth]
+      summary: Вход участника по barcode СКС
+      operationId: participantLoginBySKS
+      requestBody:
+        $ref: '#/components/requestBodies/ParticipantIdentifier'
+      responses:
+        '200': { $ref: '#/components/responses/ParticipantSession' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/me:
+    get:
+      tags: [Participant]
+      summary: Текущий участник и мероприятие
+      operationId: participantMe
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ParticipantSession' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/logout:
+    post:
+      tags: [Participant auth]
+      summary: Завершить текущую participant session
+      operationId: participantLogout
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/points:
+    get:
+      tags: [Points]
+      summary: Баланс и журнал баллов текущего участника
+      operationId: participantPoints
+      security: [{ participantCookie: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/lectures:
+    get:
+      tags: [Attendance]
+      summary: Лекции и посещения текущего участника
+      operationId: participantLectures
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/qr:
+    post:
+      tags: [Attendance]
+      summary: Выпустить одноразовый QR-код посещения
+      operationId: participantIssueQR
+      security: [{ participantCookie: [] }]
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/tasks:
+    get:
+      tags: [Tasks]
+      summary: Активные задания и отправки текущего участника
+      operationId: participantTasks
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/tasks/{taskId}:
+    parameters: [{ $ref: '#/components/parameters/TaskId' }]
+    get:
+      tags: [Tasks]
+      summary: Задание текущего участника
+      operationId: participantTask
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/tasks/{taskId}/submissions:
+    parameters: [{ $ref: '#/components/parameters/TaskId' }]
+    post:
+      tags: [Tasks]
+      summary: Отправить подтверждение выполнения задания
+      operationId: participantSubmitTask
+      security: [{ participantCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                participant_comment: { type: string, maxLength: 2000 }
+                links: { type: array, maxItems: 10, items: { type: string, format: uri } }
+                images: { type: array, maxItems: 10, items: { type: string, format: binary } }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/task-assets/{assetId}:
+    parameters: [{ $ref: '#/components/parameters/AssetId' }]
+    get:
+      tags: [Tasks]
+      summary: Получить временную ссылку на собственный файл задания
+      operationId: participantTaskAsset
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/DownloadURL' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/merch:
+    get:
+      tags: [Merch]
+      summary: Доступный каталог мерча
+      operationId: participantMerch
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/merch/{productSlug}:
+    parameters: [{ $ref: '#/components/parameters/ProductSlug' }]
+    get:
+      tags: [Merch]
+      summary: Карточка товара
+      operationId: participantMerchProduct
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/merch-saving-target:
+    put:
+      tags: [Merch]
+      summary: Установить цель накопления
+      operationId: participantSetSavingTarget
+      security: [{ participantCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties: { product_id: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Merch]
+      summary: Удалить цель накопления
+      operationId: participantDeleteSavingTarget
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/orders:
+    get:
+      tags: [Merch]
+      summary: Заказы текущего участника
+      operationId: participantOrders
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Merch]
+      summary: Зарезервировать товары и баллы
+      operationId: participantReserveOrder
+      security: [{ participantCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReserveOrderInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/orders/{orderId}:
+    parameters: [{ $ref: '#/components/parameters/OrderId' }]
+    get:
+      tags: [Merch]
+      summary: Собственный заказ
+      operationId: participantOrder
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /participant/orders/{orderId}/cancel:
+    parameters: [{ $ref: '#/components/parameters/OrderId' }]
+    post:
+      tags: [Merch]
+      summary: Отменить зарезервированный заказ
+      operationId: participantCancelOrder
+      security: [{ participantCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Event participants]
+      summary: Реестр участников мероприятия
+      operationId: adminEventParticipants
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      parameters:
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ParticipantStatus' } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Event participants]
+      summary: Добавить участника мероприятия
+      operationId: adminCreateEventParticipant
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParticipantInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/import:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    post:
+      tags: [Event participants]
+      summary: Импортировать CSV или XLSX участников
+      operationId: adminImportEventParticipants
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties: { file: { type: string, format: binary } }
+          text/csv:
+            schema: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/export:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Event participants]
+      summary: Экспортировать реестр участников
+      operationId: adminExportEventParticipants
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv, xlsx], default: csv }
+      responses:
+        '200':
+          description: CSV или XLSX
+          content:
+            text/csv: { schema: { type: string, format: binary } }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/{participantId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ParticipantId' }
+    get:
+      tags: [Event participants]
+      summary: Участник мероприятия
+      operationId: adminEventParticipant
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Event participants]
+      summary: Изменить участника мероприятия
+      operationId: adminUpdateEventParticipant
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParticipantInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/{participantId}/block:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ParticipantId' }
+    post:
+      tags: [Event participants]
+      summary: Заблокировать участника и отозвать его сессии
+      operationId: adminBlockEventParticipant
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/{participantId}/unblock:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ParticipantId' }
+    post:
+      tags: [Event participants]
+      summary: Разблокировать участника
+      operationId: adminUnblockEventParticipant
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/{participantId}/archive:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ParticipantId' }
+    post:
+      tags: [Event participants]
+      summary: Архивировать участника
+      operationId: adminArchiveEventParticipant
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.participants.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/{participantId}/points:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ParticipantId' }
+    get:
+      tags: [Points]
+      summary: Баланс и журнал баллов участника
+      operationId: adminParticipantPoints
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.points.manage
+      parameters:
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/participants/{participantId}/points/adjustments:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ParticipantId' }
+    post:
+      tags: [Points]
+      summary: Добавить корректировку баллов
+      operationId: adminAdjustParticipantPoints
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.points.manage
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PointsAdjustmentInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/lectures:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Attendance]
+      summary: Лекции мероприятия
+      operationId: adminLectures
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Attendance]
+      summary: Создать лекцию
+      operationId: adminCreateLecture
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LectureInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/lectures/{lectureId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/LectureId' }
+    get:
+      tags: [Attendance]
+      summary: Лекция
+      operationId: adminLecture
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Attendance]
+      summary: Изменить лекцию
+      operationId: adminUpdateLecture
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LectureInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Attendance]
+      summary: Удалить лекцию без посещений
+      operationId: adminDeleteLecture
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/lectures/{lectureId}/activate:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/LectureId' }
+    post:
+      tags: [Attendance]
+      summary: Активировать лекцию
+      operationId: adminActivateLecture
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/lectures/{lectureId}/finish:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/LectureId' }
+    post:
+      tags: [Attendance]
+      summary: Завершить лекцию
+      operationId: adminFinishLecture
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/lectures/{lectureId}/attendance:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/LectureId' }
+    get:
+      tags: [Attendance]
+      summary: Журнал посещений лекции
+      operationId: adminLectureAttendance
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/lectures/{lectureId}/attendance/scan:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/LectureId' }
+    post:
+      tags: [Attendance]
+      summary: Зарегистрировать посещение по QR
+      operationId: adminScanLectureAttendance
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.attendance.scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttendanceScanInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/tasks:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Tasks]
+      summary: Задания мероприятия
+      operationId: adminTasks
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Tasks]
+      summary: Создать задание
+      operationId: adminCreateTask
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/tasks/{taskId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/TaskId' }
+    get:
+      tags: [Tasks]
+      summary: Задание
+      operationId: adminTask
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Tasks]
+      summary: Изменить задание
+      operationId: adminUpdateTask
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Tasks]
+      summary: Удалить задание без отправок
+      operationId: adminDeleteTask
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/tasks/{taskId}/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/TaskId' }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [activate, disable, archive] }
+    post:
+      tags: [Tasks]
+      summary: Изменить статус задания
+      operationId: adminTransitionTask
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/tasks/{taskId}/image:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/TaskId' }
+    post:
+      tags: [Tasks]
+      summary: Загрузить изображение задания
+      operationId: adminSetTaskImage
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties: { image: { type: string, format: binary } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Tasks]
+      summary: Удалить изображение задания
+      operationId: adminDeleteTaskImage
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/task-submissions:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Task moderation]
+      summary: Очередь подтверждений заданий
+      operationId: adminTaskSubmissions
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.moderate
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/SubmissionStatus' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/task-submissions/{submissionId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/SubmissionId' }
+    get:
+      tags: [Task moderation]
+      summary: Подтверждение задания
+      operationId: adminTaskSubmission
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.moderate
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/task-submissions/{submissionId}/{decision}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/SubmissionId' }
+      - name: decision
+        in: path
+        required: true
+        schema: { type: string, enum: [approve, reject] }
+    post:
+      tags: [Task moderation]
+      summary: Принять решение по подтверждению
+      operationId: adminModerateTaskSubmission
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.tasks.moderate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModerationInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/products:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Merch admin]
+      summary: Полный каталог товаров
+      operationId: adminMerchProducts
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Merch admin]
+      summary: Создать товар
+      operationId: adminCreateMerchProduct
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/products/{productId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ProductId' }
+    get:
+      tags: [Merch admin]
+      summary: Товар
+      operationId: adminMerchProduct
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Merch admin]
+      summary: Изменить товар и остаток
+      operationId: adminUpdateMerchProduct
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Merch admin]
+      summary: Удалить товар без истории заказов
+      operationId: adminDeleteMerchProduct
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/products/{productId}/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ProductId' }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [activate, hide] }
+    post:
+      tags: [Merch admin]
+      summary: Изменить видимость товара
+      operationId: adminTransitionMerchProduct
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/products/{productId}/images:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ProductId' }
+    post:
+      tags: [Merch admin]
+      summary: Добавить изображение товара
+      operationId: adminAddMerchImage
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+                sort_order: { type: integer, default: 0 }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/products/{productId}/images/{imageId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/ProductId' }
+      - { $ref: '#/components/parameters/ImageId' }
+    delete:
+      tags: [Merch admin]
+      summary: Удалить изображение товара
+      operationId: adminDeleteMerchImage
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/orders:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Merch orders]
+      summary: Очередь заказов
+      operationId: adminMerchOrders
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.orders.manage
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/OrderStatus' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/orders/{orderId}:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/OrderId' }
+    get:
+      tags: [Merch orders]
+      summary: Заказ
+      operationId: adminMerchOrder
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.orders.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/orders/{orderId}/issue:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/OrderId' }
+    post:
+      tags: [Merch orders]
+      summary: Выдать заказ и списать баллы
+      operationId: adminIssueMerchOrder
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.orders.manage
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/merch/orders/{orderId}/reject:
+    parameters:
+      - { $ref: '#/components/parameters/ContestId' }
+      - { $ref: '#/components/parameters/OrderId' }
+    post:
+      tags: [Merch orders]
+      summary: Отклонить заказ и освободить резерв
+      operationId: adminRejectMerchOrder
+      security: [{ bearerAuth: [] }]
+      x-required-permission: event.merch.orders.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties: { reason: { type: string, minLength: 3, maxLength: 2000 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
 components:
+  parameters:
+    ContestId: { name: contestId, in: path, required: true, schema: { type: string, format: uuid } }
+    ParticipantId: { name: participantId, in: path, required: true, schema: { type: string, format: uuid } }
+    LectureId: { name: lectureId, in: path, required: true, schema: { type: string, format: uuid } }
+    TaskId: { name: taskId, in: path, required: true, schema: { type: string, format: uuid } }
+    SubmissionId: { name: submissionId, in: path, required: true, schema: { type: string, format: uuid } }
+    AssetId: { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+    ProductId: { name: productId, in: path, required: true, schema: { type: string, format: uuid } }
+    ProductSlug: { name: productSlug, in: path, required: true, schema: { type: string } }
+    ImageId: { name: imageId, in: path, required: true, schema: { type: string, format: uuid } }
+    OrderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+    EventSlug: { name: eventSlug, in: path, required: true, schema: { type: string } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+    Offset: { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 8, maxLength: 200 }
+
+  requestBodies:
+    ParticipantIdentifier:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Допустимы value либо профильное имя поля endpoint.
+            properties:
+              value: { type: string }
+              union_card_number: { type: string }
+              sks_barcode: { type: string }
+
+  responses:
+    Success:
+      description: Успешный ответ в общем envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+    Created:
+      description: Ресурс создан; идемпотентный replay может вернуть 200
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+    ParticipantSession:
+      description: Participant cookie установлена или уже подтверждена
+      content:
+        application/json:
+          schema:
+            allOf:
+              - { $ref: '#/components/schemas/SuccessEnvelope' }
+              - type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ParticipantSession' }
+    DownloadURL:
+      description: Короткоживущая ссылка на объект
+      content:
+        application/json:
+          schema:
+            allOf:
+              - { $ref: '#/components/schemas/SuccessEnvelope' }
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    required: [download_url]
+                    properties: { download_url: { type: string, format: uri } }
+    Error:
+      description: Ошибка в общем envelope; HTTP status и error.code зависят от причины
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
   schemas:
     SuccessEnvelope:
       type: object
@@ -72,6 +1045,27 @@ components:
                 - IDEMPOTENCY_CONFLICT
                 - RATE_LIMIT_EXCEEDED
                 - TELEGRAM_DELIVERY_FAILED
+                - NOT_FOUND
+                - PARTICIPANT_IDENTIFIER_TAKEN
+                - PARTICIPANT_IDENTITY_AMBIGUOUS
+                - PARTICIPANT_AUTH_FAILED
+                - PARTICIPANT_SESSION_EXPIRED
+                - LECTURE_NOT_FOUND
+                - INVALID_LECTURE_TRANSITION
+                - LECTURE_HAS_ATTENDANCE
+                - ATTENDANCE_CLOSED
+                - QR_INVALID
+                - QR_EXPIRED
+                - QR_REPLAYED
+                - PARTICIPANT_UNAVAILABLE
+                - TASK_NOT_FOUND
+                - INVALID_TASK_TRANSITION
+                - TASK_SUBMISSION_CLOSED
+                - STORAGE_UNAVAILABLE
+                - MERCH_NOT_FOUND
+                - INVALID_MERCH_TRANSITION
+                - INSUFFICIENT_STOCK
+                - INSUFFICIENT_POINTS
                 - INTERNAL_ERROR
             message:
               type: string
@@ -101,8 +1095,126 @@ components:
         predictions: { type: boolean }
         jury: { type: boolean }
 
+    ParticipantStatus: { type: string, enum: [ACTIVE, BLOCKED, ARCHIVED] }
+    SubmissionStatus: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+    OrderStatus: { type: string, enum: [RESERVED, ISSUED, REJECTED, CANCELLED] }
+    Participant:
+      type: object
+      required: [id, event_id, full_name, birth_date, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid }
+        full_name: { type: string }
+        birth_date: { type: string, format: date }
+        union_card_number: { type: string, nullable: true }
+        sks_barcode: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ParticipantStatus' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        archived_at: { type: string, format: date-time, nullable: true }
+    EventRef:
+      type: object
+      required: [id, slug, name, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        timezone: { type: string }
+    ParticipantSession:
+      type: object
+      required: [participant, event]
+      properties:
+        participant: { $ref: '#/components/schemas/Participant' }
+        event: { $ref: '#/components/schemas/EventRef' }
+        expires_at: { type: string, format: date-time }
+    ParticipantNameLogin:
+      type: object
+      required: [full_name, birth_date]
+      properties:
+        full_name: { type: string }
+        birth_date: { type: string, format: date }
+    ParticipantInput:
+      type: object
+      required: [full_name, birth_date]
+      properties:
+        full_name: { type: string }
+        birth_date: { type: string, format: date }
+        union_card_number: { type: string, nullable: true }
+        sks_barcode: { type: string, nullable: true }
+    PointsAdjustmentInput:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount: { type: integer, format: int64, not: { enum: [0] } }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+        idempotency_key: { type: string, minLength: 8, maxLength: 200 }
+    LectureInput:
+      type: object
+      required: [title, points]
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        points: { type: integer, format: int64, minimum: 0 }
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        attendance_starts_at: { type: string, format: date-time, nullable: true }
+        attendance_ends_at: { type: string, format: date-time, nullable: true }
+    AttendanceScanInput:
+      type: object
+      required: [token, scanner_type]
+      properties:
+        token: { type: string }
+        scanner_type: { type: string, enum: [CAMERA, USB, MANUAL] }
+    TaskInput:
+      type: object
+      required: [title, description, points, allowed_submission_types]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        icon: { type: string, nullable: true }
+        points: { type: integer, format: int64, minimum: 0 }
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        sort_order: { type: integer }
+        allowed_submission_types:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [IMAGE, LINK] }
+    ModerationInput:
+      type: object
+      properties: { comment: { type: string, maxLength: 2000 } }
+    ProductInput:
+      type: object
+      required: [title, description, price_points, stock_quantity]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        price_points: { type: integer, format: int64, minimum: 1 }
+        discount_price_points: { type: integer, format: int64, minimum: 1, nullable: true }
+        stock_quantity: { type: integer, minimum: 0 }
+    ReserveOrderInput:
+      type: object
+      required: [items]
+      properties:
+        idempotency_key: { type: string, minLength: 8, maxLength: 200 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required: [product_id, quantity]
+            properties:
+              product_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    participantCookie:
+      type: apiKey
+      in: cookie
+      name: slc_participant_session

@@ -11,14 +11,14 @@ endif
 help: ## Список команд
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'
 
-up: ## Поднять инфраструктуру для локальной разработки (postgres, redis, minio)
-	docker compose --profile dev up -d
+up: ## Поднять PostgreSQL для локальной разработки
+	docker compose up -d
 
 down: ## Остановить инфраструктуру
-	docker compose --profile dev down
+	docker compose down
 
 logs: ## Логи инфраструктуры
-	docker compose --profile dev logs -f
+	docker compose logs -f
 
 api-build: ## Собрать бинарь api
 	cd backend && go build -o bin/api ./cmd/api

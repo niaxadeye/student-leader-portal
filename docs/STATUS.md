@@ -3,7 +3,35 @@
 Живой документ для передачи контекста между сессиями. Обновлять при заметных изменениях.
 Обзор этапов — в [README](../README.md). Спецификация — [SITE.md](../SITE.md).
 
-_Последнее обновление: 2026-07-14 (Этап 5 закрыт)._
+_Последнее обновление: 2026-08-17 (платформа мероприятий, этапы 1–6 + hardening)._
+
+**Платформа мероприятий (2026-08-17, рабочее дерево):** добавлены независимые от
+`users` участники мероприятий и participant auth (`0011`), append-only PointsLedger
+(`0012`), лекции, одноразовые signed QR и транзакционная посещаемость с начислением
+баллов (`0013`), задания, immutable attempts, приватные подтверждения, модерация и
+однократный `TASK_REWARD` (`0014`) и магазин мерча с атомарными резервами/holds
+(`0015`). Все миграции применены. Hardening добавил magic-byte validation изображений,
+единую матрицу scoped permissions, OpenAPI event flow, ESLint 9 и route-level code
+splitting. Полный Go regression, frontend lint/build и production smoke
+участников/мерча прошли; API перезапущен через PM2, health — 200.
+Подробный журнал и следующий план — в [`work_user_func.md`](../work_user_func.md).
+
+**Object storage (2026-08-17):** runtime и backend переведены на Timeweb Cloud S3
+через AWS SDK for Go v2. Локальные object storage/Redis удалены из Compose, runtime,
+кода и документации; их контейнеры, volumes и images удалены с сервера. PostgreSQL
+не затронут. Production upload → presigned download → byte match → delete и полный
+merch smoke прошли: `PASS=35 FAIL=0`.
+
+**QR scanner (2026-08-17):** admin attendance scanner переведён с нативного
+`BarcodeDetector` на React scanner с ZXing/WASM fallback для Safari/Firefox/mobile.
+Добавлены выбор камеры, torch/zoom, точные camera errors и чтение QR из изображения.
+Camera UI теперь доступен только на coarse-touch мобильных устройствах до 1023 px:
+preview увеличен до 72svh, finder-рамка скрыта, автофокус ручного input на телефоне
+отключён, а во время активной камеры input заблокирован. На ПК оставлены HID/ручной ввод.
+WASM self-hosted и отдаётся nginx как `application/wasm`; lint/build/decode smoke — PASS.
+
+**Рефактор auth/refresh (2026-07-15, коммит `4d2ac02`, задеплоен):** бэкенд — общий выпуск пары токенов вынесен в `newRefreshCredentials`/`mintTokenPair` (переиспользуют `issueSession` и `Refresh`), проверки refresh — в `validateRefresh`. Фронт (`shared/api/client.ts`) — единый `fetchWithRefresh` для «401→refresh→повтор» вместо тройного дублирования (JSON/CSV/multipart). Чисто внутренний, контракт не изменился: `smoke_auth.sh` PASS=14/0 против нового бинарника.
+
 
 **Тулинг:** `admin create-user <login> <password> <role> [full_name] [--must-change]` (идемпотентен по login, роли SUPER_ADMIN|ADMIN|CONTESTANT в GLOBAL-scope). Тестовые юзеры засеяны: `superadmin` / `admin` / `contestant` (см. креды у команды). БД-том переживает рестарт, но users заполняем этой командой.
 
@@ -11,7 +39,8 @@ _Последнее обновление: 2026-07-14 (Этап 5 закрыт)._
 
 ### Этап 0 — инфраструктура
 - Monorepo: `backend/` (Go), `frontend/` (React/Vite/TS), `infra/`, `docs/`.
-- Docker Compose: postgres (**порт 5433**, не 5432 — см. память server-infra), redis, minio.
+- Docker Compose: PostgreSQL (**порт 5433**, не 5432 — см. память server-infra).
+- Файловое хранилище: внешний Timeweb Cloud S3; локальные object storage и cache-сервисы не используются.
 - Config, Makefile, линтеры, базовый OpenAPI (`backend/api/openapi.yaml`), envelope-ответы.
 
 ### Этап 1 — авторизация (бэкенд + фронт)
@@ -70,15 +99,15 @@ _Последнее обновление: 2026-07-14 (Этап 5 закрыт)._
 - Список испытаний на странице конкурса (`challenges-section.tsx`) + диалог создания (`create-challenge-dialog.tsx`).
 
 ### Этап 4 — подача ответов (submissions, бэкенд + фронт, 2026-07-14)
-Миграция `0008_submissions.up.sql`: `files` (метаданные объектов MinIO), `submissions` (одна работа на пару испытание+конкурсант, `answers_json`, статус DRAFT/SUBMITTED/LOCKED, счётчики версий/ревизий), `submission_revisions` (immutable-снапшоты схемы+ответов+файлов, checksum), `submission_files` — SITE.md §21.11–21.14.
+Миграция `0008_submissions.up.sql`: `files` (метаданные объектов S3), `submissions` (одна работа на пару испытание+конкурсант, `answers_json`, статус DRAFT/SUBMITTED/LOCKED, счётчики версий/ревизий), `submission_revisions` (immutable-снапшоты схемы+ответов+файлов, checksum), `submission_files` — SITE.md §21.11–21.14.
 
 Бэкенд (`modules/submissions/`):
 - Черновик: `GET /challenges/:cid/submission` создаёт/открывает работу (проставляет `first_opened_at`), `PUT .../draft` сохраняет ответы без ревизии.
 - Отправка `POST .../submit`: валидация обязательных полей (по типам, FILE_GROUP → наличие файла), immutable-ревизия (SUBMIT/RESUBMIT), checksum sha256, `version++` при повторной подаче. Первая — SUBMIT, далее RESUBMIT.
 - Окно подачи: проверка PUBLISHED + `open_at`/`deadline_at`; поздняя подача только при `settings.allow_late_submission`; LOCKED → 409.
-- Файлы: `POST .../files` (multipart → MinIO через API, ключ `submissions/<contest>/<ch>/<sub>/<reqid>-<safe>`, валидация расширения/размера по настройкам поля), `DELETE .../files/:id` (soft + удаление объекта, только владелец/открытое окно). Откат объекта при сбое БД.
+- Файлы: `POST .../files` (multipart → S3 через API, ключ `submissions/<contest>/<ch>/<sub>/<reqid>-<safe>`, валидация расширения/размера по настройкам поля), `DELETE .../files/:id` (soft + удаление объекта, только владелец/открытое окно). Откат объекта при сбое БД.
 - Админ: `GET /admin/challenges/:cid/submissions` (таблица дирекции §7.6 — ФИО/логин/организация из `users`, число файлов, фильтр по статусу, `meta.total`), `GET /admin/submissions/:id` (ответы+файлы+история ревизий), `GET .../files/:id` (302 на presigned-URL). Доступ — `HasContestAccess`.
-- Adapter `challenge_adapter.go` связывает submissions с challenges/contests без обратных зависимостей. Presigner из `storage` подключается в `deps.go` (nil-safe, если MinIO недоступен).
+- Adapter `challenge_adapter.go` связывает submissions с challenges/contests без обратных зависимостей. Presigner из `storage` подключается в `deps.go` (nil-safe, если S3 не настроен).
 - Новый эндпоинт `GET /my/contests` (`contests.MyContests`) — конкурсы, где пользователь активный участник (для кабинета). `ListForContestant` в challenges добавляет `my_submission_status` в список испытаний.
 - **Долг (отложено осознанно)**: `outbox_event submission.submitted` для Telegram-уведомления (TODO в `service_submit.go`) — Этап 5. Правила валидации min/max/regex по полю — как в Этапе 3.
 
@@ -111,20 +140,20 @@ _Последнее обновление: 2026-07-14 (Этап 5 закрыт)._
 - ⚠️ Флэки тестовый аккаунт `contestant`: при рассинхроне (must_change=f, пароль не совпадает) пересоздать `admin create-user contestant 'Contestant!2026' CONTESTANT '...' --must-change`. Не связано с кодом login.
 - **Админ-фронт всё ещё на моках** — теперь есть реальное API конкурсов/участников (Этап 2), но фронт к нему не подключён. Следующий заход: заменить моки в `entities/contest|contestant` на реальные вызовы.
 - **Админ-панель целиком на моках** — реального API под конкурсы/конкурсантов/пользователей нет (Этап 2). Действия reset/block/добавить — только тосты-заглушки, CRUD-форм и деталей испытаний/submissions нет (по договорённости — ядро).
-- **Frontend lint нежизнеспособен**: скрипт `eslint .` есть, но конфига нет (eslint 9 требует flat-config). Проверка кода — только через `tsc -b`. Долг тулинга.
+- ✅ ESLint 9 flat config добавлен; `npm run lint` проходит без warnings.
 - Forgot-password — без self-service (сброс делает админ, SITE.md §7).
-- Bundle > 500 kB — code-splitting отложен.
+- ✅ Route-level code splitting выполнен; основной JS chunk около 295 КБ (gzip 93 КБ).
 
 ## Следующий шаг
 Этап 5 (уведомления: outbox + Telegram) закрыт: миграция `0009_outbox`, транзакционный outbox в submit, Telegram-клиент, диспетчер-горутина в API (`FOR UPDATE SKIP LOCKED`, exponential backoff, DEAD после лимита), `challenges_count` у конкурса возвращён. Смоук PASS=11, регресс 126, задеплоено. Дальше:
 1. **Включить Telegram** — создать бота (@BotFather), вписать `TELEGRAM_BOT_TOKEN`/`TELEGRAM_DEFAULT_CHAT_ID` в `.env`, `TELEGRAM_NOTIFICATIONS_ENABLED=true`, рестарт API. Затем прогнать `smoke_outbox.sh` — увидеть реальную доставку (SENT) и сообщение в чате.
 2. **Ручной прогон в браузере** — сквозной сценарий Этапов 3–5: админ создаёт испытание и форму, конкурсант отправляет ответ с файлом, дирекция видит его во вкладке «Ответы», в Telegram приходит уведомление.
-3. **Этап 6 — файлы/справка или hardening** (SITE.md §47): следующий крупный блок по дорожной карте. Определиться на старте сессии.
+3. ✅ **Runtime feature flags включены**; следующий шаг — browser acceptance staff/participant UI.
 4. Долг Этапа 3–4: недостающие типы полей (RICH_TEXT/TIME/DATETIME/MULTISELECT), `open_at`/`close_at` в UI, правила валидации (min/max/regex) в редакторе поля и на submit. Долг Этапа 5: напоминания о дедлайне и уведомление о критической ошибке файла (SITE.md §15) — событий пока нет.
 
 ## Как запускать
 ```bash
-make up            # postgres/redis/minio (порты на 127.0.0.1)
+make up            # PostgreSQL (порт на 127.0.0.1)
 make api-run       # API :8080
 make frontend-dev  # SPA :5173
 ```

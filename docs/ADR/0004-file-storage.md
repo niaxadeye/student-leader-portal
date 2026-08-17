@@ -8,7 +8,7 @@
 данных не подходит; bucket не должен быть публичным (§13).
 
 ## Решение
-- Объекты в S3-совместимом хранилище (production) / MinIO (development).
+- Объекты во внешнем S3-совместимом хранилище.
 - В PostgreSQL — только метаданные (`files`, `submission_files`).
 - Загрузка через presigned URL: init → presigned PUT → complete → серверная проверка →
   статус READY. Предусмотрен multipart.

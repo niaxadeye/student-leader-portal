@@ -63,6 +63,84 @@ func (a *App) Router() http.Handler {
 					r.Post("/contestants/import", d.contestsHandler.ImportContestants)
 					r.Get("/contestants/export", d.contestsHandler.ExportContestants)
 
+					// Лекции мероприятия, QR attendance и история посещений.
+					r.Route("/lectures", func(r chi.Router) {
+						r.Get("/", d.lecturesHandler.AdminList)
+						r.Post("/", d.lecturesHandler.AdminCreate)
+						r.Route("/{lectureId}", func(r chi.Router) {
+							r.Get("/", d.lecturesHandler.AdminGet)
+							r.Patch("/", d.lecturesHandler.AdminUpdate)
+							r.Delete("/", d.lecturesHandler.AdminDelete)
+							r.Post("/activate", d.lecturesHandler.Activate())
+							r.Post("/finish", d.lecturesHandler.Finish())
+							r.Get("/attendance", d.lecturesHandler.AdminAttendance)
+							r.Post("/attendance/scan", d.lecturesHandler.Scan)
+						})
+					})
+
+					// Задания мероприятия и очередь проверки подтверждений.
+					r.Route("/tasks", func(r chi.Router) {
+						r.Get("/", d.eventTasksHandler.AdminList)
+						r.Post("/", d.eventTasksHandler.AdminCreate)
+						r.Route("/{taskId}", func(r chi.Router) {
+							r.Get("/", d.eventTasksHandler.AdminGet)
+							r.Patch("/", d.eventTasksHandler.AdminUpdate)
+							r.Delete("/", d.eventTasksHandler.AdminDelete)
+							r.Post("/activate", d.eventTasksHandler.AdminTransition("activate"))
+							r.Post("/disable", d.eventTasksHandler.AdminTransition("disable"))
+							r.Post("/archive", d.eventTasksHandler.AdminTransition("archive"))
+							r.Post("/image", d.eventTasksHandler.AdminSetImage)
+							r.Delete("/image", d.eventTasksHandler.AdminDeleteImage)
+						})
+					})
+
+					// Каталог мерча и выдача зарезервированных заказов.
+					r.Route("/merch/products", func(r chi.Router) {
+						r.Get("/", d.merchHandler.AdminProducts)
+						r.Post("/", d.merchHandler.AdminCreateProduct)
+						r.Route("/{productId}", func(r chi.Router) {
+							r.Get("/", d.merchHandler.AdminProduct)
+							r.Patch("/", d.merchHandler.AdminUpdateProduct)
+							r.Delete("/", d.merchHandler.AdminDeleteProduct)
+							r.Post("/activate", d.merchHandler.AdminTransitionProduct("activate"))
+							r.Post("/hide", d.merchHandler.AdminTransitionProduct("hide"))
+							r.Post("/images", d.merchHandler.AdminAddImage)
+							r.Delete("/images/{imageId}", d.merchHandler.AdminDeleteImage)
+						})
+					})
+					r.Route("/merch/orders", func(r chi.Router) {
+						r.Get("/", d.merchHandler.AdminOrders)
+						r.Route("/{orderId}", func(r chi.Router) {
+							r.Get("/", d.merchHandler.AdminOrder)
+							r.Post("/issue", d.merchHandler.AdminIssue)
+							r.Post("/reject", d.merchHandler.AdminReject)
+						})
+					})
+					r.Get("/task-submissions", d.eventTasksHandler.ModerationList)
+					r.Route("/task-submissions/{submissionId}", func(r chi.Router) {
+						r.Get("/", d.eventTasksHandler.ModerationGet)
+						r.Post("/approve", d.eventTasksHandler.Approve())
+						r.Post("/reject", d.eventTasksHandler.Reject())
+						r.Get("/assets/{assetId}", d.eventTasksHandler.AdminAsset)
+					})
+
+					// Участники платформы мероприятий не являются users/contestants.
+					r.Route("/participants", func(r chi.Router) {
+						r.Get("/", d.eventParticipantsHandler.AdminList)
+						r.Post("/", d.eventParticipantsHandler.AdminCreate)
+						r.Post("/import", d.eventParticipantsHandler.AdminImport)
+						r.Get("/export", d.eventParticipantsHandler.AdminExport)
+						r.Route("/{participantId}", func(r chi.Router) {
+							r.Get("/", d.eventParticipantsHandler.AdminGet)
+							r.Patch("/", d.eventParticipantsHandler.AdminUpdate)
+							r.Post("/block", d.eventParticipantsHandler.AdminBlock())
+							r.Post("/unblock", d.eventParticipantsHandler.AdminUnblock())
+							r.Post("/archive", d.eventParticipantsHandler.AdminArchive())
+							r.Get("/points", d.pointsHandler.AdminOverview)
+							r.Post("/points/adjustments", d.pointsHandler.AdminAdjustment)
+						})
+					})
+
 					// Испытания конкурса (SITE.md §10, Этап 3).
 					r.Get("/challenges", d.challengesHandler.List)
 					r.Post("/challenges", d.challengesHandler.Create)
@@ -147,6 +225,37 @@ func (a *App) Router() http.Handler {
 				r.Get("/sessions", d.authHandler.Sessions)
 				r.Delete("/sessions/{sessionId}", d.authHandler.RevokeSession)
 			})
+		})
+
+		// Независимый participant auth flow, scoped по slug мероприятия.
+		r.Route("/events/{eventSlug}/participant-auth", func(r chi.Router) {
+			r.Use(middleware.SecurityHeaders)
+			r.Use(middleware.CSRFOrigin(origins...))
+			r.Post("/fio", d.eventParticipantsHandler.LoginByName)
+			r.Post("/union-card", d.eventParticipantsHandler.LoginByUnionCard)
+			r.Post("/sks", d.eventParticipantsHandler.LoginBySKSBarcode)
+		})
+
+		r.Route("/participant", func(r chi.Router) {
+			r.Use(middleware.SecurityHeaders)
+			r.Use(d.participantAuthn.Require)
+			r.Get("/me", d.eventParticipantsHandler.Me)
+			r.Get("/points", d.pointsHandler.ParticipantOverview)
+			r.Get("/lectures", d.lecturesHandler.ParticipantLectures)
+			r.Get("/tasks", d.eventTasksHandler.ParticipantList)
+			r.Get("/tasks/{taskId}", d.eventTasksHandler.ParticipantGet)
+			r.With(middleware.CSRFOrigin(origins...)).Post("/tasks/{taskId}/submissions", d.eventTasksHandler.ParticipantSubmit)
+			r.Get("/task-assets/{assetId}", d.eventTasksHandler.ParticipantAsset)
+			r.Get("/merch", d.merchHandler.ParticipantProducts)
+			r.Get("/merch/{productSlug}", d.merchHandler.ParticipantProduct)
+			r.With(middleware.CSRFOrigin(origins...)).Put("/merch-saving-target", d.merchHandler.ParticipantSetTarget)
+			r.With(middleware.CSRFOrigin(origins...)).Delete("/merch-saving-target", d.merchHandler.ParticipantDeleteTarget)
+			r.Get("/orders", d.merchHandler.ParticipantOrders)
+			r.With(middleware.CSRFOrigin(origins...)).Post("/orders", d.merchHandler.ParticipantReserve)
+			r.Get("/orders/{orderId}", d.merchHandler.ParticipantOrder)
+			r.With(middleware.CSRFOrigin(origins...)).Post("/orders/{orderId}/cancel", d.merchHandler.ParticipantCancel)
+			r.With(middleware.CSRFOrigin(origins...)).Post("/qr", d.lecturesHandler.ParticipantCode)
+			r.With(middleware.CSRFOrigin(origins...)).Post("/logout", d.eventParticipantsHandler.Logout)
 		})
 	})
 

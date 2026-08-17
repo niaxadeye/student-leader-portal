@@ -16,10 +16,9 @@
   не заработают. Если DNS ещё не переключён, шаги 1–8 можно выполнить и
   проверить локально (см. §9 «Проверка до переключения DNS»), а переключение
   сделать последним.
-- Порты 80/443 открыты снаружи. Порты Postgres/Redis — только на
-  `127.0.0.1` (так уже настроено в `docker-compose.yml`, наружу не открывать).
-- Файлы хранятся во внешнем S3 (`S3_ENDPOINT=https://s3.twcstorage.ru`), а не
-  в MinIO — на проде MinIO не поднимается (см. §3).
+- Порты 80/443 открыты снаружи. Порт PostgreSQL — только на `127.0.0.1`
+  (так уже настроено в `docker-compose.yml`, наружу не открывать).
+- Файлы хранятся во внешнем S3 (`S3_ENDPOINT=https://s3.twcstorage.ru`).
 
 Установить системные зависимости:
 
@@ -90,22 +89,20 @@ scp old-server:/var/www/student-leader-portal/.env /var/www/student-leader-porta
   5432 (как на старом сервере). Если 5432 свободен, можно использовать его
   и убрать кастомный порт — но тогда поменяй и `docker-compose.yml`.
 
-## 3. Инфраструктура (Postgres/Redis)
+## 3. Инфраструктура (PostgreSQL)
 
 ```bash
 docker compose up -d
-docker compose ps   # postgres и redis должны быть healthy
+docker compose ps   # postgres должен быть healthy
 ```
 
-MinIO в compose помечен профилем `dev` и на проде не поднимается — файлы
-хранятся во внешнем S3 (`S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` из
-`.env`, см. §2). Бакет там должен существовать заранее — `minio-init`
-на проде не выполняется.
+Файлы хранятся во внешнем S3 (`S3_ENDPOINT`, `S3_ACCESS_KEY`,
+`S3_SECRET_KEY` из `.env`, см. §2). Бакет должен существовать заранее.
 
-Если порт 5432 или 6379 на сервере уже занят (система БД/Redis) — создай
+Если порт 5432 на сервере уже занят (системная БД) — создай
 `docker-compose.override.yml` по образцу локальной разработки (файл в
 `.gitignore`, на сервере создаётся вручную), меняя маппинг портов, и
-синхронизируй `POSTGRES_PORT`/`REDIS_URL` в `.env`.
+синхронизируй `POSTGRES_PORT` в `.env`.
 
 ## 4. Сборка backend
 
@@ -142,6 +139,9 @@ cd ..
 ## 7. nginx + TLS
 
 Конфиг nginx не хранится в репозитории — создаётся на сервере вручную.
+Для кросс-браузерного QR-сканера убедись, что в `/etc/nginx/mime.types`
+присутствует строка `application/wasm wasm;`: ZXing fallback загружается как
+локальный WebAssembly asset.
 Пример (`/etc/nginx/sites-available/eazytech.ru`):
 
 ```nginx

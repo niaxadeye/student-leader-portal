@@ -9,9 +9,9 @@
 Браузер ──HTTPS──▶ nginx ──┬─▶ frontend/dist (статика SPA)
                            └─▶ /api/ ─▶ Go API (127.0.0.1:8080)
                                              │
-                        ┌────────────────────┼────────────────────┐
-                        ▼                     ▼                    ▼
-                    PostgreSQL             Redis               MinIO (S3)
+                        ┌────────────────────┴────────────────────┐
+                        ▼                                         ▼
+                    PostgreSQL                            Timeweb Cloud S3
                         ▲
                    Go worker (outbox → Telegram, файлы, экспорт)
 ```
@@ -31,7 +31,7 @@
 1. Модульный монолит.
 2. JWT session-модель (access в памяти, refresh в HttpOnly-cookie, ротация).
 3. Хранение динамических форм (JSONB + версионирование схемы + immutable-ревизии).
-4. Файловое хранилище (S3/MinIO, presigned upload, метаданные в БД).
+4. Файловое хранилище (S3, presigned URLs, метаданные в БД).
 5. Transactional outbox для внешних side effects (Telegram).
 
 ## Контракт API
