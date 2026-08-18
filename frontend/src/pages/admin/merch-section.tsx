@@ -34,14 +34,22 @@ const orderStatus: Record<
   CANCELLED: { label: 'Отменён', tone: 'neutral' },
 }
 
-export function MerchSection({ contestId }: { contestId: string }) {
-  const products = useAdminMerch(contestId)
+export function MerchSection({
+  contestId,
+  canManageProducts = true,
+  canManageOrders = true,
+}: {
+  contestId: string
+  canManageProducts?: boolean
+  canManageOrders?: boolean
+}) {
+  const products = useAdminMerch(contestId, canManageProducts)
   const transition = useTransitionMerch(contestId)
   const remove = useDeleteMerch(contestId)
   const [editing, setEditing] = useState<MerchProduct | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [filter, setFilter] = useState<MerchOrderStatus | 'ALL'>('RESERVED')
-  const orders = useAdminMerchOrders(contestId, filter)
+  const orders = useAdminMerchOrders(contestId, filter, canManageOrders)
   const moderate = useModerateMerchOrder(contestId)
 
   function openProduct(product: MerchProduct | null) {
@@ -99,11 +107,15 @@ export function MerchSection({ contestId }: { contestId: string }) {
           </h2>
           <p className="mt-1 text-[13px] text-muted">Каталог, остатки и резервирование за баллы.</p>
         </div>
+        {canManageProducts && (
         <Button size="sm" onClick={() => openProduct(null)}>
           <Plus className="h-4 w-4" /> Новый товар
         </Button>
+        )}
       </div>
 
+      {canManageProducts && (
+      <>
       {products.isLoading && <Skeleton className="h-32 w-full" />}
       {products.isError && <ErrorState onRetry={() => products.refetch()} />}
       {products.data?.length === 0 && (
@@ -179,7 +191,11 @@ export function MerchSection({ contestId }: { contestId: string }) {
           })}
         </div>
       )}
+      </>
+      )}
 
+      {canManageOrders && (
+      <>
       <div className="mb-3 mt-7 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-[18px] font-semibold text-ink">
@@ -247,13 +263,17 @@ export function MerchSection({ contestId }: { contestId: string }) {
           </div>
         </div>
       )}
+      </>
+      )}
 
+      {canManageProducts && (
       <MerchProductDialog
         contestId={contestId}
         product={editing}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+      )}
     </section>
   )
 }

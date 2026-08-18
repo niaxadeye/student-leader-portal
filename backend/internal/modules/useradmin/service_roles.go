@@ -35,6 +35,10 @@ func normScope(in AssignRoleInput) (AssignRoleInput, bool) {
 		if strings.TrimSpace(in.ScopeID) == "" {
 			return in, false
 		}
+		// STAFF не скоупится через user_roles: права на конкурс — event_staff_permissions.
+		if in.Role == "STAFF" {
+			return in, false
+		}
 		// Для ADMIN на конкурс уровень обязателен и валиден; для прочих ролей — не задаём.
 		if in.Role == "ADMIN" {
 			if !ValidAccessLevels[in.AccessLevel] {

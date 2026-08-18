@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { KeyRound, Ban, RotateCcw, ShieldCheck } from 'lucide-react'
+import { KeyRound, Ban, RotateCcw, ShieldCheck, IdCard } from 'lucide-react'
 import { useResetPassword, useUserStatusMutation } from '@/entities/user/queries'
 import { ManageRolesDialog } from './manage-roles-dialog'
+import { ManageStaffDialog } from './manage-staff-dialog'
 import { Card } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { toast } from 'sonner'
@@ -13,6 +14,7 @@ const roleBadge: Record<RoleCode, { label: string; tone: 'brand' | 'neutral' | '
   MEGA_ADMIN: { label: 'Мегаадмин', tone: 'brand' },
   SUPER_ADMIN: { label: 'Суперадмин', tone: 'brand' },
   ADMIN: { label: 'Админ', tone: 'success' },
+  STAFF: { label: 'Сотрудник', tone: 'success' },
   CONTESTANT: { label: 'Конкурсант', tone: 'neutral' },
 }
 
@@ -50,7 +52,9 @@ function UserRow({ u }: { u: AdminUser }) {
   const reset = useResetPassword()
   const status = useUserStatusMutation()
   const [rolesOpen, setRolesOpen] = useState(false)
+  const [staffOpen, setStaffOpen] = useState(false)
   const blocked = u.status === 'BLOCKED'
+  const isStaffUser = roleCodes(u).includes('STAFF')
 
   function onReset() {
     reset.mutate(u.id, {
@@ -96,6 +100,15 @@ function UserRow({ u }: { u: AdminUser }) {
       </td>
       <td className="px-4 py-3">
         <div className="flex justify-end gap-1">
+          {isStaffUser && (
+            <button
+              title="Права на мероприятия"
+              onClick={() => setStaffOpen(true)}
+              className="rounded-btn p-2 text-muted-2 hover:bg-muted/10 hover:text-brand"
+            >
+              <IdCard className="h-4 w-4" />
+            </button>
+          )}
           <button
             title="Управление ролями"
             onClick={() => setRolesOpen(true)}
@@ -125,6 +138,14 @@ function UserRow({ u }: { u: AdminUser }) {
             open={rolesOpen}
             onOpenChange={setRolesOpen}
           />
+          {isStaffUser && (
+            <ManageStaffDialog
+              userId={u.id}
+              login={u.login}
+              open={staffOpen}
+              onOpenChange={setStaffOpen}
+            />
+          )}
         </div>
       </td>
     </tr>

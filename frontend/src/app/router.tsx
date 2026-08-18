@@ -38,10 +38,13 @@ const appRoutes: RouteObject[] = [
       },
       {
         path: '/admin',
-        lazy: async () => ({
-          Component: (await import('@/pages/admin/admin-layout')).AdminLayout,
-        }),
+        element: <RequireRole roles={['MEGA_ADMIN', 'SUPER_ADMIN', 'ADMIN', 'STAFF']} />,
         children: [
+          {
+            lazy: async () => ({
+              Component: (await import('@/pages/admin/admin-layout')).AdminLayout,
+            }),
+            children: [
           {
             index: true,
             lazy: async () => ({
@@ -67,11 +70,16 @@ const appRoutes: RouteObject[] = [
             }),
           },
           {
-            path: 'challenges/:challengeId',
-            lazy: async () => ({
-              Component: (await import('@/pages/admin/challenge-builder-page'))
-                .ChallengeBuilderPage,
-            }),
+            element: <RequireRole roles={['MEGA_ADMIN', 'SUPER_ADMIN', 'ADMIN']} />,
+            children: [
+              {
+                path: 'challenges/:challengeId',
+                lazy: async () => ({
+                  Component: (await import('@/pages/admin/challenge-builder-page'))
+                    .ChallengeBuilderPage,
+                }),
+              },
+            ],
           },
           {
             element: <RequireRole roles={['SUPER_ADMIN', 'MEGA_ADMIN']} />,
@@ -93,6 +101,8 @@ const appRoutes: RouteObject[] = [
                   Component: (await import('@/pages/admin/organizers-page')).OrganizersPage,
                 }),
               },
+            ],
+          },
             ],
           },
         ],

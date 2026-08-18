@@ -31,3 +31,17 @@ func GrantsFor(required string) []string {
 func IsKnown(permission string) bool {
 	return len(GrantsFor(permission)) > 0
 }
+
+// All returns every permission that can be granted to STAFF on a contest.
+func All() []string {
+	return []string{
+		ParticipantsManage,
+		AttendanceScan,
+		AttendanceManage,
+		TasksManage,
+		TasksModerate,
+		MerchManage,
+		MerchOrdersManage,
+		PointsManage,
+	}
+}

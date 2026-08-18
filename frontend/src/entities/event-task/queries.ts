@@ -30,11 +30,11 @@ const participantTasksKey = (eventId: string, participantId: string) => [
   participantId,
 ]
 
-export function useAdminTasks(contestId: string | undefined) {
+export function useAdminTasks(contestId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: adminTasksKey(contestId ?? ''),
     queryFn: () => listAdminTasks(contestId!),
-    enabled: !!contestId,
+    enabled: !!contestId && enabled,
   })
 }
 
@@ -90,11 +90,15 @@ export function useTaskImage(contestId: string, taskId: string) {
   })
 }
 
-export function useTaskModeration(contestId: string | undefined, status: TaskSubmissionStatus) {
+export function useTaskModeration(
+  contestId: string | undefined,
+  status: TaskSubmissionStatus,
+  enabled = true,
+) {
   return useQuery({
     queryKey: moderationKey(contestId ?? '', status),
     queryFn: () => listTaskSubmissions(contestId!, status),
-    enabled: !!contestId,
+    enabled: !!contestId && enabled,
   })
 }
 

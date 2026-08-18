@@ -1,7 +1,7 @@
 export type ContestStatus = 'DRAFT' | 'ACTIVE' | 'FINISHED' | 'ARCHIVED'
 
 /** Уровень доступа актора к конкурсу (§4): OWNER — владелец/мега, иначе назначенный ADMIN. */
-export type ContestAccessLevel = 'OWNER' | 'EDIT' | 'VIEW'
+export type ContestAccessLevel = 'OWNER' | 'EDIT' | 'VIEW' | 'STAFF'
 
 /** Конкурс из админ-API (бэкенд: modules/contests, SITE.md §9, §21.6). */
 export interface AdminContest {

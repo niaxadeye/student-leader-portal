@@ -23,11 +23,12 @@ const roleLabels: Record<RoleCode, string> = {
   MEGA_ADMIN: 'Мегаадмин',
   SUPER_ADMIN: 'Суперадмин',
   ADMIN: 'Админ',
+  STAFF: 'Сотрудник',
   CONTESTANT: 'Конкурсант',
 }
 
 // Роли, назначаемые через этот диалог (мега/супер создаются иначе).
-const assignableRoles: RoleCode[] = ['ADMIN', 'CONTESTANT']
+const assignableRoles: RoleCode[] = ['ADMIN', 'STAFF', 'CONTESTANT']
 
 export function ManageRolesDialog({
   userId,
@@ -69,6 +70,7 @@ function RolesBody({ userId }: { userId: string }) {
 
   // Уровень доступа задаётся только для ADMIN на конкретный конкурс (§3.4).
   const needsAccessLevel = role === 'ADMIN' && scopeId !== ''
+  const staffGlobal = role === 'STAFF'
 
   const contestName = (id: string) => contests.data?.find((c) => c.id === id)?.name
 
@@ -84,7 +86,7 @@ function RolesBody({ userId }: { userId: string }) {
 
   function onAssign() {
     setError(undefined)
-    const scopeType = scopeId ? 'CONTEST' : 'GLOBAL'
+    const scopeType = staffGlobal || !scopeId ? 'GLOBAL' : 'CONTEST'
     assign.mutate(
       {
         role,
@@ -154,6 +156,7 @@ function RolesBody({ userId }: { userId: string }) {
               </Select>
             )}
           </Field>
+          {!staffGlobal && (
           <Field label="Область" helpText="Пусто — глобально. Иначе роль действует в выбранном конкурсе.">
             {(p) => (
               <Select value={scopeId || 'GLOBAL'} onValueChange={(v) => setScopeId(v === 'GLOBAL' ? '' : v)}>
@@ -171,6 +174,7 @@ function RolesBody({ userId }: { userId: string }) {
               </Select>
             )}
           </Field>
+          )}
           {needsAccessLevel && (
             <Field label="Уровень доступа" helpText="EDIT — правка контента; VIEW — только просмотр. Участниками управляет только владелец.">
               {(p) => (

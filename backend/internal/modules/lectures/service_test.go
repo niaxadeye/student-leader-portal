@@ -14,13 +14,15 @@ import (
 type fakeRepo struct {
 	allowed       bool
 	permissionErr error
+	lastPerm      atomic.Value
 	lecture       *Lecture
 	scanMu        sync.Mutex
 	scanned       bool
 	created       atomic.Int32
 }
 
-func (f *fakeRepo) Can(context.Context, string, string, string) (bool, error) {
+func (f *fakeRepo) Can(_ context.Context, _, _, permission string) (bool, error) {
+	f.lastPerm.Store(permission)
 	return f.allowed, f.permissionErr
 }
 func (f *fakeRepo) List(context.Context, string) ([]Lecture, error) { return nil, nil }
@@ -118,6 +120,13 @@ func TestLectureValidationAndPermissions(t *testing.T) {
 	repo.allowed = false
 	if _, err := service.List(context.Background(), Actor{UserID: "staff"}, "event"); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("permission: got %v", err)
+	}
+	repo.allowed = true
+	if _, err := service.List(context.Background(), Actor{UserID: "staff"}, "event"); err != nil {
+		t.Fatalf("scan list: %v", err)
+	}
+	if got, _ := repo.lastPerm.Load().(string); got != PermissionScan {
+		t.Fatalf("list permission: got %q want %q", got, PermissionScan)
 	}
 }
 

@@ -50,7 +50,7 @@ func (s *Service) ensure(ctx context.Context, actor Actor, contestID, permission
 }
 
 func (s *Service) List(ctx context.Context, actor Actor, contestID string) ([]Lecture, error) {
-	if err := s.ensure(ctx, actor, contestID, PermissionManage); err != nil {
+	if err := s.ensure(ctx, actor, contestID, PermissionScan); err != nil {
 		return nil, err
 	}
 	list, err := s.repo.List(ctx, contestID)

@@ -10,6 +10,7 @@ import (
 	"github.com/eazytech/student-leader-cabinet/internal/modules/challenges"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/contests"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/eventparticipants"
+	"github.com/eazytech/student-leader-cabinet/internal/modules/eventpermissions"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/eventtasks"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/lectures"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/merch"
@@ -27,6 +28,7 @@ type deps struct {
 	contestsHandler          *contests.Handler
 	challengesHandler        *challenges.Handler
 	userAdminHandler         *useradmin.Handler
+	staffHandler             *eventpermissions.Handler
 	submissionsHandler       *submissions.Handler
 	eventParticipantsHandler *eventparticipants.Handler
 	participantAuthn         *eventparticipants.Authenticator
@@ -56,6 +58,8 @@ func (a *App) build() *deps {
 	challengesRepo := challenges.NewRepo(a.pool)
 	challengesSvc := challenges.NewService(challengesRepo, contestsRepo, auditSvc)
 	userAdminSvc := useradmin.NewService(a.pool, auditSvc)
+	staffSvc := eventpermissions.NewService(eventpermissions.NewRepo(a.pool), auditSvc)
+	authSvc.SetStaffDirectory(staffSvc)
 	eventParticipantsSvc := eventparticipants.NewService(
 		eventparticipants.NewRepo(a.pool), auditSvc, a.cfg.ParticipantAuth.SessionTTL,
 	)
@@ -125,6 +129,7 @@ func (a *App) build() *deps {
 		contestsHandler:          contests.NewHandler(contestsSvc, imageStore),
 		challengesHandler:        challenges.NewHandler(challengesSvc),
 		userAdminHandler:         useradmin.NewHandler(userAdminSvc),
+		staffHandler:             eventpermissions.NewHandler(staffSvc),
 		submissionsHandler:       submissions.NewHandler(submissionsSvc, fileStore, a.cfg.Limits.MaxFileSizeMB),
 		eventParticipantsHandler: eventparticipants.NewHandler(eventParticipantsSvc, participantCookie, participantLoginLimiter),
 		participantAuthn:         eventparticipants.NewAuthenticator(eventParticipantsSvc, participantCookie.Name),

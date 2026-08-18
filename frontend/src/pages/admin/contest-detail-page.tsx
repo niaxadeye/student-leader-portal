@@ -28,6 +28,8 @@ import { LecturesSection } from './lectures-section'
 import { EventTasksSection } from './event-tasks-section'
 import { MerchSection } from './merch-section'
 import { canEditContest, canManageParticipants, type ContestStatus } from '@/entities/contest/types'
+import { useAuth } from '@/entities/auth/auth-context'
+import { hasStaffPermission } from '@/entities/auth/roles'
 
 /** Доступные переходы по статусу (зеркалит матрицу бэкенда). */
 const actionsByStatus: Record<ContestStatus, Array<'publish' | 'finish' | 'archive'>> = {
@@ -45,6 +47,7 @@ const actionMeta = {
 
 export function AdminContestDetailPage() {
   const { contestId } = useParams()
+  const { user } = useAuth()
   const { data: contest, isLoading, isError, refetch } = useAdminContest(contestId)
   const transition = useTransitionContest(contestId!)
   const [editOpen, setEditOpen] = useState(false)
@@ -68,6 +71,19 @@ export function AdminContestDetailPage() {
   const actions = actionsByStatus[contest.status]
   const canEdit = canEditContest(contest.access_level)
   const canManage = canManageParticipants(contest.access_level)
+  const isOwner = contest.access_level === 'OWNER'
+  const cid = contest.id
+  const canScan =
+    isOwner || hasStaffPermission(user, cid, 'event.attendance.scan', 'event.attendance.manage')
+  const canManageAttendance = isOwner || hasStaffPermission(user, cid, 'event.attendance.manage')
+  const canManageTasks = isOwner || hasStaffPermission(user, cid, 'event.tasks.manage')
+  const canModerateTasks =
+    isOwner || hasStaffPermission(user, cid, 'event.tasks.moderate', 'event.tasks.manage')
+  const canManageMerch = isOwner || hasStaffPermission(user, cid, 'event.merch.manage')
+  const canManageOrders =
+    isOwner || hasStaffPermission(user, cid, 'event.merch.orders.manage', 'event.merch.manage')
+  const canManageEventParticipants =
+    isOwner || hasStaffPermission(user, cid, 'event.participants.manage')
 
   function runTransition(action: 'publish' | 'finish' | 'archive') {
     transition.mutate(action, {
@@ -169,34 +185,46 @@ export function AdminContestDetailPage() {
         </Card>
       </div>
 
-      <div className="mb-8">
-        <ChallengesSection contestId={contest.id} canEdit={canEdit} />
-      </div>
-
       {canEdit && (
         <div className="mb-8">
-          <LecturesSection contestId={contest.id} />
+          <ChallengesSection contestId={contest.id} canEdit={canEdit} />
         </div>
       )}
 
-      {canEdit && (
+      {(canScan || canManageAttendance) && (
         <div className="mb-8">
-          <EventTasksSection contestId={contest.id} />
+          <LecturesSection contestId={contest.id} canManage={canManageAttendance} />
         </div>
       )}
 
-      {canEdit && (
+      {(canManageTasks || canModerateTasks) && (
         <div className="mb-8">
-          <MerchSection contestId={contest.id} />
+          <EventTasksSection
+            contestId={contest.id}
+            canManage={canManageTasks}
+            canModerate={canModerateTasks}
+          />
         </div>
       )}
 
-      {canManage && (
+      {(canManageMerch || canManageOrders) && (
+        <div className="mb-8">
+          <MerchSection
+            contestId={contest.id}
+            canManageProducts={canManageMerch}
+            canManageOrders={canManageOrders}
+          />
+        </div>
+      )}
+
+      {canManageEventParticipants && (
         <div className="mb-8">
           <EventParticipantsSection contestId={contest.id} />
         </div>
       )}
 
+      {(canEdit || contest.access_level === 'VIEW') && (
+        <>
       <div className="mb-3">
         <h2 className="text-[20px] font-semibold text-ink">Конкурсные аккаунты</h2>
         <p className="mt-1 text-[13px] text-muted">
@@ -204,6 +232,8 @@ export function AdminContestDetailPage() {
         </p>
       </div>
       <ContestantsTable contestId={contest.id} canManage={canManage} />
+        </>
+      )}
 
       <EditContestDialog contest={contest} open={editOpen} onOpenChange={setEditOpen} />
     </div>

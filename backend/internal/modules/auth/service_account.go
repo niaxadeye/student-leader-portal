@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	"github.com/eazytech/student-leader-cabinet/internal/modules/eventpermissions"
 	"github.com/eazytech/student-leader-cabinet/internal/platform/security"
 )
 
@@ -60,12 +61,25 @@ func (s *Service) RevokeSession(ctx context.Context, userID, sessionID string) e
 	return s.repo.RevokeSession(ctx, userID, sessionID, "user_revoked")
 }
 
-// Me возвращает пользователя и его роли.
-func (s *Service) Me(ctx context.Context, userID string) (*User, []Role, error) {
+// Me возвращает пользователя, его роли и staff-permissions на мероприятия.
+func (s *Service) Me(ctx context.Context, userID string) (*User, []Role, []eventpermissions.Grant, error) {
 	u, err := s.repo.UserByID(ctx, userID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	roles, err := s.repo.RolesByUser(ctx, userID)
-	return u, roles, err
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	grants := []eventpermissions.Grant{}
+	if s.staff != nil {
+		grants, err = s.staff.GrantsForUser(ctx, userID)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if grants == nil {
+			grants = []eventpermissions.Grant{}
+		}
+	}
+	return u, roles, grants, nil
 }

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { assignRole, createUser, getUser, listUsers, removeRole, updateUser } from './api'
 import { blockUser, resetPassword, unblockUser } from './admin-actions'
+import { clearStaffPermissions, listStaffPermissions, replaceStaffPermissions } from './staff-api'
+import type { StaffPermission } from '@/entities/auth/types'
 import type { AssignRoleInput, CreateUserInput, RoleAssignment, UsersFilter } from './types'
 
 /** Реестр пользователей — только SUPER_ADMIN (гард на роуте). */
@@ -73,6 +75,35 @@ export function useRemoveRole(userId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'user', userId] })
       qc.invalidateQueries({ queryKey: ['admin', 'users'] })
+    },
+  })
+}
+
+export function useStaffPermissions(userId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'user', userId, 'staff-permissions'],
+    queryFn: () => listStaffPermissions(userId!),
+    enabled: !!userId && enabled,
+  })
+}
+
+export function useReplaceStaffPermissions(userId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { contestId: string; permissions: StaffPermission[] }) =>
+      replaceStaffPermissions(userId, input.contestId, input.permissions),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'user', userId, 'staff-permissions'] })
+    },
+  })
+}
+
+export function useClearStaffPermissions(userId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (contestId: string) => clearStaffPermissions(userId, contestId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'user', userId, 'staff-permissions'] })
     },
   })
 }

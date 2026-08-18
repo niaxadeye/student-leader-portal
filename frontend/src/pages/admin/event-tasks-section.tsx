@@ -29,14 +29,22 @@ const submissionStatus: Record<TaskSubmissionStatus, string> = {
   REJECTED: 'На доработке',
 }
 
-export function EventTasksSection({ contestId }: { contestId: string }) {
+export function EventTasksSection({
+  contestId,
+  canManage = true,
+  canModerate = true,
+}: {
+  contestId: string
+  canManage?: boolean
+  canModerate?: boolean
+}) {
   const tasks = useAdminTasks(contestId)
   const transition = useTransitionTask(contestId)
   const remove = useDeleteTask(contestId)
   const [editing, setEditing] = useState<EventTask | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [filter, setFilter] = useState<TaskSubmissionStatus>('PENDING')
-  const moderation = useTaskModeration(contestId, filter)
+  const moderation = useTaskModeration(contestId, filter, canModerate)
   const [selected, setSelected] = useState<TaskSubmission | null>(null)
 
   function openTask(task: EventTask | null) {
@@ -71,9 +79,11 @@ export function EventTasksSection({ contestId }: { contestId: string }) {
             Подтверждения выполнения, модерация и награды.
           </p>
         </div>
+        {canManage && (
         <Button size="sm" onClick={() => openTask(null)}>
           <Plus className="h-4 w-4" /> Новое задание
         </Button>
+        )}
       </div>
 
       {tasks.isLoading && <Skeleton className="h-32 w-full" />}
@@ -112,6 +122,7 @@ export function EventTasksSection({ contestId }: { contestId: string }) {
                     </p>
                   )}
                 </div>
+                {canManage && (
                 <div className="flex flex-wrap gap-1">
                   {task.status !== 'ARCHIVED' && (
                     <Button size="sm" variant="ghost" onClick={() => openTask(task)}>
@@ -139,12 +150,15 @@ export function EventTasksSection({ contestId }: { contestId: string }) {
                     </Button>
                   )}
                 </div>
+                )}
               </CardBody>
             </Card>
           ))}
         </div>
       )}
 
+      {canModerate && (
+      <>
       <div className="mb-3 mt-7 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-[18px] font-semibold text-ink">
@@ -210,6 +224,8 @@ export function EventTasksSection({ contestId }: { contestId: string }) {
             ))}
           </div>
         </div>
+      )}
+      </>
       )}
 
       <EventTaskDialog

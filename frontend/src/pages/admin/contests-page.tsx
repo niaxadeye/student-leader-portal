@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Trophy, Users, ChevronRight, Plus } from 'lucide-react'
 import { useAuth } from '@/entities/auth/auth-context'
-import { isMega, isSuper } from '@/entities/auth/roles'
+import { isMega, isStaff, isSuper } from '@/entities/auth/roles'
 import { useAdminContests } from '@/entities/contest/queries'
 import { Card } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -25,7 +25,11 @@ export function AdminContestsPage() {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-[28px] font-bold tracking-tight text-ink">Конкурсы</h1>
-          <p className="mt-1 text-[15px] text-muted">Управление конкурсами и испытаниями.</p>
+          <p className="mt-1 text-[15px] text-muted">
+            {isStaff(user) && !canCreate
+              ? 'Мероприятия, на которых вам выданы права.'
+              : 'Управление конкурсами и испытаниями.'}
+          </p>
         </div>
         {canCreate && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>

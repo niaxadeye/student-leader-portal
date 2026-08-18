@@ -12,7 +12,7 @@ import (
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	p := middleware.PrincipalFrom(r.Context())
-	u, roles, err := h.svc.Me(r.Context(), p.UserID)
+	u, roles, grants, err := h.svc.Me(r.Context(), p.UserID)
 	if err != nil {
 		writeAuthError(w, r, err)
 		return
@@ -27,6 +27,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		"full_name":            u.FullName,
 		"roles":                codes,
 		"must_change_password": u.MustChangePassword,
+		"staff_permissions":    grants,
 	}, nil)
 }
 

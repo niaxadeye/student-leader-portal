@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/eazytech/student-leader-cabinet/internal/modules/eventpermissions"
 	"github.com/eazytech/student-leader-cabinet/internal/platform/security"
 )
 
@@ -14,10 +15,15 @@ type Auditor interface {
 	Log(ctx context.Context, actorUserID, action, entityType, entityID string, meta map[string]any)
 }
 
+type staffDirectory interface {
+	GrantsForUser(ctx context.Context, userID string) ([]eventpermissions.Grant, error)
+}
+
 type Service struct {
 	repo    *Repo
 	jwt     *security.JWTManager
 	audit   Auditor
+	staff   staffDirectory
 	refTTL  time.Duration
 	now     func() time.Time
 }
@@ -25,6 +31,8 @@ type Service struct {
 func NewService(repo *Repo, jwt *security.JWTManager, audit Auditor, refreshTTL time.Duration) *Service {
 	return &Service{repo: repo, jwt: jwt, audit: audit, refTTL: refreshTTL, now: time.Now}
 }
+
+func (s *Service) SetStaffDirectory(d staffDirectory) { s.staff = d }
 
 // LoginInput — параметры входа с контекстом клиента для сессии/аудита.
 type LoginInput struct {
@@ -97,8 +105,8 @@ func (s *Service) mintTokenPair(userID, role, sessionID, jti, refresh string, re
 
 func (s *Service) primaryRole(ctx context.Context, userID string) string {
 	roles, _ := s.repo.RolesByUser(ctx, userID)
-	// Приоритет: MEGA_ADMIN > SUPER_ADMIN > ADMIN > CONTESTANT (docs/RBAC_MULTITENANCY.md §3.1).
-	rank := map[string]int{"MEGA_ADMIN": 4, "SUPER_ADMIN": 3, "ADMIN": 2, "CONTESTANT": 1}
+	// Приоритет: MEGA_ADMIN > SUPER_ADMIN > ADMIN > STAFF > CONTESTANT.
+	rank := map[string]int{"MEGA_ADMIN": 5, "SUPER_ADMIN": 4, "ADMIN": 3, "STAFF": 2, "CONTESTANT": 1}
 	best, bestRank := "CONTESTANT", 0
 	for _, r := range roles {
 		if rank[r.Code] > bestRank {

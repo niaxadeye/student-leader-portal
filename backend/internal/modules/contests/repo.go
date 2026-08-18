@@ -33,6 +33,7 @@ func (a Access) CanEdit() bool { return a >= AccessEdit }
 //   - MEGA_ADMIN            → EDIT (полный кросс-арендный доступ, O5);
 //   - владелец конкурса     → EDIT;
 //   - назначенный ADMIN     → EDIT|VIEW из user_roles.access_level;
+//   - STAFF с permission    → None для контента конкурса (метаданные — отдельно);
 //   - иначе                 → None.
 func (r *Repo) AccessLevel(ctx context.Context, userID, contestID string, isMega bool) (Access, error) {
 	if isMega {
@@ -71,7 +72,7 @@ func (r *Repo) AccessLevel(ctx context.Context, userID, contestID string, isMega
 
 // ListForPrincipal — конкурсы в области видимости актора (§3.5):
 //   - MEGA_ADMIN — все конкурсы;
-//   - иначе — где пользователь владелец (owner_user_id) ИЛИ назначен ADMIN (scoped).
+//   - иначе — владелец, назначенный ADMIN, либо STAFF с event_staff_permissions.
 // SUPER_ADMIN попадает сюда как владелец своих конкурсов.
 func (r *Repo) ListForPrincipal(ctx context.Context, userID string, isMega bool, status string) ([]Contest, error) {
 	// access_level в выборке: мега/владелец → OWNER; иначе уровень из user_roles (EDIT|VIEW).
@@ -83,17 +84,24 @@ func (r *Repo) ListForPrincipal(ctx context.Context, userID string, isMega bool,
 		       (SELECT count(*) FROM contest_challenges ch
 		          WHERE ch.contest_id = c.id AND ch.status <> 'ARCHIVED'),
 		       CASE WHEN $1::bool OR c.owner_user_id = $2 THEN 'OWNER'
-		            ELSE (SELECT ur.access_level FROM user_roles ur JOIN roles rl ON rl.id = ur.role_id
-		                   WHERE ur.user_id = $2 AND rl.code = 'ADMIN'
-		                     AND ur.scope_type = 'CONTEST' AND ur.scope_id = c.id
-		                   LIMIT 1)
+		            ELSE COALESCE(
+		              (SELECT ur.access_level FROM user_roles ur JOIN roles rl ON rl.id = ur.role_id
+		                WHERE ur.user_id = $2 AND rl.code = 'ADMIN'
+		                  AND ur.scope_type = 'CONTEST' AND ur.scope_id = c.id
+		                LIMIT 1),
+		              CASE WHEN EXISTS (
+		                SELECT 1 FROM event_staff_permissions ep
+		                WHERE ep.user_id = $2 AND ep.contest_id = c.id
+		              ) THEN 'STAFF' END)
 		       END AS access_level
 		FROM contests c
 		WHERE ($1::bool
 		        OR c.owner_user_id = $2
 		        OR c.id IN (
 		          SELECT ur.scope_id FROM user_roles ur JOIN roles rl ON rl.id = ur.role_id
-		          WHERE ur.user_id = $2 AND rl.code = 'ADMIN' AND ur.scope_type = 'CONTEST'))
+		          WHERE ur.user_id = $2 AND rl.code = 'ADMIN' AND ur.scope_type = 'CONTEST')
+		        OR c.id IN (
+		          SELECT ep.contest_id FROM event_staff_permissions ep WHERE ep.user_id = $2))
 		  AND ($3 = '' OR c.status = $3)
 		ORDER BY c.created_at DESC`, isMega, userID, status)
 	if err != nil {
@@ -131,6 +139,16 @@ func (r *Repo) IsOwner(ctx context.Context, userID, contestID string) (bool, err
 		return false, ErrNotFound
 	}
 	return owner, err
+}
+
+// HasStaffAccess сообщает, есть ли у пользователя хотя бы одно event-permission на конкурс.
+func (r *Repo) HasStaffAccess(ctx context.Context, userID, contestID string) (bool, error) {
+	var ok bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM event_staff_permissions
+			WHERE user_id=$1 AND contest_id=$2)`, userID, contestID).Scan(&ok)
+	return ok, err
 }
 
 // ListForParticipant — конкурсы, где пользователь активный участник (для кабинета конкурсанта).

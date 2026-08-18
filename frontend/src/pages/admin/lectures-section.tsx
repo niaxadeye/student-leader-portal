@@ -21,7 +21,13 @@ const statusMeta = {
   FINISHED: { label: 'Завершена', tone: 'brand' as const },
 }
 
-export function LecturesSection({ contestId }: { contestId: string }) {
+export function LecturesSection({
+  contestId,
+  canManage = true,
+}: {
+  contestId: string
+  canManage?: boolean
+}) {
   const lectures = useAdminLectures(contestId)
   const transition = useTransitionLecture(contestId)
   const remove = useDeleteLecture(contestId)
@@ -66,9 +72,11 @@ export function LecturesSection({ contestId }: { contestId: string }) {
             Расписание, окно сканирования и награда за посещение.
           </p>
         </div>
+        {canManage && (
         <Button size="sm" onClick={openCreate}>
           <Plus className="h-4 w-4" /> Новая лекция
         </Button>
+        )}
       </div>
 
       {lectures.isLoading && <Skeleton className="h-32 w-full" />}
@@ -100,12 +108,12 @@ export function LecturesSection({ contestId }: { contestId: string }) {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {lecture.status !== 'FINISHED' && (
+                    {canManage && lecture.status !== 'FINISHED' && (
                       <Button size="sm" variant="ghost" onClick={() => openEdit(lecture)}>
                         <Pencil className="h-4 w-4" /> Изменить
                       </Button>
                     )}
-                    {lecture.status === 'DRAFT' && (
+                    {canManage && lecture.status === 'DRAFT' && (
                       <>
                         <Button
                           size="sm"
@@ -132,6 +140,7 @@ export function LecturesSection({ contestId }: { contestId: string }) {
                             <QrCode className="h-4 w-4" /> Сканер
                           </Link>
                         </Button>
+                        {canManage && (
                         <Button
                           size="sm"
                           variant="secondary"
@@ -140,6 +149,7 @@ export function LecturesSection({ contestId }: { contestId: string }) {
                         >
                           <Flag className="h-4 w-4" /> Завершить
                         </Button>
+                        )}
                       </>
                     )}
                     {lecture.status === 'FINISHED' && (

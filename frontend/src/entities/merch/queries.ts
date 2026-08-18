@@ -33,18 +33,23 @@ const participantOrdersKey = (eventId: string, participantId: string) => [
   participantId,
 ]
 
-export function useAdminMerch(contestId?: string) {
+export function useAdminMerch(contestId?: string, enabled = true) {
   return useQuery({
     queryKey: adminProductsKey(contestId ?? ''),
     queryFn: () => listAdminMerch(contestId!),
-    enabled: !!contestId,
+    enabled: !!contestId && enabled,
   })
 }
 
-export function useAdminMerchOrders(contestId: string, status: MerchOrderStatus | 'ALL') {
+export function useAdminMerchOrders(
+  contestId: string,
+  status: MerchOrderStatus | 'ALL',
+  enabled = true,
+) {
   return useQuery({
     queryKey: [...adminOrdersKey(contestId), status],
     queryFn: () => listAdminMerchOrders(contestId, status),
+    enabled: !!contestId && enabled,
   })
 }
 

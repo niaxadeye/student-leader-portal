@@ -1,4 +1,4 @@
-import { LayoutDashboard, Trophy, Users, Shield, Building2, ShieldPlus } from 'lucide-react'
+import { LayoutDashboard, Trophy, Users, Shield, Building2, ShieldPlus, IdCard } from 'lucide-react'
 import type { RoleCode } from '@/entities/auth/types'
 
 export interface AdminNavItem {
@@ -28,5 +28,6 @@ export const roleMeta: Record<RoleCode, { label: string; icon: typeof Shield }> 
   MEGA_ADMIN: { label: 'Мегаадмин', icon: ShieldPlus },
   SUPER_ADMIN: { label: 'Суперадмин', icon: Shield },
   ADMIN: { label: 'Администратор', icon: Shield },
+  STAFF: { label: 'Сотрудник', icon: IdCard },
   CONTESTANT: { label: 'Конкурсант', icon: Users },
 }

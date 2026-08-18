@@ -40,19 +40,16 @@ func (a *App) Router() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/config", a.handleConfig)
 
-		// Админ-раздел: требует access-токен и роль ADMIN/SUPER_ADMIN.
-		// Scope конкретного конкурса проверяется в сервис-слое (SITE.md §6 п.5).
+		// Админ-раздел: access-токен обязателен. Грубый роль-гейт разведён по группам:
+		// контент конкурса — ADMIN/SUPER; реестр и staff-права — SUPER/MEGA;
+		// event-операции — ADMIN/SUPER/STAFF. Тонкая изоляция — в сервисе.
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(d.authn.Require)
-			// ADMIN и SUPER_ADMIN попадают в админ-раздел; MEGA_ADMIN проходит всегда.
-			// Тонкая изоляция (владение, EDIT/VIEW) — в сервис-слое, не здесь.
-			r.Use(middleware.RequireRole("ADMIN", "SUPER_ADMIN"))
 
-			r.Route("/contests", func(r chi.Router) {
-				r.Get("/", d.contestsHandler.List)
-				r.Post("/", d.contestsHandler.Create)
-				r.Route("/{contestId}", func(r chi.Router) {
-					r.Get("/", d.contestsHandler.Get)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole("ADMIN", "SUPER_ADMIN"))
+				r.Post("/contests", d.contestsHandler.Create)
+				r.Route("/contests/{contestId}", func(r chi.Router) {
 					r.Patch("/", d.contestsHandler.Update)
 					r.Post("/publish", d.contestsHandler.Publish())
 					r.Post("/finish", d.contestsHandler.Finish())
@@ -62,8 +59,56 @@ func (a *App) Router() http.Handler {
 					r.Delete("/contestants/{userId}", d.contestsHandler.RemoveContestant)
 					r.Post("/contestants/import", d.contestsHandler.ImportContestants)
 					r.Get("/contestants/export", d.contestsHandler.ExportContestants)
+					r.Get("/challenges", d.challengesHandler.List)
+					r.Post("/challenges", d.challengesHandler.Create)
+				})
+				r.Route("/challenges/{challengeId}", func(r chi.Router) {
+					r.Get("/", d.challengesHandler.Get)
+					r.Patch("/", d.challengesHandler.Update)
+					r.Post("/duplicate", d.challengesHandler.Duplicate)
+					r.Post("/publish", d.challengesHandler.Publish())
+					r.Post("/close", d.challengesHandler.Close())
+					r.Post("/archive", d.challengesHandler.Archive())
+					r.Get("/schema-preview", d.challengesHandler.SchemaPreview)
+					r.Get("/fields", d.challengesHandler.ListFields)
+					r.Post("/fields", d.challengesHandler.AddField)
+					r.Patch("/fields/reorder", d.challengesHandler.ReorderFields)
+					r.Patch("/fields/{fieldId}", d.challengesHandler.UpdateField)
+					r.Delete("/fields/{fieldId}", d.challengesHandler.DeleteField)
+					r.Get("/submissions", d.submissionsHandler.AdminList)
+				})
+				r.Route("/submissions/{submissionId}", func(r chi.Router) {
+					r.Get("/", d.submissionsHandler.AdminGet)
+					r.Get("/files/{fileId}", d.submissionsHandler.DownloadFile)
+				})
+				r.Route("/users/{userId}", func(r chi.Router) {
+					r.Post("/reset-password", d.userAdminHandler.ResetPassword)
+					r.Post("/block", d.userAdminHandler.Block)
+					r.Post("/unblock", d.userAdminHandler.Unblock)
+				})
+			})
 
-					// Лекции мероприятия, QR attendance и история посещений.
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole("SUPER_ADMIN", "MEGA_ADMIN"))
+				r.Get("/users", d.userAdminHandler.ListUsers)
+				r.Post("/users", d.userAdminHandler.CreateUser)
+				r.Get("/users/{userId}", d.userAdminHandler.GetUser)
+				r.Patch("/users/{userId}", d.userAdminHandler.UpdateUser)
+				r.Post("/users/{userId}/roles", d.userAdminHandler.AssignRole)
+				r.Delete("/users/{userId}/roles", d.userAdminHandler.RemoveRole)
+				r.Get("/users/{userId}/staff-permissions", d.staffHandler.ListForUser)
+				r.Put("/users/{userId}/staff-permissions", d.staffHandler.ReplaceForUser)
+				r.Delete("/users/{userId}/staff-permissions", d.staffHandler.ClearForUser)
+				r.Get("/contests/{contestId}/staff", d.staffHandler.ListForContest)
+				r.Put("/contests/{contestId}/staff/{userId}", d.staffHandler.ReplaceForContest)
+				r.Delete("/contests/{contestId}/staff/{userId}", d.staffHandler.ClearForContest)
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole("ADMIN", "SUPER_ADMIN", "STAFF"))
+				r.Get("/contests", d.contestsHandler.List)
+				r.Get("/contests/{contestId}", d.contestsHandler.Get)
+				r.Route("/contests/{contestId}", func(r chi.Router) {
 					r.Route("/lectures", func(r chi.Router) {
 						r.Get("/", d.lecturesHandler.AdminList)
 						r.Post("/", d.lecturesHandler.AdminCreate)
@@ -77,8 +122,6 @@ func (a *App) Router() http.Handler {
 							r.Post("/attendance/scan", d.lecturesHandler.Scan)
 						})
 					})
-
-					// Задания мероприятия и очередь проверки подтверждений.
 					r.Route("/tasks", func(r chi.Router) {
 						r.Get("/", d.eventTasksHandler.AdminList)
 						r.Post("/", d.eventTasksHandler.AdminCreate)
@@ -93,8 +136,6 @@ func (a *App) Router() http.Handler {
 							r.Delete("/image", d.eventTasksHandler.AdminDeleteImage)
 						})
 					})
-
-					// Каталог мерча и выдача зарезервированных заказов.
 					r.Route("/merch/products", func(r chi.Router) {
 						r.Get("/", d.merchHandler.AdminProducts)
 						r.Post("/", d.merchHandler.AdminCreateProduct)
@@ -123,8 +164,6 @@ func (a *App) Router() http.Handler {
 						r.Post("/reject", d.eventTasksHandler.Reject())
 						r.Get("/assets/{assetId}", d.eventTasksHandler.AdminAsset)
 					})
-
-					// Участники платформы мероприятий не являются users/contestants.
 					r.Route("/participants", func(r chi.Router) {
 						r.Get("/", d.eventParticipantsHandler.AdminList)
 						r.Post("/", d.eventParticipantsHandler.AdminCreate)
@@ -140,54 +179,7 @@ func (a *App) Router() http.Handler {
 							r.Post("/points/adjustments", d.pointsHandler.AdminAdjustment)
 						})
 					})
-
-					// Испытания конкурса (SITE.md §10, Этап 3).
-					r.Get("/challenges", d.challengesHandler.List)
-					r.Post("/challenges", d.challengesHandler.Create)
 				})
-			})
-
-			// Испытания по id + поля конструктора (доступ проверяется в сервисе).
-			r.Route("/challenges/{challengeId}", func(r chi.Router) {
-				r.Get("/", d.challengesHandler.Get)
-				r.Patch("/", d.challengesHandler.Update)
-				r.Post("/duplicate", d.challengesHandler.Duplicate)
-				r.Post("/publish", d.challengesHandler.Publish())
-				r.Post("/close", d.challengesHandler.Close())
-				r.Post("/archive", d.challengesHandler.Archive())
-				r.Get("/schema-preview", d.challengesHandler.SchemaPreview)
-				r.Get("/fields", d.challengesHandler.ListFields)
-				r.Post("/fields", d.challengesHandler.AddField)
-				r.Patch("/fields/reorder", d.challengesHandler.ReorderFields)
-				r.Patch("/fields/{fieldId}", d.challengesHandler.UpdateField)
-				r.Delete("/fields/{fieldId}", d.challengesHandler.DeleteField)
-
-				// Ответы конкурсантов на испытание — таблица дирекции (SITE.md §7.6, Этап 4).
-				r.Get("/submissions", d.submissionsHandler.AdminList)
-			})
-
-			// Просмотр одной работы + скачивание файлов (доступ проверяется в сервисе).
-			r.Route("/submissions/{submissionId}", func(r chi.Router) {
-				r.Get("/", d.submissionsHandler.AdminGet)
-				r.Get("/files/{fileId}", d.submissionsHandler.DownloadFile)
-			})
-
-			// Действия над юзером, доступные ADMIN (в рамках своих конкурсантов).
-			r.Route("/users/{userId}", func(r chi.Router) {
-				r.Post("/reset-password", d.userAdminHandler.ResetPassword)
-				r.Post("/block", d.userAdminHandler.Block)
-				r.Post("/unblock", d.userAdminHandler.Unblock)
-			})
-
-			// Реестр пользователей и управление ролями — только SUPER_ADMIN (SITE.md §5.1).
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("SUPER_ADMIN", "MEGA_ADMIN"))
-				r.Get("/users", d.userAdminHandler.ListUsers)
-				r.Post("/users", d.userAdminHandler.CreateUser)
-				r.Get("/users/{userId}", d.userAdminHandler.GetUser)
-				r.Patch("/users/{userId}", d.userAdminHandler.UpdateUser)
-				r.Post("/users/{userId}/roles", d.userAdminHandler.AssignRole)
-				r.Delete("/users/{userId}/roles", d.userAdminHandler.RemoveRole)
 			})
 		})
 

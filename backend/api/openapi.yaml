@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Student Leader Cabinet API
-  version: 0.6.0
+    version: 0.7.0
   description: >
     REST API личного кабинета студенческого лидера. Все ответы обёрнуты в envelope
     {data, meta, request_id} либо {error, request_id} (SITE.md §20, §50).
@@ -28,6 +28,63 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/AppConfig'
+
+  /admin/users/{userId}/staff-permissions:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Staff]
+      summary: Права STAFF на мероприятия
+      operationId: listUserStaffPermissions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Staff]
+      summary: Выдать или заменить права STAFF на конкурс
+      operationId: replaceUserStaffPermissions
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contest_id, permissions]
+              properties:
+                contest_id: { type: string, format: uuid }
+                permissions: { type: array, items: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Staff]
+      summary: Снять права STAFF с конкурса
+      operationId: clearUserStaffPermissions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: contest_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/contests/{contestId}/staff:
+    parameters: [{ $ref: '#/components/parameters/ContestId' }]
+    get:
+      tags: [Staff]
+      summary: Сотрудники мероприятия и их permissions
+      operationId: listContestStaff
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
 
   /events/{eventSlug}/participant-auth/fio:
     parameters: [{ $ref: '#/components/parameters/EventSlug' }]

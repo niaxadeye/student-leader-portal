@@ -21,6 +21,7 @@ function topRole(roles: RoleCode[]): RoleCode {
   if (roles.includes('MEGA_ADMIN')) return 'MEGA_ADMIN'
   if (roles.includes('SUPER_ADMIN')) return 'SUPER_ADMIN'
   if (roles.includes('ADMIN')) return 'ADMIN'
+  if (roles.includes('STAFF')) return 'STAFF'
   return 'CONTESTANT'
 }
 

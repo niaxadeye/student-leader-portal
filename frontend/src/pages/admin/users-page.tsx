@@ -68,6 +68,7 @@ export function AdminUsersPage() {
         <FilterSelect value={role} onChange={(v) => patch({ role: v })} label="Все роли" options={[
           ['SUPER_ADMIN', 'Суперадмины'],
           ['ADMIN', 'Админы'],
+          ['STAFF', 'Сотрудники'],
           ['CONTESTANT', 'Конкурсанты'],
         ]} />
         <FilterSelect value={status} onChange={(v) => patch({ status: v })} label="Все статусы" options={[

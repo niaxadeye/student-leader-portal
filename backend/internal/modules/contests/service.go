@@ -93,16 +93,23 @@ func (s *Service) Create(ctx context.Context, a Actor, in CreateInput) (*Contest
 	return s.repo.ByID(ctx, id)
 }
 
-// ensureView — доступ хотя бы на чтение (EDIT или VIEW).
+// ensureView — доступ хотя бы на чтение контента конкурса ИЛИ staff-permission на мероприятие.
 func (s *Service) ensureView(ctx context.Context, a Actor, contestID string) error {
 	lvl, err := s.repo.AccessLevel(ctx, a.UserID, contestID, a.IsMega)
 	if err != nil {
 		return err
 	}
-	if !lvl.CanView() {
-		return ErrForbidden
+	if lvl.CanView() {
+		return nil
 	}
-	return nil
+	ok, err := s.repo.HasStaffAccess(ctx, a.UserID, contestID)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	return ErrForbidden
 }
 
 // ensureEdit — доступ на редактирование (владелец, назначенный EDIT-админ или мега).
@@ -140,6 +147,13 @@ func (s *Service) AccessFor(ctx context.Context, a Actor, contestID string) (str
 	case AccessView:
 		return "VIEW", nil
 	default:
+		ok, err := s.repo.HasStaffAccess(ctx, a.UserID, contestID)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return "STAFF", nil
+		}
 		return "", nil
 	}
 }

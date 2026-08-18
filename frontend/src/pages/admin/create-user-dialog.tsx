@@ -20,6 +20,7 @@ import type { RoleCode } from '@/entities/auth/types'
 const allRoleOptions: Array<{ value: RoleCode; label: string }> = [
   { value: 'SUPER_ADMIN', label: 'Суперадмин' },
   { value: 'ADMIN', label: 'Админ' },
+  { value: 'STAFF', label: 'Сотрудник' },
   { value: 'CONTESTANT', label: 'Конкурсант' },
 ]
 

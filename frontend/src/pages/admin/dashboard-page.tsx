@@ -1,5 +1,6 @@
 import { Trophy, Users, FileCheck, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/entities/auth/auth-context'
+import { isStaff } from '@/entities/auth/roles'
 import { useAdminContests } from '@/entities/contest/queries'
 import { useAdminUsers } from '@/entities/user/queries'
 import { StatCard } from '@/widgets/stat-card'
@@ -8,6 +9,7 @@ import { Skeleton } from '@/shared/ui/states'
 export function AdminDashboardPage() {
   const { user } = useAuth()
   const isSuper = !!user?.roles.includes('SUPER_ADMIN')
+  const staffOnly = isStaff(user) && !isSuper && !user?.roles.includes('ADMIN') && !user?.roles.includes('MEGA_ADMIN')
   const { data: contests, isLoading } = useAdminContests()
   // Реестр юзеров доступен только SUPER_ADMIN — иначе запрос вернёт 403.
   const { data: usersPage } = useAdminUsers({ role: 'ADMIN', limit: 1 }, isSuper)
@@ -24,7 +26,9 @@ export function AdminDashboardPage() {
         <p className="mt-1 text-[15px] text-muted">
           {isSuper
             ? 'Обзор всей системы: конкурсы, пользователи, доступы.'
-            : 'Обзор назначенных вам конкурсов.'}
+            : staffOnly
+              ? 'Мероприятия, на которых вам выданы права.'
+              : 'Обзор назначенных вам конкурсов.'}
         </p>
       </header>
 
@@ -42,7 +46,7 @@ export function AdminDashboardPage() {
           {isSuper ? (
             <StatCard label="Администраторов" value={usersPage?.total ?? 0} icon={ShieldCheck} />
           ) : (
-            <StatCard label="Ваша роль" value="Админ" icon={ShieldCheck} />
+            <StatCard label="Ваша роль" value={staffOnly ? 'Сотрудник' : 'Админ'} icon={ShieldCheck} />
           )}
         </div>
       )}
