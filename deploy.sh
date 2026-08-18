@@ -60,11 +60,16 @@ pm2 describe eazytech-worker | grep -q 'status.*online' || fail "eazytech-worker
 log "health-check"
 PORT="${HTTP_PORT:-8080}"
 for i in $(seq 1 10); do
-  if curl -fsS "http://127.0.0.1:${PORT}/health/ready" >/dev/null 2>&1; then
-    log "OK: API готов (/health/ready)"
+  hdr="$(mktemp)"
+  body="$(curl -fsS -D "$hdr" "http://127.0.0.1:${PORT}/health/ready" || true)"
+  if grep -qi '^content-type: application/json' "$hdr" \
+     && printf '%s' "$body" | grep -q '"status":"ready"'; then
+    rm -f "$hdr"
+    log "OK: API готов (/health/ready JSON)"
     break
   fi
-  [ "$i" = 10 ] && fail "API не ответил на /health/ready за 10 попыток (journalctl -u eazytech-api)"
+  rm -f "$hdr"
+  [ "$i" = 10 ] && fail "API не ответил JSON /health/ready за 10 попыток (journalctl -u eazytech-api)"
   sleep 1
 done
 

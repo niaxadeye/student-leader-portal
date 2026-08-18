@@ -172,11 +172,6 @@ func (a *App) Router() http.Handler {
 					r.Get("/", d.submissionsHandler.AdminGet)
 					r.Get("/files/{fileId}", d.submissionsHandler.DownloadFile)
 				})
-				r.Route("/users/{userId}", func(r chi.Router) {
-					r.Post("/reset-password", d.userAdminHandler.ResetPassword)
-					r.Post("/block", d.userAdminHandler.Block)
-					r.Post("/unblock", d.userAdminHandler.Unblock)
-				})
 			})
 
 			r.Group(func(r chi.Router) {
@@ -185,6 +180,9 @@ func (a *App) Router() http.Handler {
 				r.Post("/users", d.userAdminHandler.CreateUser)
 				r.Get("/users/{userId}", d.userAdminHandler.GetUser)
 				r.Patch("/users/{userId}", d.userAdminHandler.UpdateUser)
+				r.Post("/users/{userId}/reset-password", d.userAdminHandler.ResetPassword)
+				r.Post("/users/{userId}/block", d.userAdminHandler.Block)
+				r.Post("/users/{userId}/unblock", d.userAdminHandler.Unblock)
 				r.Post("/users/{userId}/roles", d.userAdminHandler.AssignRole)
 				r.Delete("/users/{userId}/roles", d.userAdminHandler.RemoveRole)
 				r.Get("/users/{userId}/staff-permissions", d.staffHandler.ListForUser)

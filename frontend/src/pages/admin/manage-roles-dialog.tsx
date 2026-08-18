@@ -69,7 +69,8 @@ function RolesBody({ userId }: { userId: string }) {
   const [error, setError] = useState<string>()
 
   // Уровень доступа задаётся только для ADMIN на конкретный конкурс (§3.4).
-  const needsAccessLevel = role === 'ADMIN' && scopeId !== ''
+  // Глобальный ADMIN запрещён.
+  const needsAccessLevel = role === 'ADMIN'
   const staffGlobal = role === 'STAFF'
 
   const contestName = (id: string) => contests.data?.find((c) => c.id === id)?.name
@@ -86,6 +87,10 @@ function RolesBody({ userId }: { userId: string }) {
 
   function onAssign() {
     setError(undefined)
+    if (role === 'ADMIN' && !scopeId) {
+      setError('Админу нужен конкурс и уровень EDIT или VIEW.')
+      return
+    }
     const scopeType = staffGlobal || !scopeId ? 'GLOBAL' : 'CONTEST'
     assign.mutate(
       {
@@ -157,14 +162,14 @@ function RolesBody({ userId }: { userId: string }) {
             )}
           </Field>
           {!staffGlobal && (
-          <Field label="Область" helpText="Пусто — глобально. Иначе роль действует в выбранном конкурсе.">
+          <Field label="Область" helpText={role === 'ADMIN' ? 'Админ действует только в выбранном конкурсе.' : 'Пусто — глобально. Иначе роль действует в выбранном конкурсе.'}>
             {(p) => (
-              <Select value={scopeId || 'GLOBAL'} onValueChange={(v) => setScopeId(v === 'GLOBAL' ? '' : v)}>
+              <Select value={scopeId || (role === 'ADMIN' ? '' : 'GLOBAL')} onValueChange={(v) => setScopeId(v === 'GLOBAL' ? '' : v)}>
                 <SelectTrigger id={p.id}>
-                  <SelectValue />
+                  <SelectValue placeholder={role === 'ADMIN' ? 'Выберите конкурс' : undefined} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="GLOBAL">Глобально</SelectItem>
+                  {role !== 'ADMIN' && <SelectItem value="GLOBAL">Глобально</SelectItem>}
                   {contests.data?.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}

@@ -100,6 +100,49 @@ func (r *Repo) AssignRole(ctx context.Context, userID, role, scopeType, scopeID,
 	return nil
 }
 
+// SetPassword ставит новый хеш и must_change_password=TRUE.
+func (r *Repo) SetPassword(ctx context.Context, userID, hash string) error {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE users SET password_hash=$2, must_change_password=TRUE,
+		       password_changed_at=now(), failed_login_count=0, locked_until=NULL,
+		       updated_at=now()
+		WHERE id=$1 AND deleted_at IS NULL`, userID, hash)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// SetStatus меняет статус пользователя.
+func (r *Repo) SetStatus(ctx context.Context, userID, status string) error {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE users SET status=$2, updated_at=now()
+		WHERE id=$1 AND deleted_at IS NULL`, userID, status)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// RevokeSessions отзывает сессии и refresh-токены цели (сброс пароля/ролей/блокировка).
+func (r *Repo) RevokeSessions(ctx context.Context, userID, reason string) error {
+	_, err := r.pool.Exec(ctx, `
+		WITH s AS (
+			UPDATE auth_sessions SET revoked_at = now(), revoke_reason = $2
+			WHERE user_id = $1 AND revoked_at IS NULL
+			RETURNING id
+		)
+		UPDATE refresh_tokens SET revoked_at = now()
+		WHERE session_id IN (SELECT id FROM s) AND revoked_at IS NULL`, userID, reason)
+	return err
+}
+
 // RemoveRole снимает роль пользователя со scope.
 func (r *Repo) RemoveRole(ctx context.Context, userID, role, scopeType, scopeID string) error {
 	_, err := r.pool.Exec(ctx, `

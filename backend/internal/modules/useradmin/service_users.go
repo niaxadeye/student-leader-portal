@@ -47,8 +47,11 @@ func (s *Service) List(ctx context.Context, a Actor, f ListFilter) (*ListResult,
 	return &ListResult{Users: users, Total: total, Limit: f.Limit, Offset: f.Offset}, nil
 }
 
-// Get возвращает пользователя с ролями.
-func (s *Service) Get(ctx context.Context, id string) (*User, error) {
+// Get возвращает пользователя с ролями, только если актор вправе его видеть.
+func (s *Service) Get(ctx context.Context, a Actor, id string) (*User, error) {
+	if err := s.ensureManage(ctx, a, id, ActionView); err != nil {
+		return nil, err
+	}
 	return s.repo.ByID(ctx, id)
 }
 
@@ -93,17 +96,23 @@ func (s *Service) Create(ctx context.Context, a Actor, in CreateInput) (*CreateR
 	if login == "" || name == "" {
 		return nil, ErrValidation
 	}
-	role, scopeType, scopeID := "", "", ""
+	role, scopeType, scopeID, accessLevel := "", "", "", ""
 	if strings.TrimSpace(in.Role) != "" {
 		norm, ok := normScope(AssignRoleInput{Role: in.Role, ScopeType: in.ScopeType, ScopeID: in.ScopeID, AccessLevel: in.AccessLevel})
 		if !ok {
 			return nil, ErrValidation
 		}
-		role, scopeType, scopeID = norm.Role, norm.ScopeType, norm.ScopeID
+		role, scopeType, scopeID, accessLevel = norm.Role, norm.ScopeType, norm.ScopeID, norm.AccessLevel
 	}
-	// Guard: кто кого может создавать (§3.3).
 	if !canCreateRole(a, role) {
 		return nil, ErrForbidden
+	}
+	if role != "" {
+		if err := s.ensureCanGrant(ctx, a, AssignRoleInput{
+			Role: role, ScopeType: scopeType, ScopeID: scopeID, AccessLevel: accessLevel,
+		}); err != nil {
+			return nil, err
+		}
 	}
 	temp, err := security.GenerateTempPassword()
 	if err != nil {
@@ -113,11 +122,6 @@ func (s *Service) Create(ctx context.Context, a Actor, in CreateInput) (*CreateR
 	if err != nil {
 		return nil, err
 	}
-	accessLevel := ""
-	if strings.TrimSpace(in.Role) != "" {
-		norm, _ := normScope(AssignRoleInput{Role: in.Role, ScopeType: in.ScopeType, ScopeID: in.ScopeID, AccessLevel: in.AccessLevel})
-		accessLevel = norm.AccessLevel
-	}
 	id, err := s.repo.Create(ctx, NewUser{
 		Login: login, FullName: name, PasswordHash: hash,
 		Email: optStr(in.Email), Organization: optStr(in.Organization),
@@ -126,20 +130,23 @@ func (s *Service) Create(ctx context.Context, a Actor, in CreateInput) (*CreateR
 	if err != nil {
 		return nil, err
 	}
-	s.audit.Log(ctx, a.UserID, "USER_CREATED", "user", id, map[string]any{"login": login, "role": role})
+	s.log(ctx, a.UserID, "USER_CREATED", id, map[string]any{"login": login, "role": role})
 	return &CreateResult{UserID: id, Login: login, TempPassword: temp}, nil
 }
 
 // Update меняет профиль пользователя.
-func (s *Service) Update(ctx context.Context, actorID, id, fullName, email, org string) (*User, error) {
+func (s *Service) Update(ctx context.Context, a Actor, id, fullName, email, org string) (*User, error) {
 	name := strings.TrimSpace(fullName)
 	if name == "" {
 		return nil, ErrValidation
 	}
+	if err := s.ensureManage(ctx, a, id, ActionUpdate); err != nil {
+		return nil, err
+	}
 	if err := s.repo.UpdateProfile(ctx, id, name, optStr(email), optStr(org)); err != nil {
 		return nil, err
 	}
-	s.audit.Log(ctx, actorID, "USER_UPDATED", "user", id, nil)
+	s.log(ctx, a.UserID, "USER_UPDATED", id, nil)
 	return s.repo.ByID(ctx, id)
 }
 

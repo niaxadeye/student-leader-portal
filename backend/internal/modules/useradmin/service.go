@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/eazytech/student-leader-cabinet/internal/platform/security"
@@ -23,19 +22,68 @@ type Auditor interface {
 	Log(ctx context.Context, actorUserID, action, entityType, entityID string, meta map[string]any)
 }
 
+// repository — граница доступа к пользователям. Реальный Repo и тестовые фейки.
+type repository interface {
+	List(ctx context.Context, f ListFilter) ([]User, int, error)
+	ByID(ctx context.Context, id string) (*User, error)
+	Create(ctx context.Context, nu NewUser, role, scopeType, scopeID, accessLevel string) (string, error)
+	UpdateProfile(ctx context.Context, id, fullName string, email, org *string) error
+	AssignRole(ctx context.Context, userID, role, scopeType, scopeID, accessLevel string) error
+	RemoveRole(ctx context.Context, userID, role, scopeType, scopeID string) error
+	AccessTarget(ctx context.Context, userID string) (*AccessTarget, error)
+	OwnsContestant(ctx context.Context, actorID, userID string) (bool, error)
+	ContestOwnedBy(ctx context.Context, contestID, userID string) (bool, error)
+	SetPassword(ctx context.Context, userID, hash string) error
+	SetStatus(ctx context.Context, userID, status string) error
+	RevokeSessions(ctx context.Context, userID, reason string) error
+}
+
 type Service struct {
-	pool  *pgxpool.Pool
-	repo  *Repo
+	repo  repository
 	audit Auditor
 }
 
 func NewService(pool *pgxpool.Pool, audit Auditor) *Service {
-	return &Service{pool: pool, repo: NewRepo(pool), audit: audit}
+	return &Service{repo: NewRepo(pool), audit: audit}
+}
+
+func newService(repo repository, audit Auditor) *Service {
+	return &Service{repo: repo, audit: audit}
+}
+
+func (s *Service) log(ctx context.Context, actorID, action, entityID string, meta map[string]any) {
+	if s.audit == nil {
+		return
+	}
+	s.audit.Log(ctx, actorID, action, "user", entityID, meta)
+}
+
+// ensureManage загружает цель и применяет CanManageUser. Запрет пишется в аудит.
+func (s *Service) ensureManage(ctx context.Context, a Actor, userID string, action ManageAction) error {
+	t, err := s.repo.AccessTarget(ctx, userID)
+	if err != nil {
+		return err
+	}
+	inContest := false
+	if a.IsSuper() && !a.IsMega() {
+		inContest, err = s.repo.OwnsContestant(ctx, a.UserID, userID)
+		if err != nil {
+			return err
+		}
+	}
+	if err := CanManageUser(a, *t, inContest, action); err != nil {
+		s.log(ctx, a.UserID, "USER_ACCESS_DENIED", userID, map[string]any{"action": string(action)})
+		return err
+	}
+	return nil
 }
 
 // ResetPassword ставит новый временный пароль и must_change_password=TRUE.
 // Возвращает временный пароль (показать один раз). Завершает все сессии пользователя.
-func (s *Service) ResetPassword(ctx context.Context, actorID, userID string) (string, error) {
+func (s *Service) ResetPassword(ctx context.Context, a Actor, userID string) (string, error) {
+	if err := s.ensureManage(ctx, a, userID, ActionReset); err != nil {
+		return "", err
+	}
 	temp, err := security.GenerateTempPassword()
 	if err != nil {
 		return "", err
@@ -44,43 +92,28 @@ func (s *Service) ResetPassword(ctx context.Context, actorID, userID string) (st
 	if err != nil {
 		return "", err
 	}
-	ct, err := s.pool.Exec(ctx, `
-		UPDATE users SET password_hash=$2, must_change_password=TRUE,
-		       password_changed_at=now(), failed_login_count=0, locked_until=NULL,
-		       updated_at=now()
-		WHERE id=$1 AND deleted_at IS NULL`, userID, hash)
-	if err != nil {
+	if err := s.repo.SetPassword(ctx, userID, hash); err != nil {
 		return "", err
 	}
-	if ct.RowsAffected() == 0 {
-		return "", ErrUserNotFound
-	}
-	_, _ = s.pool.Exec(ctx, `UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, userID)
-	s.audit.Log(ctx, actorID, "USER_PASSWORD_RESET", "user", userID, nil)
+	_ = s.repo.RevokeSessions(ctx, userID, "password_reset")
+	s.log(ctx, a.UserID, "USER_PASSWORD_RESET", userID, nil)
 	return temp, nil
 }
 
 // SetStatus блокирует/разблокирует пользователя. При блокировке завершает сессии.
-func (s *Service) SetStatus(ctx context.Context, actorID, userID, status string) error {
-	ct, err := s.pool.Exec(ctx, `
-		UPDATE users SET status=$2, updated_at=now()
-		WHERE id=$1 AND deleted_at IS NULL`, userID, status)
-	if err != nil {
+func (s *Service) SetStatus(ctx context.Context, a Actor, userID, status string) error {
+	if status != "BLOCKED" && status != "ACTIVE" {
+		return ErrValidation
+	}
+	if err := s.ensureManage(ctx, a, userID, ActionStatus); err != nil {
 		return err
 	}
-	if ct.RowsAffected() == 0 {
-		return ErrUserNotFound
+	if err := s.repo.SetStatus(ctx, userID, status); err != nil {
+		return err
 	}
 	if status == "BLOCKED" {
-		_, _ = s.pool.Exec(ctx, `UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, userID)
+		_ = s.repo.RevokeSessions(ctx, userID, "blocked")
 	}
-	s.audit.Log(ctx, actorID, "USER_STATUS_CHANGED", "user", userID, map[string]any{"status": status})
+	s.log(ctx, a.UserID, "USER_STATUS_CHANGED", userID, map[string]any{"status": status})
 	return nil
-}
-
-// exists для дружелюбной 404 (не используется напрямую, но полезно в тестах).
-func (s *Service) exists(ctx context.Context, userID string) bool {
-	var id string
-	err := s.pool.QueryRow(ctx, `SELECT id FROM users WHERE id=$1`, userID).Scan(&id)
-	return !errors.Is(err, pgx.ErrNoRows) && err == nil
 }

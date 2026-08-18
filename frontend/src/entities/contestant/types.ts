@@ -19,18 +19,19 @@ export interface AddContestantInput {
   organization?: string
 }
 
-/** Ответ добавления: временный пароль показать один раз. */
+/** Ответ добавления: временный пароль показать один раз, если аккаунт создан. */
 export interface AddContestantResult {
   user_id: string
   login: string
-  temp_password: string
+  temp_password?: string
+  created: boolean
 }
 
 /** Одна строка результата импорта CSV. */
 export interface ImportRow {
   line: number
   login: string
-  status: 'created' | 'error'
+  status: 'created' | 'attached' | 'error'
   temp_password?: string
   error?: string
 }

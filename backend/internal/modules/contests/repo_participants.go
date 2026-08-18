@@ -40,40 +40,71 @@ type NewContestant struct {
 	PasswordHash string
 }
 
-// AddContestant в одной транзакции: создаёт пользователя (must_change),
-// назначает роль CONTESTANT scope=CONTEST и добавляет participant-строку.
-// Возвращает userID. Идемпотентен по login (повторный — обновит роль/связь).
-func (r *Repo) AddContestant(ctx context.Context, contestID string, nc NewContestant) (string, error) {
+// LookupLogin возвращает существующий аккаунт по логину (без пароля).
+func (r *Repo) LookupLogin(ctx context.Context, login string) (*existingAccount, error) {
+	var acc existingAccount
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, created_by FROM users WHERE login=$1 AND deleted_at IS NULL`, login).
+		Scan(&acc.ID, &acc.CreatedBy)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT rl.code FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id
+		WHERE ur.user_id=$1`, acc.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	acc.Roles = []string{}
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		acc.Roles = append(acc.Roles, code)
+	}
+	return &acc, rows.Err()
+}
+
+// InsertContestantUser создаёт нового конкурсанта с created_by актора.
+func (r *Repo) InsertContestantUser(ctx context.Context, createdBy string, nc NewContestant) (string, error) {
+	var id string
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO users (login, password_hash, full_name, organization, status, must_change_password, created_by)
+		VALUES ($1,$2,$3,$4,'ACTIVE',TRUE,$5)
+		RETURNING id`, nc.Login, nc.PasswordHash, nc.FullName, nc.Organization, createdBy).Scan(&id)
+	if isUniqueViolation(err) {
+		return "", ErrLoginConflict
+	}
+	return id, err
+}
+
+// AttachContestant назначает роль CONTESTANT на конкурс и строку участия.
+// Не меняет профиль и пароль существующего пользователя.
+func (r *Repo) AttachContestant(ctx context.Context, contestID, userID string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer tx.Rollback(ctx)
-
-	var userID string
-	err = tx.QueryRow(ctx, `
-		INSERT INTO users (login, password_hash, full_name, organization, status, must_change_password)
-		VALUES ($1,$2,$3,$4,'ACTIVE',TRUE)
-		ON CONFLICT (login) DO UPDATE SET full_name=EXCLUDED.full_name,
-		    organization=EXCLUDED.organization, updated_at=now()
-		RETURNING id`, nc.Login, nc.PasswordHash, nc.FullName, nc.Organization).Scan(&userID)
-	if err != nil {
-		return "", err
-	}
 	if _, err = tx.Exec(ctx, `
 		INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
 		SELECT $1, r.id, 'CONTEST', $2 FROM roles r WHERE r.code='CONTESTANT'
 		ON CONFLICT DO NOTHING`, userID, contestID); err != nil {
-		return "", err
+		return err
 	}
 	if _, err = tx.Exec(ctx, `
 		INSERT INTO contest_participants (contest_id, user_id, participant_type)
 		VALUES ($1,$2,'CONTESTANT')
 		ON CONFLICT (contest_id, user_id) DO UPDATE SET left_at=NULL`,
 		contestID, userID); err != nil {
-		return "", err
+		return err
 	}
-	return userID, tx.Commit(ctx)
+	return tx.Commit(ctx)
 }
 
 // RemoveParticipant помечает участие завершённым (soft, left_at).

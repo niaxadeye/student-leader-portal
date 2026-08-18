@@ -42,113 +42,35 @@
 
 ## 4. P0: критичные задачи
 
-### P0.1. Закрыть захват учётных записей через unscoped user administration
+### P0.1. Закрыть захват учётных записей через unscoped user administration — **сделано 2026-08-19**
 
-#### Проблема
+Инварианты в `useradmin.CanManageUser` + `contests.canAttachExistingContestant`:
 
-Маршруты сброса пароля и блокировки находятся в общей ADMIN/SUPER_ADMIN-группе:
+- ADMIN/STAFF получают 403 на reset/block/unblock (роутер: только SUPER/MEGA; сервис — та же проверка).
+- SUPER управляет только `created_by` и CONTESTANT-only участниками своих конкурсов.
+- SUPER не трогает MEGA и других SUPER. MEGA — глобально, в т.ч. заморозка SUPER (O6).
+- Добавление существующего чужого/привилегированного login → `409 LOGIN_TAKEN` без UUID и без смены пароля.
+- Свой CONTESTANT привязывается без перезаписи профиля/пароля.
+- Запрет пишется в `USER_ACCESS_DENIED`; сессии отзываются при reset/block/смене ролей.
 
-- `backend/internal/app/router.go`, блок `/users/{userId}`;
-- `backend/internal/modules/useradmin/service.go`, методы `ResetPassword` и `SetStatus`.
+### P0.2. Исправить BOLA в реестре пользователей и ролях — **сделано 2026-08-19**
 
-Сервис выполняет глобальный `UPDATE users WHERE id=$1`, не проверяя:
+- Get/Update/Assign/Remove фильтруются тем же `CanManageUser`.
+- Назначение ролей — только цепочка `created_by` (не «чужой конкурсант в моём событии»).
+- Глобальный ADMIN запрещён: только `CONTEST` + `EDIT|VIEW`.
+- После assign/remove ролей сессии цели отзываются.
 
-- роль и область прав актора;
-- `created_by` целевого пользователя;
-- принадлежность целевого пользователя конкурсу актора;
-- запрет воздействия на равную или более привилегированную роль.
+### P0.3. Устранить перехват API защитной страницей KillBot — **предложение готово, не применено**
 
-Дополнительно `backend/internal/modules/contests/repo_participants.go` при добавлении
-участника использует `INSERT ... ON CONFLICT(login) DO UPDATE ... RETURNING id`.
-Это позволяет привязать существующий логин к своему конкурсу, узнать UUID аккаунта,
-а затем вызвать глобальный reset-password. Так потенциально захватывается чужая,
-в том числе привилегированная, учётная запись.
+См. `docs/ops/KILLBOT_BYPASS.md` и `infra/ops/check-public-api.sh`.
+На 2026-08-18 apex `eazytech.ru` всё ещё отдаёт HTML. DNS/WAF не менялись.
 
-Есть и более простой случай: ADMIN видит UUID участников через API конкурса и может
-вызвать unscoped reset/block, хотя утверждённая модель прямо запрещает ADMIN управлять
-участниками.
+`deploy.sh` теперь проверяет, что **локальный** `/health/ready` — JSON со `"status":"ready"`, а не любой HTTP 200.
 
-#### Требуемое направление исправления
+### P0.4. Настроить резервное копирование и восстановление — **скрипты готовы, cron не включён**
 
-1. Убрать reset/block/unblock из зоны доступа `ADMIN` либо поставить обязательный
-   service-level guard. Согласно `docs/RBAC_MULTITENANCY.md`, участниками управляют
-   только владелец-SUPER_ADMIN и MEGA_ADMIN.
-2. Централизовать проверку `CanManageUser(actor, target, action)` в сервисном слое:
-   маршрутизация и frontend не считаются границей безопасности.
-3. SUPER_ADMIN может управлять только пользователями своей цепочки `created_by` и
-   участниками принадлежащих ему конкурсов. MEGA_ADMIN может работать глобально.
-4. Запретить SUPER_ADMIN изменять/сбрасывать MEGA_ADMIN, чужого SUPER_ADMIN и чужие
-   tenant-аккаунты.
-5. Пересмотреть `ON CONFLICT(login)` при добавлении участника. Нельзя молча захватывать
-   существующий глобальный аккаунт. Для конфликта должен быть безопасный явный сценарий
-   с проверкой владельца и роли либо `409 Conflict`.
-6. После изменения пароля, статуса или ролей отзывать активные сессии целевого
-   пользователя в той же согласованной операции.
-
-#### Обязательные тесты
-
-- ADMIN получает `403` на reset/block/unblock любого пользователя.
-- SUPER_ADMIN A получает `403` для пользователя, созданного SUPER_ADMIN B.
-- SUPER_ADMIN не может воздействовать на MEGA_ADMIN или другого SUPER_ADMIN.
-- SUPER_ADMIN может управлять собственным конкурсантам согласно спецификации.
-- MEGA_ADMIN сохраняет разрешённый глобальный доступ.
-- Добавление существующего чужого/привилегированного login не меняет аккаунт и не
-  раскрывает пригодный для дальнейшего захвата идентификатор.
-- Запрещённые действия не меняют БД и создают корректный security/audit event, если
-  такой формат принят в проекте.
-
-### P0.2. Исправить BOLA в реестре пользователей и ролях
-
-#### Проблема
-
-- `backend/internal/modules/useradmin/service_users.go`: `Get` и часть `Update`
-  недостаточно ограничивают target по владельцу.
-- `backend/internal/modules/useradmin/service_roles.go`: проверяется право на конкурс,
-  но не гарантируется, что целевой пользователь принадлежит актору. В UI также можно
-  создать/назначить глобальный ADMIN, что противоречит per-contest модели.
-- После снятия привилегированной роли существующий access JWT может сохранять старые
-  полномочия до истечения TTL.
-
-#### Definition of Done
-
-- Все list/get/update/assign/remove операции фильтруются по actor и `created_by`.
-- `ADMIN + CONTEST` требует `scope_id` и `access_level=EDIT|VIEW`.
-- Глобальный ADMIN запрещён, если для него нет отдельно утверждённого legacy-сценария.
-- Нельзя назначить роль чужому пользователю, даже если актор владеет указанным
-  конкурсом.
-- При security-sensitive изменении ролей отзываются сессии либо вводится надёжная
-  проверка актуальной версии полномочий.
-- Покрыты тестами tenant A / tenant B / MEGA / SUPER / ADMIN EDIT / ADMIN VIEW.
-
-### P0.3. Устранить перехват API защитной страницей KillBot
-
-Это преимущественно инфраструктурная задача и может находиться вне репозитория.
-На момент аудита:
-
-- `eazytech.ru` резолвился на адреса KillBot;
-- `/`, `/health/ready`, `/api/v1/config` возвращали `200 text/html` со страницей
-  проверки пользователя вместо ожидаемого JSON;
-- `www.eazytech.ru` и прямой origin `201.51.29.205` отвечали корректно.
-
-Нельзя менять DNS/WAF без явного разрешения. Подготовить безопасное предложение:
-
-- bypass challenge для `/api/*`, `/health/*`, `/assets/*`;
-- health check должен проверять status, `Content-Type` и небольшой JSON-маркер, а не
-  только HTTP 200;
-- отдельно проверить CORS, cookie и refresh flow через публичный apex-домен.
-
-### P0.4. Настроить резервное копирование и восстановление
-
-На сервере не обнаружены project-level backup scripts, cron или systemd timer для БД.
-PostgreSQL находится в единственном Docker volume.
-
-Требуется отдельное согласование инфраструктурных изменений. Целевое состояние:
-
-- ежедневный зашифрованный `pg_dump`;
-- off-host storage и ограниченный доступ;
-- retention, мониторинг свежести и ошибок;
-- инвентаризация/backup критичных S3-объектов;
-- документированный restore runbook и регулярный тест восстановления.
+См. `docs/ops/BACKUP_RESTORE.md`, `infra/backup/pg_dump.sh`, `infra/backup/pg_restore.sh`.
+Нужно отдельное разрешение на systemd timer и off-host storage.
 
 ## 5. P1: высокий приоритет
 
@@ -331,10 +253,9 @@ cd frontend && npm audit --omit=dev
 
 ## 9. Рекомендуемый порядок выполнения
 
-1. P0.1: reset/block + participant upsert exploit, с regression tests.
-2. P0.2: tenant-safe user registry и role assignment, с полной RBAC-матрицей.
-3. Подготовить отдельные инфраструктурные изменения для KillBot и backup; не применять
-   их без разрешения.
+1. ~~P0.1: reset/block + participant upsert exploit, с regression tests.~~
+2. ~~P0.2: tenant-safe user registry и role assignment, с полной RBAC-матрицей.~~
+3. P0.3/P0.4: применить KillBot bypass и backup timer **только после явного разрешения**.
 4. P1.1: backend dependency upgrades.
 5. P1.2–P1.5: body limits, atomic refresh, file ownership, rate limiter.
 6. Data audit/migration для `owner_user_id` и `access_level`.

@@ -16,13 +16,6 @@ type Handler struct {
 
 func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 
-func actorID(r *http.Request) string {
-	if p := middleware.PrincipalFrom(r.Context()); p != nil {
-		return p.UserID
-	}
-	return ""
-}
-
 // actorOf собирает субъект операции (id + роль) из принципала запроса.
 func actorOf(r *http.Request) Actor {
 	if p := middleware.PrincipalFrom(r.Context()); p != nil {
@@ -32,7 +25,7 @@ func actorOf(r *http.Request) Actor {
 }
 
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	temp, err := h.svc.ResetPassword(r.Context(), actorID(r), chi.URLParam(r, "userId"))
+	temp, err := h.svc.ResetPassword(r.Context(), actorOf(r), chi.URLParam(r, "userId"))
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -41,7 +34,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Block(w http.ResponseWriter, r *http.Request) {
-	if err := h.svc.SetStatus(r.Context(), actorID(r), chi.URLParam(r, "userId"), "BLOCKED"); err != nil {
+	if err := h.svc.SetStatus(r.Context(), actorOf(r), chi.URLParam(r, "userId"), "BLOCKED"); err != nil {
 		writeErr(w, r, err)
 		return
 	}
@@ -49,7 +42,7 @@ func (h *Handler) Block(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Unblock(w http.ResponseWriter, r *http.Request) {
-	if err := h.svc.SetStatus(r.Context(), actorID(r), chi.URLParam(r, "userId"), "ACTIVE"); err != nil {
+	if err := h.svc.SetStatus(r.Context(), actorOf(r), chi.URLParam(r, "userId"), "ACTIVE"); err != nil {
 		writeErr(w, r, err)
 		return
 	}

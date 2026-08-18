@@ -45,10 +45,14 @@ func (h *Handler) AddContestant(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	// Временный пароль отдаётся один раз — админ передаёт его конкурсанту.
-	httpserver.WriteJSON(w, r, http.StatusCreated, map[string]any{
-		"user_id": res.UserID, "login": res.Login, "temp_password": res.TempPassword,
-	}, nil)
+	status := http.StatusCreated
+	body := map[string]any{"user_id": res.UserID, "login": res.Login, "created": res.Created}
+	if res.Created {
+		body["temp_password"] = res.TempPassword
+	} else {
+		status = http.StatusOK
+	}
+	httpserver.WriteJSON(w, r, status, body, nil)
 }
 
 func (h *Handler) RemoveContestant(w http.ResponseWriter, r *http.Request) {

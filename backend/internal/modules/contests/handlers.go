@@ -171,6 +171,8 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		httpserver.WriteError(w, r, http.StatusConflict, "SLUG_TAKEN", "Слаг уже занят", nil)
 	case errors.Is(err, ErrBadStatus):
 		httpserver.WriteError(w, r, http.StatusConflict, "INVALID_TRANSITION", "Недопустимый переход статуса", nil)
+	case errors.Is(err, ErrLoginConflict):
+		httpserver.WriteError(w, r, http.StatusConflict, "LOGIN_TAKEN", "Логин уже занят", nil)
 	case errors.Is(err, ErrValidation):
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Проверьте заполнение полей", nil)
 	default:

@@ -2,10 +2,7 @@ package useradmin
 
 import (
 	"context"
-	"errors"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // AssignRoleInput — назначение роли пользователю.
@@ -30,7 +27,11 @@ func normScope(in AssignRoleInput) (AssignRoleInput, bool) {
 	switch in.ScopeType {
 	case ScopeGlobal:
 		in.ScopeID = nilUUID
-		in.AccessLevel = "" // уровень доступа только для ADMIN+CONTEST
+		in.AccessLevel = ""
+		// Глобальный ADMIN не утверждён: ADMIN только per-contest с EDIT|VIEW.
+		if in.Role == "ADMIN" {
+			return in, false
+		}
 	case ScopeContest:
 		if strings.TrimSpace(in.ScopeID) == "" {
 			return in, false
@@ -63,14 +64,8 @@ func (s *Service) ensureCanGrant(ctx context.Context, a Actor, norm AssignRoleIn
 	if !canCreateRole(a, norm.Role) {
 		return ErrForbidden
 	}
-	// Назначение доступа к конкурсу может делать только его владелец.
 	if norm.ScopeType == ScopeContest {
-		var owner bool
-		err := s.pool.QueryRow(ctx,
-			`SELECT owner_user_id = $1 FROM contests WHERE id = $2`, a.UserID, norm.ScopeID).Scan(&owner)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrValidation
-		}
+		owner, err := s.repo.ContestOwnedBy(ctx, norm.ScopeID, a.UserID)
 		if err != nil {
 			return err
 		}
@@ -87,16 +82,17 @@ func (s *Service) AssignRole(ctx context.Context, a Actor, userID string, in Ass
 	if !ok {
 		return ErrValidation
 	}
-	if err := s.ensureCanGrant(ctx, a, norm); err != nil {
+	if err := s.ensureManage(ctx, a, userID, ActionGrant); err != nil {
 		return err
 	}
-	if _, err := s.repo.ByID(ctx, userID); err != nil {
+	if err := s.ensureCanGrant(ctx, a, norm); err != nil {
 		return err
 	}
 	if err := s.repo.AssignRole(ctx, userID, norm.Role, norm.ScopeType, norm.ScopeID, norm.AccessLevel); err != nil {
 		return err
 	}
-	s.audit.Log(ctx, a.UserID, "ROLE_ASSIGNED", "user", userID,
+	_ = s.repo.RevokeSessions(ctx, userID, "role_changed")
+	s.log(ctx, a.UserID, "ROLE_ASSIGNED", userID,
 		map[string]any{"role": norm.Role, "scope_type": norm.ScopeType, "scope_id": norm.ScopeID, "access_level": norm.AccessLevel})
 	return nil
 }
@@ -107,16 +103,17 @@ func (s *Service) RemoveRole(ctx context.Context, a Actor, userID string, in Ass
 	if !ok {
 		return ErrValidation
 	}
-	if err := s.ensureCanGrant(ctx, a, norm); err != nil {
+	if err := s.ensureManage(ctx, a, userID, ActionGrant); err != nil {
 		return err
 	}
-	if _, err := s.repo.ByID(ctx, userID); err != nil {
+	if err := s.ensureCanGrant(ctx, a, norm); err != nil {
 		return err
 	}
 	if err := s.repo.RemoveRole(ctx, userID, norm.Role, norm.ScopeType, norm.ScopeID); err != nil {
 		return err
 	}
-	s.audit.Log(ctx, a.UserID, "ROLE_REMOVED", "user", userID,
+	_ = s.repo.RevokeSessions(ctx, userID, "role_changed")
+	s.log(ctx, a.UserID, "ROLE_REMOVED", userID,
 		map[string]any{"role": norm.Role, "scope_type": norm.ScopeType, "scope_id": norm.ScopeID})
 	return nil
 }

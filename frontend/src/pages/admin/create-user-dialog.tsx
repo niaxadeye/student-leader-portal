@@ -14,8 +14,10 @@ import { toast } from 'sonner'
 import { useAuth } from '@/entities/auth/auth-context'
 import { isMega } from '@/entities/auth/roles'
 import { useCreateUser } from '@/entities/user/queries'
+import { useAdminContests } from '@/entities/contest/queries'
 import { TempPasswordNote } from './temp-password-note'
 import type { RoleCode } from '@/entities/auth/types'
+import type { AccessLevel } from '@/entities/user/types'
 
 const allRoleOptions: Array<{ value: RoleCode; label: string }> = [
   { value: 'SUPER_ADMIN', label: 'Суперадмин' },
@@ -32,6 +34,7 @@ export function CreateUserDialog({
   onOpenChange: (v: boolean) => void
 }) {
   const { user } = useAuth()
+  const contests = useAdminContests()
   // SUPER_ADMIN не может создавать SUPER_ADMIN — только мега (§3.3).
   const roleOptions = isMega(user)
     ? allRoleOptions
@@ -40,15 +43,20 @@ export function CreateUserDialog({
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<RoleCode>('ADMIN')
+  const [scopeId, setScopeId] = useState('')
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>('EDIT')
   const [error, setError] = useState<string>()
   const [temp, setTemp] = useState<{ login: string; password: string }>()
   const create = useCreateUser()
+  const needsContest = role === 'ADMIN'
 
   function reset() {
     setLogin('')
     setFullName('')
     setEmail('')
     setRole('ADMIN')
+    setScopeId('')
+    setAccessLevel('EDIT')
     setError(undefined)
     setTemp(undefined)
   }
@@ -60,8 +68,20 @@ export function CreateUserDialog({
       setError('Логин и ФИО обязательны.')
       return
     }
+    if (needsContest && !scopeId) {
+      setError('Админу нужен конкурс и уровень EDIT или VIEW.')
+      return
+    }
     create.mutate(
-      { login: login.trim(), full_name: fullName.trim(), email: email.trim() || undefined, role },
+      {
+        login: login.trim(),
+        full_name: fullName.trim(),
+        email: email.trim() || undefined,
+        role,
+        scope_type: needsContest ? 'CONTEST' : 'GLOBAL',
+        scope_id: needsContest ? scopeId : undefined,
+        access_level: needsContest ? accessLevel : undefined,
+      },
       {
         onSuccess: (r) => {
           toast.success('Пользователь создан')
@@ -115,6 +135,39 @@ export function CreateUserDialog({
                 </Select>
               )}
             </Field>
+            {needsContest && (
+              <>
+                <Field label="Конкурс" required helpText="Глобальный ADMIN запрещён — доступ только к выбранному конкурсу.">
+                  {(p) => (
+                    <Select value={scopeId || ''} onValueChange={setScopeId}>
+                      <SelectTrigger id={p.id}>
+                        <SelectValue placeholder="Выберите конкурс" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(contests.data ?? []).map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </Field>
+                <Field label="Уровень доступа">
+                  {(p) => (
+                    <Select value={accessLevel} onValueChange={(v) => setAccessLevel(v as AccessLevel)}>
+                      <SelectTrigger id={p.id}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EDIT">Редактирование</SelectItem>
+                        <SelectItem value="VIEW">Только просмотр</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </Field>
+              </>
+            )}
             <div className="mt-1 flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Отмена

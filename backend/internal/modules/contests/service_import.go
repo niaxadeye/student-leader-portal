@@ -2,6 +2,7 @@ package contests
 
 import (
 	"context"
+	"errors"
 	"strings"
 )
 
@@ -9,7 +10,7 @@ import (
 type ImportRow struct {
 	Line         int    `json:"line"`
 	Login        string `json:"login"`
-	Status       string `json:"status"` // created | error
+	Status       string `json:"status"` // created | attached | error
 	TempPassword string `json:"temp_password,omitempty"`
 	Error        string `json:"error,omitempty"`
 }
@@ -56,8 +57,14 @@ func (s *Service) ImportContestants(ctx context.Context, a Actor, contestID, csv
 			Login: cols[0], FullName: cols[1], Organization: org,
 		})
 		if err != nil {
-			row.Status, row.Error = "error", "не удалось создать"
+			if errors.Is(err, ErrLoginConflict) {
+				row.Status, row.Error = "error", "логин занят"
+			} else {
+				row.Status, row.Error = "error", "не удалось создать"
+			}
 			res.Failed++
+		} else if !out.Created {
+			row.Status = "attached"
 		} else {
 			row.Status, row.TempPassword = "created", out.TempPassword
 			res.Created++

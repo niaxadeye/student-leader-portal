@@ -28,7 +28,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
-	u, err := h.svc.Get(r.Context(), chi.URLParam(r, "userId"))
+	u, err := h.svc.Get(r.Context(), actorOf(r), chi.URLParam(r, "userId"))
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -80,7 +80,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Некорректный запрос", nil)
 		return
 	}
-	u, err := h.svc.Update(r.Context(), actorID(r), chi.URLParam(r, "userId"),
+	u, err := h.svc.Update(r.Context(), actorOf(r), chi.URLParam(r, "userId"),
 		req.FullName, req.Email, req.Organization)
 	if err != nil {
 		writeErr(w, r, err)

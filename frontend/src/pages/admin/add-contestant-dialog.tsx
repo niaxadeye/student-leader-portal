@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/button'
 import { toast } from 'sonner'
 import { useAddContestant } from '@/entities/contestant/queries'
 import { TempPasswordNote } from './temp-password-note'
+import { ApiRequestError } from '@/shared/api/client'
 
 export function AddContestantDialog({
   contestId,
@@ -42,10 +43,20 @@ export function AddContestantDialog({
       { login: login.trim(), full_name: fullName.trim(), organization: organization.trim() || undefined },
       {
         onSuccess: (r) => {
-          toast.success('Конкурсант добавлен')
-          setTemp({ login: r.login, password: r.temp_password })
+          if (r.created && r.temp_password) {
+            toast.success('Конкурсант добавлен')
+            setTemp({ login: r.login, password: r.temp_password })
+          } else {
+            toast.success('Конкурсант привязан к конкурсу (пароль не менялся)')
+            onOpenChange(false)
+          }
         },
-        onError: () => setError('Не удалось добавить. Возможно, логин занят.'),
+        onError: (err) =>
+          setError(
+            err instanceof ApiRequestError && err.code === 'LOGIN_TAKEN'
+              ? 'Логин уже занят.'
+              : 'Не удалось добавить. Возможно, логин занят.',
+          ),
       },
     )
   }

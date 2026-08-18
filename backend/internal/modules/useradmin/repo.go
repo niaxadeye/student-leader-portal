@@ -116,6 +116,58 @@ func (r *Repo) ByID(ctx context.Context, id string) (*User, error) {
 	return &u, nil
 }
 
+// AccessTarget возвращает created_by и коды ролей для CanManageUser.
+func (r *Repo) AccessTarget(ctx context.Context, userID string) (*AccessTarget, error) {
+	var t AccessTarget
+	t.ID = userID
+	err := r.pool.QueryRow(ctx, `
+		SELECT created_by FROM users WHERE id=$1 AND deleted_at IS NULL`, userID).Scan(&t.CreatedBy)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT rl.code FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id
+		WHERE ur.user_id=$1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	t.Roles = []string{}
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		t.Roles = append(t.Roles, code)
+	}
+	return &t, rows.Err()
+}
+
+// OwnsContestant — целевой пользователь активный участник конкурса, которым владеет актор.
+func (r *Repo) OwnsContestant(ctx context.Context, actorID, userID string) (bool, error) {
+	var ok bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM contest_participants p
+			JOIN contests c ON c.id = p.contest_id
+			WHERE p.user_id = $1 AND p.left_at IS NULL AND c.owner_user_id = $2
+		)`, userID, actorID).Scan(&ok)
+	return ok, err
+}
+
+// ContestOwnedBy сообщает, владеет ли userID конкурсом. ErrValidation, если конкурса нет.
+func (r *Repo) ContestOwnedBy(ctx context.Context, contestID, userID string) (bool, error) {
+	var owner bool
+	err := r.pool.QueryRow(ctx, `SELECT owner_user_id = $1 FROM contests WHERE id = $2`, userID, contestID).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, ErrValidation
+	}
+	return owner, err
+}
+
 func (r *Repo) rolesOf(ctx context.Context, userID string) ([]RoleAssignment, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT rl.code, ur.scope_type, ur.scope_id, ur.access_level

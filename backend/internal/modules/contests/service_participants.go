@@ -27,11 +27,13 @@ type AddContestantResult struct {
 	UserID       string
 	Login        string
 	TempPassword string
+	Created      bool
 }
 
 // AddContestant создаёт конкурсанта с временным паролем и привязывает к конкурсу.
+// Существующий логин не захватывается: свой CONTESTANT-only — тихая привязка без смены пароля;
+// чужой или привилегированный — 409 без UUID.
 func (s *Service) AddContestant(ctx context.Context, a Actor, contestID string, in AddContestantInput) (*AddContestantResult, error) {
-	// Управление составом участников — только владелец или мега (§3.6): EDIT-админ получает 403.
 	if err := s.ensureOwnerOrMega(ctx, a, contestID); err != nil {
 		return nil, err
 	}
@@ -39,6 +41,21 @@ func (s *Service) AddContestant(ctx context.Context, a Actor, contestID string, 
 	name := strings.TrimSpace(in.FullName)
 	if login == "" || name == "" {
 		return nil, ErrValidation
+	}
+	existing, err := s.repo.LookupLogin(ctx, login)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		if err := canAttachExistingContestant(a, *existing); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AttachContestant(ctx, contestID, existing.ID); err != nil {
+			return nil, err
+		}
+		s.audit.Log(ctx, a.UserID, "CONTESTANT_ATTACHED", "contest", contestID,
+			map[string]any{"user_id": existing.ID, "login": login})
+		return &AddContestantResult{UserID: existing.ID, Login: login, Created: false}, nil
 	}
 	temp, err := security.GenerateTempPassword()
 	if err != nil {
@@ -48,15 +65,18 @@ func (s *Service) AddContestant(ctx context.Context, a Actor, contestID string, 
 	if err != nil {
 		return nil, err
 	}
-	userID, err := s.repo.AddContestant(ctx, contestID, NewContestant{
+	userID, err := s.repo.InsertContestantUser(ctx, a.UserID, NewContestant{
 		Login: login, FullName: name, Organization: strings.TrimSpace(in.Organization), PasswordHash: hash,
 	})
 	if err != nil {
 		return nil, err
 	}
+	if err := s.repo.AttachContestant(ctx, contestID, userID); err != nil {
+		return nil, err
+	}
 	s.audit.Log(ctx, a.UserID, "CONTESTANT_ADDED", "contest", contestID,
 		map[string]any{"user_id": userID, "login": login})
-	return &AddContestantResult{UserID: userID, Login: login, TempPassword: temp}, nil
+	return &AddContestantResult{UserID: userID, Login: login, TempPassword: temp, Created: true}, nil
 }
 
 // RemoveContestant отвязывает участника от конкурса (soft).

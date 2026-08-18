@@ -236,6 +236,8 @@ accessLevel(user, contest) →
 - `AssignRoleInput` — добавить `AccessLevel` (`EDIT`|`VIEW`) для назначений ADMIN+CONTEST.
 - Guard: назначать доступ к конкурсу может только владелец конкурса (SUPER_ADMIN) или MEGA_ADMIN.
 - Валидация: `access_level` обязателен при `role=ADMIN, scope_type=CONTEST`; иначе NULL.
+- **Глобальный ADMIN запрещён.** Роль ADMIN назначается только на конкретный конкурс
+  (`scope_type=CONTEST` + `scope_id` + `EDIT|VIEW`). Создать/назначить ADMIN без конкурса нельзя.
 
 ### 3.5. Создание конкурса (`contests/service.go:57`)
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Student Leader Cabinet API
-    version: 0.7.0
+    version: 0.8.0
   description: >
     REST API личного кабинета студенческого лидера. Все ответы обёрнуты в envelope
     {data, meta, request_id} либо {error, request_id} (SITE.md §20, §50).
