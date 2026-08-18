@@ -3,6 +3,9 @@ package challenges
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 )
 
 // allowedTransitions задаёт матрицу переходов статуса испытания.
@@ -51,7 +54,6 @@ func (s *Service) snapshot(ctx context.Context, challengeID string, version int,
 
 // Duplicate копирует испытание (мета + активные поля) в новый DRAFT того же конкурса.
 func (s *Service) Duplicate(ctx context.Context, a Actor, challengeID string) (*Challenge, error) {
-	// Дублирование создаёт новое испытание в конкурсе → требует EDIT.
 	src, err := s.adminGetForEdit(ctx, a, challengeID)
 	if err != nil {
 		return nil, err
@@ -60,15 +62,25 @@ func (s *Service) Duplicate(ctx context.Context, a Actor, challengeID string) (*
 	if err != nil {
 		return nil, err
 	}
-	copyTitle := src.Title + " (копия)"
-	nc := &Challenge{
-		ContestID: src.ContestID, Title: copyTitle, Slug: slugify(copyTitle) + "-copy",
-		ShortDescription: src.ShortDescription, FullDescription: src.FullDescription,
-		Instructions: src.Instructions, OpenAt: src.OpenAt, DeadlineAt: src.DeadlineAt, CloseAt: src.CloseAt,
-	}
-	newID, err := s.repo.Create(ctx, nc, a.UserID)
-	if err != nil {
+	copyTitle := strings.TrimSpace(src.Title) + " (копия)"
+	var newID string
+	for attempt := 1; attempt <= 32; attempt++ {
+		nc := &Challenge{
+			ContestID: src.ContestID, Title: copyTitle, Slug: copySlug(src.Title, attempt),
+			ShortDescription: src.ShortDescription, FullDescription: src.FullDescription,
+			Instructions: src.Instructions, OpenAt: src.OpenAt, DeadlineAt: src.DeadlineAt, CloseAt: src.CloseAt,
+		}
+		newID, err = s.repo.Create(ctx, nc, a.UserID)
+		if err == nil {
+			break
+		}
+		if errors.Is(err, ErrSlugTaken) {
+			continue
+		}
 		return nil, err
+	}
+	if newID == "" {
+		return nil, ErrSlugTaken
 	}
 	for i := range fields {
 		f := fields[i]
@@ -78,4 +90,15 @@ func (s *Service) Duplicate(ctx context.Context, a Actor, challengeID string) (*
 	}
 	s.audit.Log(ctx, a.UserID, "CHALLENGE_DUPLICATED", "challenge", newID, map[string]any{"source_id": challengeID})
 	return s.repo.ByID(ctx, newID)
+}
+
+func copySlug(srcTitle string, attempt int) string {
+	base := slugify(srcTitle)
+	if base == "" {
+		base = "challenge"
+	}
+	if attempt <= 1 {
+		return base + "-copy"
+	}
+	return fmt.Sprintf("%s-copy-%d", base, attempt)
 }

@@ -1,19 +1,32 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, ListChecks, ChevronRight } from 'lucide-react'
-import { useAdminChallenges } from '@/entities/challenge/admin-queries'
+import { Plus, ListChecks, ChevronRight, Copy } from 'lucide-react'
+import { useAdminChallenges, useDuplicateChallenge } from '@/entities/challenge/admin-queries'
 import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { EmptyState, Skeleton, ErrorState } from '@/shared/ui/states'
 import { formatDate } from '@/shared/lib/format'
+import { toast } from 'sonner'
 import { challengeStatusMeta } from './challenge-status'
 import { CreateChallengeDialog } from './create-challenge-dialog'
+import type { AdminChallenge } from '@/entities/challenge/admin-types'
 
 /** Список испытаний конкурса + вход в конструктор. canEdit скрывает создание (VIEW-режим). */
 export function ChallengesSection({ contestId, canEdit }: { contestId: string; canEdit: boolean }) {
   const { data, isLoading, isError, refetch } = useAdminChallenges(contestId)
+  const duplicate = useDuplicateChallenge(contestId)
   const [createOpen, setCreateOpen] = useState(false)
+  const [copyingId, setCopyingId] = useState<string>()
+
+  function onDuplicate(ch: AdminChallenge) {
+    setCopyingId(ch.id)
+    duplicate.mutate(ch.id, {
+      onSuccess: (copy) => toast.success(`Создана копия: ${copy.title}`),
+      onError: () => toast.error('Не удалось дублировать испытание'),
+      onSettled: () => setCopyingId(undefined),
+    })
+  }
 
   return (
     <section>
@@ -40,9 +53,12 @@ export function ChallengesSection({ contestId, canEdit }: { contestId: string; c
           {data.map((ch) => {
             const meta = challengeStatusMeta[ch.status]
             return (
-              <Link key={ch.id} to={`/admin/challenges/${ch.id}`} className="block">
-                <Card className="transition hover:border-brand/40">
-                  <CardBody className="flex items-center gap-4 py-3.5">
+              <Card key={ch.id} className="transition hover:border-brand/40">
+                <CardBody className="flex items-center gap-2 py-3.5 pr-2">
+                  <Link
+                    to={`/admin/challenges/${ch.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-4"
+                  >
                     <ListChecks className="h-5 w-5 shrink-0 text-brand" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -55,9 +71,21 @@ export function ChallengesSection({ contestId, canEdit }: { contestId: string; c
                       </p>
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
-                  </CardBody>
-                </Card>
-              </Link>
+                  </Link>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      title="Дублировать"
+                      aria-label={`Дублировать «${ch.title}»`}
+                      disabled={duplicate.isPending && copyingId === ch.id}
+                      onClick={() => onDuplicate(ch)}
+                      className="shrink-0 rounded-md p-2 text-muted transition hover:bg-muted/10 hover:text-ink disabled:opacity-40"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  )}
+                </CardBody>
+              </Card>
             )
           })}
         </div>

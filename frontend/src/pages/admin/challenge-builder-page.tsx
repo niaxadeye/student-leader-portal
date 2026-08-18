@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Rocket, Lock, Archive, Eye, PencilRuler, Inbox, Pencil } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Plus, Rocket, Lock, Archive, Eye, PencilRuler, Inbox, Pencil, Copy } from 'lucide-react'
 import {
   useAdminChallenge,
   useChallengeFields,
+  useDuplicateChallenge,
   useTransitionChallenge,
 } from '@/entities/challenge/admin-queries'
 import { useAdminContest } from '@/entities/contest/queries'
@@ -43,6 +44,8 @@ export function ChallengeBuilderPage() {
   const fieldsQ = useChallengeFields(challengeId)
   const { data: contest } = useAdminContest(challengeQ.data?.contest_id)
   const transition = useTransitionChallenge(challengeId!, challengeQ.data?.contest_id ?? '')
+  const duplicate = useDuplicateChallenge(challengeQ.data?.contest_id ?? '')
+  const navigate = useNavigate()
   const [tab, setTab] = useState<'build' | 'preview' | 'submissions'>('build')
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<AdminField | null>(null)
@@ -108,6 +111,24 @@ export function ChallengeBuilderPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={duplicate.isPending}
+              onClick={() =>
+                duplicate.mutate(challenge.id, {
+                  onSuccess: (copy) => {
+                    toast.success(`Создана копия: ${copy.title}`)
+                    navigate(`/admin/challenges/${copy.id}`)
+                  },
+                  onError: () => toast.error('Не удалось дублировать испытание'),
+                })
+              }
+            >
+              <Copy className="h-4 w-4" /> Дублировать
+            </Button>
+          )}
           {canEdit && challenge.status !== 'ARCHIVED' && (
             <Button size="sm" variant="secondary" onClick={() => setMetaOpen(true)}>
               <Pencil className="h-4 w-4" /> Редактировать

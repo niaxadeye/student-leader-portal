@@ -77,7 +77,11 @@ export function useDuplicateChallenge(contestId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (challengeId: string) => duplicateChallenge(challengeId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: listKey(contestId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: listKey(contestId) })
+      qc.invalidateQueries({ queryKey: ['admin', 'contest', contestId] })
+      qc.invalidateQueries({ queryKey: ['admin', 'contests'] })
+    },
   })
 }
 
