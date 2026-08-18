@@ -40,16 +40,22 @@ func (a *App) Router() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/config", a.handleConfig)
 
-		// Админ-раздел: access-токен обязателен. Грубый роль-гейт разведён по группам:
+		// Админ-раздел: access-токен обязателен. Роль-гейт на хендлерах через With/Group:
 		// контент конкурса — ADMIN/SUPER; реестр и staff-права — SUPER/MEGA;
-		// event-операции — ADMIN/SUPER/STAFF. Тонкая изоляция — в сервисе.
+		// event-операции — ADMIN/SUPER/STAFF. Chi не позволяет два Route на один path.
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(d.authn.Require)
+			adminOrSuper := middleware.RequireRole("ADMIN", "SUPER_ADMIN")
+			superOrMega := middleware.RequireRole("SUPER_ADMIN", "MEGA_ADMIN")
+			staffGate := middleware.RequireRole("ADMIN", "SUPER_ADMIN", "STAFF")
 
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("ADMIN", "SUPER_ADMIN"))
-				r.Post("/contests", d.contestsHandler.Create)
-				r.Route("/contests/{contestId}", func(r chi.Router) {
+			r.With(staffGate).Get("/contests", d.contestsHandler.List)
+			r.With(adminOrSuper).Post("/contests", d.contestsHandler.Create)
+			r.Route("/contests/{contestId}", func(r chi.Router) {
+				r.With(staffGate).Get("/", d.contestsHandler.Get)
+
+				r.Group(func(r chi.Router) {
+					r.Use(adminOrSuper)
 					r.Patch("/", d.contestsHandler.Update)
 					r.Post("/publish", d.contestsHandler.Publish())
 					r.Post("/finish", d.contestsHandler.Finish())
@@ -62,53 +68,16 @@ func (a *App) Router() http.Handler {
 					r.Get("/challenges", d.challengesHandler.List)
 					r.Post("/challenges", d.challengesHandler.Create)
 				})
-				r.Route("/challenges/{challengeId}", func(r chi.Router) {
-					r.Get("/", d.challengesHandler.Get)
-					r.Patch("/", d.challengesHandler.Update)
-					r.Post("/duplicate", d.challengesHandler.Duplicate)
-					r.Post("/publish", d.challengesHandler.Publish())
-					r.Post("/close", d.challengesHandler.Close())
-					r.Post("/archive", d.challengesHandler.Archive())
-					r.Get("/schema-preview", d.challengesHandler.SchemaPreview)
-					r.Get("/fields", d.challengesHandler.ListFields)
-					r.Post("/fields", d.challengesHandler.AddField)
-					r.Patch("/fields/reorder", d.challengesHandler.ReorderFields)
-					r.Patch("/fields/{fieldId}", d.challengesHandler.UpdateField)
-					r.Delete("/fields/{fieldId}", d.challengesHandler.DeleteField)
-					r.Get("/submissions", d.submissionsHandler.AdminList)
-				})
-				r.Route("/submissions/{submissionId}", func(r chi.Router) {
-					r.Get("/", d.submissionsHandler.AdminGet)
-					r.Get("/files/{fileId}", d.submissionsHandler.DownloadFile)
-				})
-				r.Route("/users/{userId}", func(r chi.Router) {
-					r.Post("/reset-password", d.userAdminHandler.ResetPassword)
-					r.Post("/block", d.userAdminHandler.Block)
-					r.Post("/unblock", d.userAdminHandler.Unblock)
-				})
-			})
 
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("SUPER_ADMIN", "MEGA_ADMIN"))
-				r.Get("/users", d.userAdminHandler.ListUsers)
-				r.Post("/users", d.userAdminHandler.CreateUser)
-				r.Get("/users/{userId}", d.userAdminHandler.GetUser)
-				r.Patch("/users/{userId}", d.userAdminHandler.UpdateUser)
-				r.Post("/users/{userId}/roles", d.userAdminHandler.AssignRole)
-				r.Delete("/users/{userId}/roles", d.userAdminHandler.RemoveRole)
-				r.Get("/users/{userId}/staff-permissions", d.staffHandler.ListForUser)
-				r.Put("/users/{userId}/staff-permissions", d.staffHandler.ReplaceForUser)
-				r.Delete("/users/{userId}/staff-permissions", d.staffHandler.ClearForUser)
-				r.Get("/contests/{contestId}/staff", d.staffHandler.ListForContest)
-				r.Put("/contests/{contestId}/staff/{userId}", d.staffHandler.ReplaceForContest)
-				r.Delete("/contests/{contestId}/staff/{userId}", d.staffHandler.ClearForContest)
-			})
+				r.Group(func(r chi.Router) {
+					r.Use(superOrMega)
+					r.Get("/staff", d.staffHandler.ListForContest)
+					r.Put("/staff/{userId}", d.staffHandler.ReplaceForContest)
+					r.Delete("/staff/{userId}", d.staffHandler.ClearForContest)
+				})
 
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("ADMIN", "SUPER_ADMIN", "STAFF"))
-				r.Get("/contests", d.contestsHandler.List)
-				r.Get("/contests/{contestId}", d.contestsHandler.Get)
-				r.Route("/contests/{contestId}", func(r chi.Router) {
+				r.Group(func(r chi.Router) {
+					r.Use(staffGate)
 					r.Route("/lectures", func(r chi.Router) {
 						r.Get("/", d.lecturesHandler.AdminList)
 						r.Post("/", d.lecturesHandler.AdminCreate)
@@ -180,6 +149,47 @@ func (a *App) Router() http.Handler {
 						})
 					})
 				})
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(adminOrSuper)
+				r.Route("/challenges/{challengeId}", func(r chi.Router) {
+					r.Get("/", d.challengesHandler.Get)
+					r.Patch("/", d.challengesHandler.Update)
+					r.Post("/duplicate", d.challengesHandler.Duplicate)
+					r.Post("/publish", d.challengesHandler.Publish())
+					r.Post("/close", d.challengesHandler.Close())
+					r.Post("/archive", d.challengesHandler.Archive())
+					r.Get("/schema-preview", d.challengesHandler.SchemaPreview)
+					r.Get("/fields", d.challengesHandler.ListFields)
+					r.Post("/fields", d.challengesHandler.AddField)
+					r.Patch("/fields/reorder", d.challengesHandler.ReorderFields)
+					r.Patch("/fields/{fieldId}", d.challengesHandler.UpdateField)
+					r.Delete("/fields/{fieldId}", d.challengesHandler.DeleteField)
+					r.Get("/submissions", d.submissionsHandler.AdminList)
+				})
+				r.Route("/submissions/{submissionId}", func(r chi.Router) {
+					r.Get("/", d.submissionsHandler.AdminGet)
+					r.Get("/files/{fileId}", d.submissionsHandler.DownloadFile)
+				})
+				r.Route("/users/{userId}", func(r chi.Router) {
+					r.Post("/reset-password", d.userAdminHandler.ResetPassword)
+					r.Post("/block", d.userAdminHandler.Block)
+					r.Post("/unblock", d.userAdminHandler.Unblock)
+				})
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(superOrMega)
+				r.Get("/users", d.userAdminHandler.ListUsers)
+				r.Post("/users", d.userAdminHandler.CreateUser)
+				r.Get("/users/{userId}", d.userAdminHandler.GetUser)
+				r.Patch("/users/{userId}", d.userAdminHandler.UpdateUser)
+				r.Post("/users/{userId}/roles", d.userAdminHandler.AssignRole)
+				r.Delete("/users/{userId}/roles", d.userAdminHandler.RemoveRole)
+				r.Get("/users/{userId}/staff-permissions", d.staffHandler.ListForUser)
+				r.Put("/users/{userId}/staff-permissions", d.staffHandler.ReplaceForUser)
+				r.Delete("/users/{userId}/staff-permissions", d.staffHandler.ClearForUser)
 			})
 		})
 
