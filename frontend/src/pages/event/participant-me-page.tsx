@@ -125,6 +125,7 @@ export function ParticipantMePage() {
               value={participant.union_card_number || 'Не указан'}
             />
             <DataRow label="Barcode СКС" value={participant.sks_barcode || 'Не указан'} />
+            <DataRow label="Направление" value={participant.direction_name || 'Не указано'} />
           </CardBody>
         </Card>
 
@@ -224,7 +225,7 @@ export function ParticipantMePage() {
           )}
           {lectures.data?.length === 0 && (
             <p className="rounded-[12px] bg-surface-2 p-5 text-center text-[13px] text-muted">
-              Опубликованных лекций пока нет.
+              Для вашего направления пока нет опубликованных лекций.
             </p>
           )}
           {!!lectures.data?.length && (

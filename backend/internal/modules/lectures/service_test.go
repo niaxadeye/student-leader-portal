@@ -34,10 +34,16 @@ func (f *fakeRepo) Get(context.Context, string, string) (*Lecture, error) {
 	return &copy, nil
 }
 func (f *fakeRepo) Create(_ context.Context, contestID string, input LectureInput) (*Lecture, error) {
-	return &Lecture{ID: "lecture-1", ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft}, nil
+	return &Lecture{
+		ID: "lecture-1", ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft,
+		DirectionIDs: uniqueDirectionIDs(input.DirectionIDs), Directions: []DirectionRef{},
+	}, nil
 }
 func (f *fakeRepo) Update(_ context.Context, contestID, lectureID string, input LectureInput) (*Lecture, error) {
-	return &Lecture{ID: lectureID, ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft}, nil
+	return &Lecture{
+		ID: lectureID, ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft,
+		DirectionIDs: uniqueDirectionIDs(input.DirectionIDs), Directions: []DirectionRef{},
+	}, nil
 }
 func (f *fakeRepo) Transition(_ context.Context, contestID, lectureID, _, to string) (*Lecture, error) {
 	return &Lecture{ID: lectureID, ContestID: contestID, Status: to}, nil
@@ -129,6 +135,34 @@ func TestLectureValidationAndPermissions(t *testing.T) {
 		t.Fatalf("list permission: got %q want %q", got, PermissionScan)
 	}
 }
+
+func TestLectureAllowsParticipant(t *testing.T) {
+	t.Parallel()
+	dirA, dirB := "dir-a", "dir-b"
+	cases := []struct {
+		name        string
+		restricted  []string
+		participant *string
+		want        bool
+	}{
+		{name: "open lecture", restricted: nil, participant: &dirA, want: true},
+		{name: "open lecture without direction", restricted: nil, participant: nil, want: true},
+		{name: "matching track", restricted: []string{dirA, dirB}, participant: &dirA, want: true},
+		{name: "wrong track", restricted: []string{dirA}, participant: &dirB, want: false},
+		{name: "restricted and no track", restricted: []string{dirA}, participant: nil, want: false},
+		{name: "restricted and empty track", restricted: []string{dirA}, participant: ptr(""), want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := lectureAllowsParticipant(tc.restricted, tc.participant); got != tc.want {
+				t.Fatalf("got %v want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func ptr(value string) *string { return &value }
 
 func TestConcurrentScanRetriesCreateOneAttendance(t *testing.T) {
 	now := time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)

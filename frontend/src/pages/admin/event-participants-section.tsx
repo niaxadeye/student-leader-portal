@@ -11,6 +11,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Tags,
   Upload,
   X,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { toast } from 'sonner'
 import { exportAdminParticipants } from '@/entities/event-participant/admin-api'
 import {
   useAdminEventParticipants,
+  useEventDirections,
   useEventParticipantStatus,
   useImportEventParticipants,
 } from '@/entities/event-participant/admin-queries'
@@ -36,6 +38,7 @@ import { Card } from '@/shared/ui/card'
 import { EmptyState, ErrorState, Skeleton } from '@/shared/ui/states'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { EventDirectionsDialog } from './event-directions-dialog'
 import { EventParticipantDialog } from './event-participant-dialog'
 import { EventParticipantImportResultDialog } from './event-participant-import-result-dialog'
 import { EventParticipantPointsDialog } from './event-participant-points-dialog'
@@ -66,8 +69,10 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
+  const [directionFilter, setDirectionFilter] = useState('ALL')
   const [offset, setOffset] = useState(0)
   const [formOpen, setFormOpen] = useState(false)
+  const [directionsOpen, setDirectionsOpen] = useState(false)
   const [editing, setEditing] = useState<EventParticipant | null>(null)
   const [pointsParticipant, setPointsParticipant] = useState<EventParticipant | null>(null)
   const [importResult, setImportResult] = useState<ParticipantImportResult | null>(null)
@@ -78,12 +83,14 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
     () => ({
       search,
       status: statusFilter === 'ALL' ? '' : statusFilter,
+      directionId: directionFilter === 'ALL' ? '' : directionFilter,
       limit: pageSize,
       offset,
     }),
-    [offset, search, statusFilter],
+    [directionFilter, offset, search, statusFilter],
   )
   const participants = useAdminEventParticipants(contestId, filters)
+  const directions = useEventDirections(contestId)
   const statusMutation = useEventParticipantStatus(contestId)
   const importer = useImportEventParticipants(contestId)
   const data = participants.data
@@ -97,6 +104,11 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
   function clearSearch() {
     setSearchInput('')
     setSearch('')
+    setOffset(0)
+  }
+
+  function changeDirectionFilter(value: string) {
+    setDirectionFilter(value)
     setOffset(0)
   }
 
@@ -220,9 +232,14 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
             Отдельные профили EventParticipant для входа в платформу мероприятия.
           </p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Добавить участника
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setDirectionsOpen(true)}>
+            <Tags className="h-4 w-4" /> Направления
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Добавить участника
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -254,6 +271,21 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
           </form>
 
           <div className="flex flex-wrap gap-2">
+            <div className="w-52">
+              <Select value={directionFilter} onValueChange={changeDirectionFilter}>
+                <SelectTrigger className="h-9 text-[14px]" aria-label="Фильтр по направлению">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Все направления</SelectItem>
+                  {(directions.data ?? []).map((direction) => (
+                    <SelectItem key={direction.id} value={direction.id}>
+                      {direction.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="w-44">
               <Select
                 value={statusFilter}
@@ -319,21 +351,26 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
         ) : !data?.participants.length ? (
           <div className="p-4">
             <EmptyState
-              icon={search || statusFilter !== 'ALL' ? Search : Plus}
-              title={search || statusFilter !== 'ALL' ? 'Ничего не найдено' : 'Участников пока нет'}
+              icon={search || statusFilter !== 'ALL' || directionFilter !== 'ALL' ? Search : Plus}
+              title={
+                search || statusFilter !== 'ALL' || directionFilter !== 'ALL'
+                  ? 'Ничего не найдено'
+                  : 'Участников пока нет'
+              }
               description={
-                search || statusFilter !== 'ALL'
-                  ? 'Измените поисковый запрос или фильтр статуса.'
-                  : 'Добавьте участника вручную или загрузите список CSV/XLSX.'
+                search || statusFilter !== 'ALL' || directionFilter !== 'ALL'
+                  ? 'Измените поисковый запрос или фильтры.'
+                  : 'Добавьте участника вручную или загрузите список CSV/XLSX с колонкой direction/направление.'
               }
               action={
-                search || statusFilter !== 'ALL' ? (
+                search || statusFilter !== 'ALL' || directionFilter !== 'ALL' ? (
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={() => {
                       clearSearch()
                       changeStatusFilter('ALL')
+                      changeDirectionFilter('ALL')
                     }}
                   >
                     Сбросить фильтры
@@ -348,10 +385,11 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[780px] text-left text-[14px]">
+            <table className="w-full min-w-[900px] text-left text-[14px]">
               <thead className="text-[11px] uppercase tracking-wide text-muted-2">
                 <tr className="border-b border-border">
                   <th className="px-4 py-2 font-medium">Участник</th>
+                  <th className="px-4 py-2 font-medium">Направление</th>
                   <th className="px-4 py-2 font-medium">Идентификаторы</th>
                   <th className="px-4 py-2 font-medium">Статус</th>
                   <th className="px-4 py-2 text-right font-medium">Действия</th>
@@ -402,6 +440,11 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
         open={formOpen}
         onOpenChange={setFormOpen}
       />
+      <EventDirectionsDialog
+        contestId={contestId}
+        open={directionsOpen}
+        onOpenChange={setDirectionsOpen}
+      />
       <EventParticipantImportResultDialog
         result={importResult}
         onOpenChange={(open) => {
@@ -440,6 +483,13 @@ function ParticipantRow({
         <p className="mt-0.5 text-[12px] text-muted-2">
           Дата рождения: {formatDateOnly(participant.birth_date)}
         </p>
+      </td>
+      <td className="px-4 py-3">
+        {participant.direction_name ? (
+          <Badge>{participant.direction_name}</Badge>
+        ) : (
+          <span className="text-[12px] text-muted-2">Не указано</span>
+        )}
       </td>
       <td className="px-4 py-3 text-[12px]">
         <p className="text-muted">

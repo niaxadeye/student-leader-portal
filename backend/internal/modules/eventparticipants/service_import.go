@@ -55,6 +55,19 @@ func (s *Service) importOne(ctx context.Context, contestID string, record Import
 		row.Status, row.Message = "error", "Не заполнены обязательные поля или дата некорректна"
 		return row
 	}
+	if directionName := strings.TrimSpace(record.Direction); directionName != "" {
+		display, err := normalizeDirectionName(directionName)
+		if err != nil {
+			row.Status, row.Message = "error", "Некорректное название направления"
+			return row
+		}
+		direction, err := s.repo.EnsureDirection(ctx, contestID, display)
+		if err != nil {
+			return importFailure(row, err)
+		}
+		incoming.DirectionID = &direction.ID
+		incoming.DirectionName = &direction.Name
+	}
 
 	byUnion, err := s.importLookup(ctx, contestID, union, s.repo.FindByUnionCard)
 	if err != nil {
@@ -108,6 +121,10 @@ func (s *Service) importOne(ctx context.Context, contestID string, record Import
 	if incoming.SKSBarcode == nil {
 		incoming.SKSBarcode = existing.SKSBarcode
 	}
+	if incoming.DirectionID == nil {
+		incoming.DirectionID = existing.DirectionID
+		incoming.DirectionName = existing.DirectionName
+	}
 	incoming.ID = existing.ID
 	if sameImportedParticipant(existing, incoming) {
 		row.Status, row.Message = "duplicate", "Участник уже существует без изменений"
@@ -141,6 +158,8 @@ func importFailure(row ImportRowResult, err error) ImportRowResult {
 	switch {
 	case errors.Is(err, ErrIdentifierTaken):
 		row.Message = "Профбилет или barcode уже используется"
+	case errors.Is(err, ErrDirectionTaken):
+		row.Message = "Название направления уже используется"
 	case errors.Is(err, ErrValidation):
 		row.Message = "Некорректные данные"
 	default:
@@ -161,7 +180,8 @@ func sameImportedParticipant(current, incoming *Participant) bool {
 	return current.FullName == incoming.FullName &&
 		current.BirthDate.Equal(incoming.BirthDate) &&
 		equalOptionalIdentifier(current.UnionCardNumber, incoming.UnionCardNumber) &&
-		equalOptionalIdentifier(current.SKSBarcode, incoming.SKSBarcode)
+		equalOptionalIdentifier(current.SKSBarcode, incoming.SKSBarcode) &&
+		equalOptionalIdentifier(current.DirectionID, incoming.DirectionID)
 }
 
 func equalOptionalIdentifier(left, right *string) bool {

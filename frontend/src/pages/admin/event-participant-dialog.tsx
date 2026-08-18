@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
   useCreateEventParticipant,
+  useEventDirections,
   useUpdateEventParticipant,
 } from '@/entities/event-participant/admin-queries'
 import type { AdminParticipantInput } from '@/entities/event-participant/admin-types'
@@ -11,6 +12,7 @@ import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 
 function localToday(): string {
   const now = new Date()
@@ -45,7 +47,9 @@ export function EventParticipantDialog({
   const [birthDate, setBirthDate] = useState('')
   const [unionCard, setUnionCard] = useState('')
   const [sksBarcode, setSKSBarcode] = useState('')
+  const [directionId, setDirectionId] = useState('none')
   const [error, setError] = useState('')
+  const directions = useEventDirections(open ? contestId : undefined)
   const editing = participant !== null
   const isPending = create.isPending || update.isPending
 
@@ -55,6 +59,7 @@ export function EventParticipantDialog({
     setBirthDate(participant?.birth_date.slice(0, 10) ?? '')
     setUnionCard(participant?.union_card_number ?? '')
     setSKSBarcode(participant?.sks_barcode ?? '')
+    setDirectionId(participant?.direction_id ?? 'none')
     setError('')
   }, [open, participant])
 
@@ -80,6 +85,7 @@ export function EventParticipantDialog({
       birth_date: birthDate,
       union_card_number: unionCard.trim() || undefined,
       sks_barcode: sksBarcode.trim() || undefined,
+      direction_id: directionId === 'none' ? null : directionId,
     }
     const options = {
       onSuccess: () => {
@@ -143,6 +149,26 @@ export function EventParticipantDialog({
                 value={sksBarcode}
                 onChange={(event) => setSKSBarcode(event.target.value)}
               />
+            )}
+          </Field>
+          <Field
+            label="Направление"
+            description="Лекции можно ограничить направлением. Без направления участник видит только общие лекции."
+          >
+            {(props) => (
+              <Select value={directionId} onValueChange={setDirectionId}>
+                <SelectTrigger id={props.id} aria-invalid={props['aria-invalid']}>
+                  <SelectValue placeholder="Не указано" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Не указано</SelectItem>
+                  {(directions.data ?? []).map((direction) => (
+                    <SelectItem key={direction.id} value={direction.id}>
+                      {direction.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </Field>
 

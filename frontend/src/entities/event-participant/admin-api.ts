@@ -1,5 +1,5 @@
 import { apiGetBlob, apiPostForm, apiRequest, apiRequestFull } from '@/shared/api/client'
-import type { EventParticipant } from './types'
+import type { EventDirection, EventParticipant } from './types'
 import type {
   AdminParticipantFilters,
   AdminParticipantInput,
@@ -23,6 +23,7 @@ export async function listAdminParticipants(
   })
   if (filters.search) query.set('search', filters.search)
   if (filters.status) query.set('status', filters.status)
+  if (filters.directionId) query.set('direction_id', filters.directionId)
 
   const response = await apiRequestFull<EventParticipant[]>(
     `${participantsPath(contestId)}?${query.toString()}`,
@@ -78,4 +79,29 @@ export function exportAdminParticipants(
   format: ParticipantExportFormat,
 ): Promise<Blob> {
   return apiGetBlob(`${participantsPath(contestId)}/export?format=${format}`)
+}
+
+function directionsPath(contestId: string): string {
+  return `/admin/contests/${encodeURIComponent(contestId)}/directions`
+}
+
+export function listEventDirections(contestId: string) {
+  return apiRequest<EventDirection[]>(directionsPath(contestId))
+}
+
+export function createEventDirection(contestId: string, name: string) {
+  return apiRequest<EventDirection>(directionsPath(contestId), { method: 'POST', body: { name } })
+}
+
+export function updateEventDirection(contestId: string, directionId: string, name: string) {
+  return apiRequest<EventDirection>(
+    `${directionsPath(contestId)}/${encodeURIComponent(directionId)}`,
+    { method: 'PATCH', body: { name } },
+  )
+}
+
+export function deleteEventDirection(contestId: string, directionId: string) {
+  return apiRequest(`${directionsPath(contestId)}/${encodeURIComponent(directionId)}`, {
+    method: 'DELETE',
+  })
 }

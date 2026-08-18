@@ -15,6 +15,7 @@ const (
 
 type Repository interface {
 	CanManage(ctx context.Context, userID, contestID string) (bool, error)
+	CanAccessDirections(ctx context.Context, userID, contestID string) (bool, error)
 	List(ctx context.Context, contestID string, filter ListFilter) ([]Participant, int, error)
 	All(ctx context.Context, contestID string) ([]Participant, error)
 	ByID(ctx context.Context, contestID, participantID string) (*Participant, error)
@@ -28,6 +29,12 @@ type Repository interface {
 	CreateSession(ctx context.Context, contestID, participantID, tokenHash, userAgent, ipHash string, expiresAt time.Time) (string, error)
 	AuthenticateSession(ctx context.Context, tokenHash string) (*Principal, error)
 	RevokeSession(ctx context.Context, tokenHash, reason string) error
+	ListDirections(ctx context.Context, contestID string) ([]Direction, error)
+	CreateDirection(ctx context.Context, contestID, name string) (*Direction, error)
+	UpdateDirection(ctx context.Context, contestID, directionID, name string) (*Direction, error)
+	DeleteDirection(ctx context.Context, contestID, directionID string) error
+	EnsureDirection(ctx context.Context, contestID, name string) (*Direction, error)
+	DirectionInContest(ctx context.Context, contestID, directionID string) (bool, error)
 }
 
 type Auditor interface {
@@ -67,12 +74,27 @@ func (s *Service) ensureManage(ctx context.Context, actor Actor, contestID strin
 	return nil
 }
 
+func (s *Service) ensureDirectionRead(ctx context.Context, actor Actor, contestID string) error {
+	if actor.IsMega {
+		return nil
+	}
+	allowed, err := s.repo.CanAccessDirections(ctx, actor.UserID, contestID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrForbidden
+	}
+	return nil
+}
+
 func (s *Service) List(ctx context.Context, actor Actor, contestID string, filter ListFilter) (*ListResult, error) {
 	if err := s.ensureManage(ctx, actor, contestID); err != nil {
 		return nil, err
 	}
 	filter.Search = strings.TrimSpace(filter.Search)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	filter.DirectionID = strings.TrimSpace(filter.DirectionID)
 	if filter.Status != "" && !validStatus(filter.Status) {
 		return nil, ErrValidation
 	}
@@ -110,6 +132,10 @@ func (s *Service) Create(ctx context.Context, actor Actor, contestID string, inp
 	if err != nil {
 		return nil, err
 	}
+	p.DirectionID, err = s.resolveDirectionID(ctx, contestID, input.DirectionID)
+	if err != nil {
+		return nil, err
+	}
 	id, err := s.repo.Create(ctx, p)
 	if err != nil {
 		return nil, err
@@ -124,6 +150,10 @@ func (s *Service) Update(ctx context.Context, actor Actor, contestID, participan
 		return nil, err
 	}
 	p, err := normalizeParticipantInput(contestID, participantID, input, s.now())
+	if err != nil {
+		return nil, err
+	}
+	p.DirectionID, err = s.resolveDirectionID(ctx, contestID, input.DirectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +202,24 @@ func normalizeParticipantInput(contestID, participantID string, input CreateInpu
 		UnionCardNumber: normalizeOptionalIdentifier(input.UnionCardNumber),
 		SKSBarcode:      normalizeOptionalIdentifier(input.SKSBarcode),
 	}, nil
+}
+
+func (s *Service) resolveDirectionID(ctx context.Context, contestID string, id *string) (*string, error) {
+	if id == nil {
+		return nil, nil
+	}
+	value := strings.TrimSpace(*id)
+	if value == "" {
+		return nil, nil
+	}
+	ok, err := s.repo.DirectionInContest(ctx, contestID, value)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrValidation
+	}
+	return &value, nil
 }
 
 func validStatus(status string) bool {

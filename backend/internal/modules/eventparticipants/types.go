@@ -17,6 +17,9 @@ var (
 	ErrSessionExpired     = errors.New("participant session expired")
 	ErrEventUnavailable   = errors.New("event is unavailable")
 	ErrRateLimited        = errors.New("participant login rate limit exceeded")
+	ErrDirectionNotFound  = errors.New("event direction not found")
+	ErrDirectionTaken     = errors.New("event direction name already used")
+	ErrDirectionInUse     = errors.New("event direction is in use")
 )
 
 const (
@@ -37,9 +40,21 @@ type Participant struct {
 	UnionCardNumber    *string
 	SKSBarcode         *string
 	Status             string
+	DirectionID        *string
+	DirectionName      *string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	ArchivedAt         *time.Time
+}
+
+// Direction — направление (трек) внутри одного мероприятия.
+type Direction struct {
+	ID        string    `json:"id"`
+	ContestID string    `json:"event_id"`
+	Name      string    `json:"name"`
+	SortOrder int       `json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // EventRef — минимальные данные существующего Contest для participant flow.
@@ -57,10 +72,11 @@ type Actor struct {
 }
 
 type ListFilter struct {
-	Search string
-	Status string
-	Limit  int
-	Offset int
+	Search      string
+	Status      string
+	DirectionID string
+	Limit       int
+	Offset      int
 }
 
 type ListResult struct {
@@ -75,6 +91,7 @@ type CreateInput struct {
 	BirthDate       time.Time
 	UnionCardNumber *string
 	SKSBarcode      *string
+	DirectionID     *string
 }
 
 type UpdateInput = CreateInput
@@ -86,6 +103,7 @@ type ImportRecord struct {
 	BirthDate       string
 	UnionCardNumber string
 	SKSBarcode      string
+	Direction       string
 }
 
 type ImportRowResult struct {

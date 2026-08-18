@@ -17,6 +17,7 @@ var (
 	ErrReplayedCode         = errors.New("participant qr code already used")
 	ErrParticipantInactive  = errors.New("participant is unavailable")
 	ErrLectureHasAttendance = errors.New("lecture with attendance cannot be deleted")
+	ErrWrongDirection       = errors.New("lecture is not for participant direction")
 )
 
 const (
@@ -37,19 +38,26 @@ type Actor struct {
 	IsMega bool
 }
 
+type DirectionRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Lecture struct {
-	ID                 string     `json:"id"`
-	ContestID          string     `json:"event_id"`
-	Title              string     `json:"title"`
-	Description        *string    `json:"description"`
-	Points             int64      `json:"points"`
-	StartsAt           *time.Time `json:"starts_at"`
-	EndsAt             *time.Time `json:"ends_at"`
-	AttendanceStartsAt *time.Time `json:"attendance_starts_at"`
-	AttendanceEndsAt   *time.Time `json:"attendance_ends_at"`
-	Status             string     `json:"status"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 string         `json:"id"`
+	ContestID          string         `json:"event_id"`
+	Title              string         `json:"title"`
+	Description        *string        `json:"description"`
+	Points             int64          `json:"points"`
+	StartsAt           *time.Time     `json:"starts_at"`
+	EndsAt             *time.Time     `json:"ends_at"`
+	AttendanceStartsAt *time.Time     `json:"attendance_starts_at"`
+	AttendanceEndsAt   *time.Time     `json:"attendance_ends_at"`
+	Status             string         `json:"status"`
+	DirectionIDs       []string       `json:"direction_ids"`
+	Directions         []DirectionRef `json:"directions"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 type LectureInput struct {
@@ -60,6 +68,7 @@ type LectureInput struct {
 	EndsAt             *time.Time `json:"ends_at"`
 	AttendanceStartsAt *time.Time `json:"attendance_starts_at"`
 	AttendanceEndsAt   *time.Time `json:"attendance_ends_at"`
+	DirectionIDs       []string   `json:"direction_ids"`
 }
 
 type Attendance struct {

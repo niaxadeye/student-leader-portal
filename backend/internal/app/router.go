@@ -133,6 +133,12 @@ func (a *App) Router() http.Handler {
 						r.Post("/reject", d.eventTasksHandler.Reject())
 						r.Get("/assets/{assetId}", d.eventTasksHandler.AdminAsset)
 					})
+					r.Route("/directions", func(r chi.Router) {
+						r.Get("/", d.eventParticipantsHandler.AdminListDirections)
+						r.Post("/", d.eventParticipantsHandler.AdminCreateDirection)
+						r.Patch("/{directionId}", d.eventParticipantsHandler.AdminUpdateDirection)
+						r.Delete("/{directionId}", d.eventParticipantsHandler.AdminDeleteDirection)
+					})
 					r.Route("/participants", func(r chi.Router) {
 						r.Get("/", d.eventParticipantsHandler.AdminList)
 						r.Post("/", d.eventParticipantsHandler.AdminCreate)

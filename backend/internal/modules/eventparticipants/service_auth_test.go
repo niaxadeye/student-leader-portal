@@ -3,6 +3,7 @@ package eventparticipants
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +31,9 @@ type fakeRepo struct {
 }
 
 func (f *fakeRepo) CanManage(context.Context, string, string) (bool, error) { return true, nil }
+func (f *fakeRepo) CanAccessDirections(context.Context, string, string) (bool, error) {
+	return true, nil
+}
 func (f *fakeRepo) List(context.Context, string, ListFilter) ([]Participant, int, error) {
 	return nil, 0, nil
 }
@@ -95,6 +99,23 @@ func (f *fakeRepo) AuthenticateSession(context.Context, string) (*Principal, err
 func (f *fakeRepo) RevokeSession(_ context.Context, tokenHash, _ string) error {
 	f.revokedHash = tokenHash
 	return nil
+}
+
+func (f *fakeRepo) ListDirections(context.Context, string) ([]Direction, error) {
+	return nil, nil
+}
+func (f *fakeRepo) CreateDirection(_ context.Context, contestID, name string) (*Direction, error) {
+	return &Direction{ID: "dir-new", ContestID: contestID, Name: name}, nil
+}
+func (f *fakeRepo) UpdateDirection(_ context.Context, contestID, directionID, name string) (*Direction, error) {
+	return &Direction{ID: directionID, ContestID: contestID, Name: name}, nil
+}
+func (f *fakeRepo) DeleteDirection(context.Context, string, string) error { return nil }
+func (f *fakeRepo) EnsureDirection(_ context.Context, contestID, name string) (*Direction, error) {
+	return &Direction{ID: "dir-" + strings.ToLower(name), ContestID: contestID, Name: name}, nil
+}
+func (f *fakeRepo) DirectionInContest(context.Context, string, string) (bool, error) {
+	return true, nil
 }
 
 type fakeAudit struct {

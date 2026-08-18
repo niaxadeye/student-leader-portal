@@ -12,8 +12,15 @@ export interface Lecture {
   attendance_starts_at: string | null
   attendance_ends_at: string | null
   status: LectureStatus
+  direction_ids: string[]
+  directions: LectureDirection[]
   created_at: string
   updated_at: string
+}
+
+export interface LectureDirection {
+  id: string
+  name: string
 }
 
 export interface LectureInput {
@@ -24,6 +31,7 @@ export interface LectureInput {
   ends_at: string | null
   attendance_starts_at: string | null
   attendance_ends_at: string | null
+  direction_ids: string[]
 }
 
 export interface LectureAttendance {

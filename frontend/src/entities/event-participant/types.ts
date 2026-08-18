@@ -7,10 +7,21 @@ export interface EventParticipant {
   birth_date: string
   union_card_number: string | null
   sks_barcode: string | null
+  direction_id: string | null
+  direction_name: string | null
   status: EventParticipantStatus
   created_at: string
   updated_at: string
   archived_at: string | null
+}
+
+export interface EventDirection {
+  id: string
+  event_id: string
+  name: string
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 export interface ParticipantEvent {

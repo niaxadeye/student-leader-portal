@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	headerFullName  = "full_name"
-	headerBirthDate = "birth_date"
-	headerUnionCard = "union_card_number"
-	headerSKS       = "sks_barcode"
+	headerFullName   = "full_name"
+	headerBirthDate  = "birth_date"
+	headerUnionCard  = "union_card_number"
+	headerSKS        = "sks_barcode"
+	headerDirection  = "direction"
 )
 
 // ParseImportFile преобразует CSV/XLSX в единый набор строк. Бизнес-валидация
@@ -124,6 +125,7 @@ func recordsFromRows(rows [][]string) ([]ImportRecord, error) {
 			BirthDate:       valueAt(rows[i], columns[headerBirthDate]),
 			UnionCardNumber: valueForHeader(rows[i], columns, headerUnionCard),
 			SKSBarcode:      valueForHeader(rows[i], columns, headerSKS),
+			Direction:       valueForHeader(rows[i], columns, headerDirection),
 		})
 	}
 	return records, nil
@@ -141,6 +143,8 @@ func mapHeaders(row []string) map[string]int {
 			columns[headerUnionCard] = index
 		case "sks barcode", "barcode", "barcode скс", "штрихкод скс":
 			columns[headerSKS] = index
+		case "direction", "track", "направление", "направления", "трек":
+			columns[headerDirection] = index
 		}
 	}
 	return columns
@@ -199,7 +203,7 @@ func parseBirthDate(value string) (time.Time, error) {
 func exportCSV(participants []Participant) (*ExportFile, error) {
 	var buffer bytes.Buffer
 	writer := csv.NewWriter(&buffer)
-	if err := writer.Write([]string{"full_name", "birth_date", "union_card_number", "sks_barcode", "status"}); err != nil {
+	if err := writer.Write([]string{"full_name", "birth_date", "union_card_number", "sks_barcode", "direction", "status"}); err != nil {
 		return nil, err
 	}
 	for i := range participants {
@@ -218,7 +222,7 @@ func exportXLSX(participants []Participant) (*ExportFile, error) {
 	book := excelize.NewFile()
 	defer book.Close()
 	sheet := book.GetSheetName(0)
-	headers := []string{"full_name", "birth_date", "union_card_number", "sks_barcode", "status"}
+	headers := []string{"full_name", "birth_date", "union_card_number", "sks_barcode", "direction", "status"}
 	for column, value := range headers {
 		cell, _ := excelize.CoordinatesToCellName(column+1, 1)
 		if err := book.SetCellValue(sheet, cell, value); err != nil {
@@ -247,7 +251,8 @@ func exportXLSX(participants []Participant) (*ExportFile, error) {
 func exportRow(participant *Participant) []string {
 	return []string{
 		participant.FullName, participant.BirthDate.Format("2006-01-02"),
-		optionalValue(participant.UnionCardNumber), optionalValue(participant.SKSBarcode), participant.Status,
+		optionalValue(participant.UnionCardNumber), optionalValue(participant.SKSBarcode),
+		optionalValue(participant.DirectionName), participant.Status,
 	}
 }
 

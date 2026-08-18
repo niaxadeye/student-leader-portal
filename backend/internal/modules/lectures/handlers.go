@@ -178,6 +178,9 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		httpserver.WriteError(w, r, http.StatusConflict, "QR_REPLAYED", "QR-код уже был использован", nil)
 	case errors.Is(err, ErrParticipantInactive):
 		httpserver.WriteError(w, r, http.StatusConflict, "PARTICIPANT_UNAVAILABLE", "Участник или мероприятие недоступны", nil)
+	case errors.Is(err, ErrWrongDirection):
+		httpserver.WriteError(w, r, http.StatusConflict, "LECTURE_WRONG_DIRECTION",
+			"Эта лекция не для направления участника", nil)
 	default:
 		httpserver.WriteError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка", nil)
 	}

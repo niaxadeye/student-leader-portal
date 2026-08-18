@@ -27,6 +27,18 @@ func TestParseCSVWithRussianHeadersAndSemicolon(t *testing.T) {
 	}
 }
 
+func TestParseCSVWithDirectionColumn(t *testing.T) {
+	t.Parallel()
+	data := "ФИО;Дата рождения;Направление\nИванов Иван;02.01.2000;IT\n"
+	records, err := ParseImportFile("participants.csv", bytes.NewBufferString(data))
+	if err != nil {
+		t.Fatalf("ParseImportFile: %v", err)
+	}
+	if len(records) != 1 || records[0].Direction != "IT" {
+		t.Fatalf("direction record: %#v", records)
+	}
+}
+
 func TestXLSXExportImportRoundTrip(t *testing.T) {
 	t.Parallel()
 	union := "U-001"
@@ -97,6 +109,24 @@ func TestImportSummaryAndMatchingRules(t *testing.T) {
 	}
 	if repo.updated[0].UnionCardNumber == nil || *repo.updated[0].UnionCardNumber != uUpdate {
 		t.Fatal("existing identifier was not preserved")
+	}
+}
+
+func TestImportAssignsDirectionFromName(t *testing.T) {
+	t.Parallel()
+	repo := &fakeRepo{}
+	svc := testService(repo, &fakeAudit{})
+	result, err := svc.Import(context.Background(), Actor{UserID: "owner"}, "contest-1", []ImportRecord{
+		{Line: 2, FullName: "Новый Человек", BirthDate: "01.01.2001", Direction: "IT"},
+	})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if result.Added != 1 || len(repo.created) != 1 || repo.created[0].DirectionID == nil {
+		t.Fatalf("created=%#v result=%#v", repo.created, result)
+	}
+	if *repo.created[0].DirectionID != "dir-it" {
+		t.Fatalf("direction id = %q", *repo.created[0].DirectionID)
 	}
 }
 

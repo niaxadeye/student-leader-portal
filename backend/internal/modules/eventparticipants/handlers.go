@@ -49,6 +49,7 @@ func participantJSON(p *Participant) map[string]any {
 		"id": p.ID, "event_id": p.ContestID, "full_name": p.FullName,
 		"birth_date":        p.BirthDate.Format("2006-01-02"),
 		"union_card_number": p.UnionCardNumber, "sks_barcode": p.SKSBarcode,
+		"direction_id": p.DirectionID, "direction_name": p.DirectionName,
 		"status": p.Status, "created_at": p.CreatedAt, "updated_at": p.UpdatedAt,
 		"archived_at": p.ArchivedAt,
 	}
@@ -59,7 +60,8 @@ func (h *Handler) AdminList(w http.ResponseWriter, r *http.Request) {
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	result, err := h.svc.List(r.Context(), staffActor(r), chi.URLParam(r, "contestId"), ListFilter{
 		Search: r.URL.Query().Get("search"), Status: r.URL.Query().Get("status"),
-		Limit: limit, Offset: offset,
+		DirectionID: r.URL.Query().Get("direction_id"),
+		Limit:       limit, Offset: offset,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -88,6 +90,7 @@ type participantRequest struct {
 	BirthDate       string  `json:"birth_date"`
 	UnionCardNumber *string `json:"union_card_number"`
 	SKSBarcode      *string `json:"sks_barcode"`
+	DirectionID     *string `json:"direction_id"`
 }
 
 func parseParticipantRequest(req participantRequest) (CreateInput, error) {
@@ -98,6 +101,7 @@ func parseParticipantRequest(req participantRequest) (CreateInput, error) {
 	return CreateInput{
 		FullName: req.FullName, BirthDate: birthDate,
 		UnionCardNumber: req.UnionCardNumber, SKSBarcode: req.SKSBarcode,
+		DirectionID: req.DirectionID,
 	}, nil
 }
 
@@ -206,6 +210,58 @@ func (h *Handler) status(target string) http.HandlerFunc {
 func (h *Handler) AdminBlock() http.HandlerFunc   { return h.status(StatusBlocked) }
 func (h *Handler) AdminUnblock() http.HandlerFunc { return h.status(StatusActive) }
 func (h *Handler) AdminArchive() http.HandlerFunc { return h.status(StatusArchived) }
+
+func (h *Handler) AdminListDirections(w http.ResponseWriter, r *http.Request) {
+	list, err := h.svc.ListDirections(r.Context(), staffActor(r), chi.URLParam(r, "contestId"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, list, map[string]any{"count": len(list)})
+}
+
+type directionRequest struct {
+	Name string `json:"name"`
+}
+
+func (h *Handler) AdminCreateDirection(w http.ResponseWriter, r *http.Request) {
+	var req directionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, r, ErrValidation)
+		return
+	}
+	direction, err := h.svc.CreateDirection(r.Context(), staffActor(r), chi.URLParam(r, "contestId"), req.Name)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusCreated, direction, nil)
+}
+
+func (h *Handler) AdminUpdateDirection(w http.ResponseWriter, r *http.Request) {
+	var req directionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, r, ErrValidation)
+		return
+	}
+	direction, err := h.svc.UpdateDirection(r.Context(), staffActor(r),
+		chi.URLParam(r, "contestId"), chi.URLParam(r, "directionId"), req.Name)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, direction, nil)
+}
+
+func (h *Handler) AdminDeleteDirection(w http.ResponseWriter, r *http.Request) {
+	err := h.svc.DeleteDirection(r.Context(), staffActor(r),
+		chi.URLParam(r, "contestId"), chi.URLParam(r, "directionId"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, map[string]bool{"deleted": true}, nil)
+}
 
 type loginByNameRequest struct {
 	FullName  string `json:"full_name"`
@@ -336,6 +392,13 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		httpserver.WriteError(w, r, http.StatusUnauthorized, "PARTICIPANT_SESSION_EXPIRED", "Сессия участника завершена", nil)
 	case errors.Is(err, ErrRateLimited):
 		httpserver.WriteError(w, r, http.StatusTooManyRequests, "RATE_LIMIT_EXCEEDED", "Слишком много попыток, попробуйте позже", nil)
+	case errors.Is(err, ErrDirectionNotFound):
+		httpserver.WriteError(w, r, http.StatusNotFound, "DIRECTION_NOT_FOUND", "Направление не найдено", nil)
+	case errors.Is(err, ErrDirectionTaken):
+		httpserver.WriteError(w, r, http.StatusConflict, "DIRECTION_NAME_TAKEN", "Направление с таким названием уже есть", nil)
+	case errors.Is(err, ErrDirectionInUse):
+		httpserver.WriteError(w, r, http.StatusConflict, "DIRECTION_IN_USE",
+			"Нельзя удалить направление: оно назначено участникам или лекциям", nil)
 	case errors.Is(err, ErrValidation):
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Проверьте заполнение полей", nil)
 	default:

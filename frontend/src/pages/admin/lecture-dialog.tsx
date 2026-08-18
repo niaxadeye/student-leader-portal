@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { useEventDirections } from '@/entities/event-participant/admin-queries'
 import type { Lecture, LectureInput } from '@/entities/lecture/types'
 import { useCreateLecture, useUpdateLecture } from '@/entities/lecture/queries'
 import { isoToLocalInput, localInputToIso } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/button'
+import { Checkbox } from '@/shared/ui/choice'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input, Textarea } from '@/shared/ui/input'
@@ -26,7 +28,9 @@ export function LectureDialog({
   const [endsAt, setEndsAt] = useState('')
   const [attendanceStartsAt, setAttendanceStartsAt] = useState('')
   const [attendanceEndsAt, setAttendanceEndsAt] = useState('')
+  const [directionIds, setDirectionIds] = useState<string[]>([])
   const [error, setError] = useState<string>()
+  const directions = useEventDirections(open ? contestId : undefined)
   const create = useCreateLecture(contestId)
   const update = useUpdateLecture(contestId, lecture?.id ?? '')
 
@@ -39,6 +43,7 @@ export function LectureDialog({
     setEndsAt(isoToLocalInput(lecture?.ends_at ?? null))
     setAttendanceStartsAt(isoToLocalInput(lecture?.attendance_starts_at ?? null))
     setAttendanceEndsAt(isoToLocalInput(lecture?.attendance_ends_at ?? null))
+    setDirectionIds(lecture?.direction_ids ?? [])
     setError(undefined)
   }, [lecture, open])
 
@@ -69,6 +74,7 @@ export function LectureDialog({
       ends_at: ends,
       attendance_starts_at: attendanceStarts,
       attendance_ends_at: attendanceEnds,
+      direction_ids: directionIds,
     }
     const mutation = lecture ? update : create
     mutation.mutate(input, {
@@ -160,6 +166,45 @@ export function LectureDialog({
                 />
               )}
             </Field>
+          </div>
+          <div>
+            <p className="text-[14px] font-medium text-ink">Направления</p>
+            <p className="mt-1 text-[13px] text-muted">
+              Если ничего не выбрать, лекцию увидят все участники. Иначе — только выбранные
+              направления.
+            </p>
+            {(directions.data?.length ?? 0) === 0 ? (
+              <p className="mt-2 rounded-[10px] bg-surface-2 p-3 text-[13px] text-muted">
+                Каталог направлений пуст. Создайте их в блоке участников.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {(directions.data ?? []).map((direction) => {
+                  const checked = directionIds.includes(direction.id)
+                  return (
+                    <li key={direction.id} className="flex items-center gap-2">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) => {
+                          setDirectionIds((current) =>
+                            value
+                              ? [...current, direction.id]
+                              : current.filter((id) => id !== direction.id),
+                          )
+                        }}
+                        id={`lecture-direction-${direction.id}`}
+                      />
+                      <label
+                        htmlFor={`lecture-direction-${direction.id}`}
+                        className="text-[14px] text-ink"
+                      >
+                        {direction.name}
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
           <div className="mt-1 flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

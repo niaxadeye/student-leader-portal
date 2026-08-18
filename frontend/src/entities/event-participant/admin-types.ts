@@ -3,6 +3,7 @@ import type { EventParticipant, EventParticipantStatus } from './types'
 export interface AdminParticipantFilters {
   search: string
   status: '' | EventParticipantStatus
+  directionId: string
   limit: number
   offset: number
 }
@@ -19,6 +20,7 @@ export interface AdminParticipantInput {
   birth_date: string
   union_card_number?: string
   sks_barcode?: string
+  direction_id?: string | null
 }
 
 export type ParticipantStatusAction = 'block' | 'unblock' | 'archive'

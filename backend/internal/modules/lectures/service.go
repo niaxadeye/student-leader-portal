@@ -207,6 +207,13 @@ func validateInput(input LectureInput) (LectureInput, error) {
 		!input.AttendanceStartsAt.Before(*input.AttendanceEndsAt) {
 		return LectureInput{}, ErrValidation
 	}
+	cleaned := make([]string, 0, len(input.DirectionIDs))
+	for _, id := range input.DirectionIDs {
+		if trimmed := strings.TrimSpace(id); trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	input.DirectionIDs = uniqueDirectionIDs(cleaned)
 	return input, nil
 }
 

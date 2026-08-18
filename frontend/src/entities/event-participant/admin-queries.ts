@@ -2,9 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   changeAdminParticipantStatus,
   createAdminParticipant,
+  createEventDirection,
+  deleteEventDirection,
   importAdminParticipants,
   listAdminParticipants,
+  listEventDirections,
   updateAdminParticipant,
+  updateEventDirection,
 } from './admin-api'
 import type {
   AdminParticipantFilters,
@@ -13,6 +17,7 @@ import type {
 } from './admin-types'
 
 const participantsKey = (contestId: string) => ['admin', 'event-participants', contestId]
+export const eventDirectionsKey = (contestId: string) => ['admin', 'event-directions', contestId]
 
 export function useAdminEventParticipants(
   contestId: string | undefined,
@@ -25,9 +30,26 @@ export function useAdminEventParticipants(
   })
 }
 
+export function useEventDirections(contestId: string | undefined) {
+  return useQuery({
+    queryKey: eventDirectionsKey(contestId ?? ''),
+    queryFn: () => listEventDirections(contestId!),
+    enabled: !!contestId,
+  })
+}
+
 function useInvalidateParticipants(contestId: string) {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: participantsKey(contestId) })
+}
+
+function useInvalidateDirections(contestId: string) {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: eventDirectionsKey(contestId) })
+    void queryClient.invalidateQueries({ queryKey: participantsKey(contestId) })
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'lectures', contestId] })
+  }
 }
 
 export function useCreateEventParticipant(contestId: string) {
@@ -70,6 +92,31 @@ export function useImportEventParticipants(contestId: string) {
   const invalidate = useInvalidateParticipants(contestId)
   return useMutation({
     mutationFn: (file: File) => importAdminParticipants(contestId, file),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCreateEventDirection(contestId: string) {
+  const invalidate = useInvalidateDirections(contestId)
+  return useMutation({
+    mutationFn: (name: string) => createEventDirection(contestId, name),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateEventDirection(contestId: string) {
+  const invalidate = useInvalidateDirections(contestId)
+  return useMutation({
+    mutationFn: ({ directionId, name }: { directionId: string; name: string }) =>
+      updateEventDirection(contestId, directionId, name),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteEventDirection(contestId: string) {
+  const invalidate = useInvalidateDirections(contestId)
+  return useMutation({
+    mutationFn: (directionId: string) => deleteEventDirection(contestId, directionId),
     onSuccess: invalidate,
   })
 }

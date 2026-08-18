@@ -193,7 +193,11 @@ export function AdminContestDetailPage() {
 
       {(canScan || canManageAttendance) && (
         <div className="mb-8">
-          <LecturesSection contestId={contest.id} canManage={canManageAttendance} />
+          <LecturesSection
+            contestId={contest.id}
+            canManage={canManageAttendance}
+            canEditDirections={canManageEventParticipants}
+          />
         </div>
       )}
 

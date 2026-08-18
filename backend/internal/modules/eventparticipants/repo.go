@@ -34,19 +34,26 @@ func (r *Repo) CanManage(ctx context.Context, userID, contestID string) (bool, e
 	return allowed, err
 }
 
+const participantSelect = `p.id, p.contest_id, p.full_name, p.full_name_normalized, p.birth_date,
+		       p.union_card_number, p.sks_barcode, p.status, p.created_at, p.updated_at,
+		       p.archived_at, p.direction_id, d.name`
+
+const participantFrom = `event_participants p
+		LEFT JOIN event_directions d ON d.id=p.direction_id AND d.contest_id=p.contest_id`
+
 func (r *Repo) List(ctx context.Context, contestID string, f ListFilter) ([]Participant, int, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, contest_id, full_name, full_name_normalized, birth_date,
-		       union_card_number, sks_barcode, status, created_at, updated_at,
-		       archived_at, count(*) OVER()
-		FROM event_participants
-		WHERE contest_id=$1
-		  AND ($2='' OR full_name ILIKE '%'||$2||'%'
-		       OR union_card_number::text ILIKE '%'||$2||'%'
-		       OR sks_barcode::text ILIKE '%'||$2||'%')
-		  AND ($3='' OR status=$3)
-		ORDER BY created_at DESC
-		LIMIT $4 OFFSET $5`, contestID, f.Search, f.Status, f.Limit, f.Offset)
+		SELECT `+participantSelect+`, count(*) OVER()
+		FROM `+participantFrom+`
+		WHERE p.contest_id=$1
+		  AND ($2='' OR p.full_name ILIKE '%'||$2||'%'
+		       OR p.union_card_number::text ILIKE '%'||$2||'%'
+		       OR p.sks_barcode::text ILIKE '%'||$2||'%'
+		       OR d.name ILIKE '%'||$2||'%')
+		  AND ($3='' OR p.status=$3)
+		  AND ($4='' OR p.direction_id::text=$4)
+		ORDER BY p.created_at DESC
+		LIMIT $5 OFFSET $6`, contestID, f.Search, f.Status, f.DirectionID, f.Limit, f.Offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -56,9 +63,8 @@ func (r *Repo) List(ctx context.Context, contestID string, f ListFilter) ([]Part
 	total := 0
 	for rows.Next() {
 		var p Participant
-		if err := rows.Scan(&p.ID, &p.ContestID, &p.FullName, &p.FullNameNormalized,
-			&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.Status,
-			&p.CreatedAt, &p.UpdatedAt, &p.ArchivedAt, &total); err != nil {
+		dest := append(participantScanDest(&p), &total)
+		if err := rows.Scan(dest...); err != nil {
 			return nil, 0, err
 		}
 		list = append(list, p)
@@ -68,9 +74,9 @@ func (r *Repo) List(ctx context.Context, contestID string, f ListFilter) ([]Part
 
 func (r *Repo) All(ctx context.Context, contestID string) ([]Participant, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, contest_id, full_name, full_name_normalized, birth_date,
-		       union_card_number, sks_barcode, status, created_at, updated_at, archived_at
-		FROM event_participants WHERE contest_id=$1 ORDER BY full_name, birth_date, id`, contestID)
+		SELECT `+participantSelect+`
+		FROM `+participantFrom+`
+		WHERE p.contest_id=$1 ORDER BY p.full_name, p.birth_date, p.id`, contestID)
 	if err != nil {
 		return nil, err
 	}
@@ -88,9 +94,9 @@ func (r *Repo) All(ctx context.Context, contestID string) ([]Participant, error)
 
 func (r *Repo) ByID(ctx context.Context, contestID, participantID string) (*Participant, error) {
 	return scanOneParticipant(r.pool.QueryRow(ctx, `
-		SELECT id, contest_id, full_name, full_name_normalized, birth_date,
-		       union_card_number, sks_barcode, status, created_at, updated_at, archived_at
-		FROM event_participants WHERE contest_id=$1 AND id=$2`, contestID, participantID))
+		SELECT `+participantSelect+`
+		FROM `+participantFrom+`
+		WHERE p.contest_id=$1 AND p.id=$2`, contestID, participantID))
 }
 
 func (r *Repo) Create(ctx context.Context, p *Participant) (string, error) {
@@ -98,10 +104,10 @@ func (r *Repo) Create(ctx context.Context, p *Participant) (string, error) {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO event_participants
 		  (contest_id, full_name, full_name_normalized, birth_date,
-		   union_card_number, sks_barcode, status)
-		VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE') RETURNING id`,
+		   union_card_number, sks_barcode, status, direction_id)
+		VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE',$7) RETURNING id`,
 		p.ContestID, p.FullName, p.FullNameNormalized, p.BirthDate,
-		p.UnionCardNumber, p.SKSBarcode).Scan(&id)
+		p.UnionCardNumber, p.SKSBarcode, p.DirectionID).Scan(&id)
 	if isUniqueViolation(err) {
 		return "", ErrIdentifierTaken
 	}
@@ -112,10 +118,10 @@ func (r *Repo) Update(ctx context.Context, p *Participant) error {
 	ct, err := r.pool.Exec(ctx, `
 		UPDATE event_participants SET
 		  full_name=$3, full_name_normalized=$4, birth_date=$5,
-		  union_card_number=$6, sks_barcode=$7, updated_at=now()
+		  union_card_number=$6, sks_barcode=$7, direction_id=$8, updated_at=now()
 		WHERE contest_id=$1 AND id=$2`,
 		p.ContestID, p.ID, p.FullName, p.FullNameNormalized, p.BirthDate,
-		p.UnionCardNumber, p.SKSBarcode)
+		p.UnionCardNumber, p.SKSBarcode, p.DirectionID)
 	if isUniqueViolation(err) {
 		return ErrIdentifierTaken
 	}
@@ -166,10 +172,9 @@ func (r *Repo) EventBySlug(ctx context.Context, slug string) (*EventRef, error) 
 
 func (r *Repo) FindByNameBirth(ctx context.Context, contestID, normalizedName string, birthDate time.Time) ([]Participant, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, contest_id, full_name, full_name_normalized, birth_date,
-		       union_card_number, sks_barcode, status, created_at, updated_at, archived_at
-		FROM event_participants
-		WHERE contest_id=$1 AND full_name_normalized=$2 AND birth_date=$3`,
+		SELECT `+participantSelect+`
+		FROM `+participantFrom+`
+		WHERE p.contest_id=$1 AND p.full_name_normalized=$2 AND p.birth_date=$3`,
 		contestID, normalizedName, birthDate)
 	if err != nil {
 		return nil, err
@@ -197,9 +202,9 @@ func (r *Repo) FindBySKSBarcode(ctx context.Context, contestID, barcode string) 
 func (r *Repo) findByIdentifier(ctx context.Context, contestID, column, value string) (*Participant, error) {
 	// column выбирается только внутренними константными вызовами выше, пользовательские
 	// данные передаются параметрами.
-	query := `SELECT id, contest_id, full_name, full_name_normalized, birth_date,
-	                 union_card_number, sks_barcode, status, created_at, updated_at, archived_at
-	          FROM event_participants WHERE contest_id=$1 AND ` + column + `=$2`
+	query := `SELECT ` + participantSelect + `
+	          FROM ` + participantFrom + `
+	          WHERE p.contest_id=$1 AND p.` + column + `=$2`
 	p, err := scanOneParticipant(r.pool.QueryRow(ctx, query, contestID, value))
 	if errors.Is(err, ErrNotFound) {
 		return nil, ErrInvalidCredentials
@@ -211,11 +216,17 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
+func participantScanDest(p *Participant) []any {
+	return []any{
+		&p.ID, &p.ContestID, &p.FullName, &p.FullNameNormalized,
+		&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.Status,
+		&p.CreatedAt, &p.UpdatedAt, &p.ArchivedAt, &p.DirectionID, &p.DirectionName,
+	}
+}
+
 func scanOneParticipant(row rowScanner) (*Participant, error) {
 	var p Participant
-	err := row.Scan(&p.ID, &p.ContestID, &p.FullName, &p.FullNameNormalized,
-		&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.Status,
-		&p.CreatedAt, &p.UpdatedAt, &p.ArchivedAt)
+	err := row.Scan(participantScanDest(&p)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

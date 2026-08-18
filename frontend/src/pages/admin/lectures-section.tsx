@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarClock, Check, Flag, Pencil, Plus, QrCode, Trash2 } from 'lucide-react'
+import { CalendarClock, Check, Flag, Pencil, Plus, QrCode, Tags, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Lecture } from '@/entities/lecture/types'
 import {
@@ -13,6 +13,7 @@ import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardBody } from '@/shared/ui/card'
 import { EmptyState, ErrorState, Skeleton } from '@/shared/ui/states'
+import { EventDirectionsDialog } from './event-directions-dialog'
 import { LectureDialog } from './lecture-dialog'
 
 const statusMeta = {
@@ -24,14 +25,17 @@ const statusMeta = {
 export function LecturesSection({
   contestId,
   canManage = true,
+  canEditDirections = false,
 }: {
   contestId: string
   canManage?: boolean
+  canEditDirections?: boolean
 }) {
   const lectures = useAdminLectures(contestId)
   const transition = useTransitionLecture(contestId)
   const remove = useDeleteLecture(contestId)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [directionsOpen, setDirectionsOpen] = useState(false)
   const [editing, setEditing] = useState<Lecture | null>(null)
 
   function openCreate() {
@@ -69,14 +73,19 @@ export function LecturesSection({
         <div>
           <h2 className="text-[20px] font-semibold text-ink">Лекции и посещаемость</h2>
           <p className="mt-1 text-[13px] text-muted">
-            Расписание, окно сканирования и награда за посещение.
+            Расписание, окно сканирования и направления, для которых открыта лекция.
           </p>
         </div>
-        {canManage && (
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Новая лекция
-        </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setDirectionsOpen(true)}>
+            <Tags className="h-4 w-4" /> Направления
+          </Button>
+          {canManage && (
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Новая лекция
+            </Button>
+          )}
+        </div>
       </div>
 
       {lectures.isLoading && <Skeleton className="h-32 w-full" />}
@@ -100,6 +109,13 @@ export function LecturesSection({
                       <p className="font-medium text-ink">{lecture.title}</p>
                       <Badge tone={status.tone}>{status.label}</Badge>
                       <Badge tone="warning">+{lecture.points} баллов</Badge>
+                      {(lecture.directions?.length ?? 0) === 0 ? (
+                        <Badge>Все направления</Badge>
+                      ) : (
+                        lecture.directions.map((direction) => (
+                          <Badge key={direction.id}>{direction.name}</Badge>
+                        ))
+                      )}
                     </div>
                     <p className="mt-1 text-[13px] text-muted">
                       {lecture.starts_at ? formatDateTime(lecture.starts_at) : 'Время не задано'}
@@ -172,6 +188,12 @@ export function LecturesSection({
         lecture={editing}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+      />
+      <EventDirectionsDialog
+        contestId={contestId}
+        open={directionsOpen}
+        onOpenChange={setDirectionsOpen}
+        canEdit={canEditDirections}
       />
     </section>
   )

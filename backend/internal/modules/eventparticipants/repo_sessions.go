@@ -31,11 +31,12 @@ func (r *Repo) AuthenticateSession(ctx context.Context, tokenHash string) (*Prin
 			SELECT s.id,
 			       p.id, p.contest_id, p.full_name, p.full_name_normalized, p.birth_date,
 			       p.union_card_number, p.sks_barcode, p.status, p.created_at, p.updated_at,
-			       p.archived_at,
+			       p.archived_at, p.direction_id, d.name,
 			       c.id, c.slug, c.name, c.status, c.timezone
 			FROM participant_sessions s
 			JOIN event_participants p ON p.id=s.event_participant_id AND p.contest_id=s.contest_id
 			JOIN contests c ON c.id=s.contest_id
+			LEFT JOIN event_directions d ON d.id=p.direction_id AND d.contest_id=p.contest_id
 			WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
 			  AND p.status='ACTIVE' AND c.status='ACTIVE'
 			FOR UPDATE OF s`, tokenHash).Scan(
@@ -46,6 +47,7 @@ func (r *Repo) AuthenticateSession(ctx context.Context, tokenHash string) (*Prin
 			&principal.Participant.SKSBarcode, &principal.Participant.Status,
 			&principal.Participant.CreatedAt, &principal.Participant.UpdatedAt,
 			&principal.Participant.ArchivedAt,
+			&principal.Participant.DirectionID, &principal.Participant.DirectionName,
 			&principal.Event.ID, &principal.Event.Slug, &principal.Event.Name,
 			&principal.Event.Status, &principal.Event.Timezone,
 		)
