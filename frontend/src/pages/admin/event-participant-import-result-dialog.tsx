@@ -28,7 +28,7 @@ export function EventParticipantImportResultDialog({
       <DialogContent
         className="max-w-3xl"
         title="Результат импорта"
-        description="Ошибочные строки не были проигнорированы: для каждой указана причина."
+        description="Колонка «Направление» необязательна: пустая ячейка не снимает уже назначенное направление, новое название попадает в каталог."
       >
         {result && (
           <div className="flex flex-col gap-5">
@@ -45,6 +45,7 @@ export function EventParticipantImportResultDialog({
                   <tr>
                     <th className="px-3 py-2 font-medium">Строка</th>
                     <th className="px-3 py-2 font-medium">ФИО</th>
+                    <th className="px-3 py-2 font-medium">Направление</th>
                     <th className="px-3 py-2 font-medium">Результат</th>
                     <th className="px-3 py-2 font-medium">Комментарий</th>
                   </tr>
@@ -59,6 +60,7 @@ export function EventParticipantImportResultDialog({
                       >
                         <td className="whitespace-nowrap px-3 py-2 text-muted">{row.line}</td>
                         <td className="px-3 py-2 font-medium text-ink">{row.full_name || '—'}</td>
+                        <td className="px-3 py-2 text-muted">{row.direction || '—'}</td>
                         <td className="px-3 py-2">
                           <Badge tone={status.tone}>{status.label}</Badge>
                         </td>

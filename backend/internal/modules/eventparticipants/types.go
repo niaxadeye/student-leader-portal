@@ -111,6 +111,7 @@ type ImportRowResult struct {
 	Status        string `json:"status"` // added | updated | error | duplicate
 	ParticipantID string `json:"participant_id,omitempty"`
 	FullName      string `json:"full_name,omitempty"`
+	Direction     string `json:"direction,omitempty"`
 	Message       string `json:"message,omitempty"`
 }
 

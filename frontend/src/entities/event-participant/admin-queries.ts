@@ -89,10 +89,14 @@ export function useEventParticipantStatus(contestId: string) {
 }
 
 export function useImportEventParticipants(contestId: string) {
-  const invalidate = useInvalidateParticipants(contestId)
+  const invalidateParticipants = useInvalidateParticipants(contestId)
+  const invalidateDirections = useInvalidateDirections(contestId)
   return useMutation({
     mutationFn: (file: File) => importAdminParticipants(contestId, file),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidateParticipants()
+      invalidateDirections()
+    },
   })
 }
 

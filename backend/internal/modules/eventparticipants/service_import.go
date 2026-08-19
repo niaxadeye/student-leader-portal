@@ -17,8 +17,9 @@ func (s *Service) Import(
 		return nil, err
 	}
 	result := &ImportResult{Rows: make([]ImportRowResult, 0, len(records))}
+	directions := map[string]*Direction{}
 	for _, record := range records {
-		row := s.importOne(ctx, contestID, record)
+		row := s.importOne(ctx, contestID, record, directions)
 		switch row.Status {
 		case "added":
 			result.Added++
@@ -38,7 +39,12 @@ func (s *Service) Import(
 	return result, nil
 }
 
-func (s *Service) importOne(ctx context.Context, contestID string, record ImportRecord) ImportRowResult {
+func (s *Service) importOne(
+	ctx context.Context,
+	contestID string,
+	record ImportRecord,
+	directions map[string]*Direction,
+) ImportRowResult {
 	row := ImportRowResult{Line: record.Line, FullName: cleanFullName(record.FullName)}
 	birthDate, err := parseBirthDate(record.BirthDate)
 	if err != nil {
@@ -56,17 +62,17 @@ func (s *Service) importOne(ctx context.Context, contestID string, record Import
 		return row
 	}
 	if directionName := strings.TrimSpace(record.Direction); directionName != "" {
-		display, err := normalizeDirectionName(directionName)
+		direction, err := s.resolveImportedDirection(ctx, contestID, directionName, directions)
 		if err != nil {
-			row.Status, row.Message = "error", "Некорректное название направления"
-			return row
-		}
-		direction, err := s.repo.EnsureDirection(ctx, contestID, display)
-		if err != nil {
+			if errors.Is(err, ErrValidation) {
+				row.Status, row.Message = "error", "Некорректное название направления"
+				return row
+			}
 			return importFailure(row, err)
 		}
 		incoming.DirectionID = &direction.ID
 		incoming.DirectionName = &direction.Name
+		row.Direction = direction.Name
 	}
 
 	byUnion, err := s.importLookup(ctx, contestID, union, s.repo.FindByUnionCard)
@@ -125,6 +131,9 @@ func (s *Service) importOne(ctx context.Context, contestID string, record Import
 		incoming.DirectionID = existing.DirectionID
 		incoming.DirectionName = existing.DirectionName
 	}
+	if incoming.DirectionName != nil {
+		row.Direction = *incoming.DirectionName
+	}
 	incoming.ID = existing.ID
 	if sameImportedParticipant(existing, incoming) {
 		row.Status, row.Message = "duplicate", "Участник уже существует без изменений"
@@ -135,6 +144,27 @@ func (s *Service) importOne(ctx context.Context, contestID string, record Import
 	}
 	row.Status = "updated"
 	return row
+}
+
+func (s *Service) resolveImportedDirection(
+	ctx context.Context,
+	contestID, name string,
+	cache map[string]*Direction,
+) (*Direction, error) {
+	display, err := normalizeDirectionName(name)
+	if err != nil {
+		return nil, err
+	}
+	key := strings.ToLower(display)
+	if cached := cache[key]; cached != nil {
+		return cached, nil
+	}
+	direction, err := s.repo.EnsureDirection(ctx, contestID, display)
+	if err != nil {
+		return nil, err
+	}
+	cache[key] = direction
+	return direction, nil
 }
 
 func (s *Service) importLookup(

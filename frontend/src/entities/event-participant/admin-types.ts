@@ -32,6 +32,7 @@ export interface ParticipantImportRow {
   status: ParticipantImportRowStatus
   participant_id?: string
   full_name?: string
+  direction?: string
   message?: string
 }
 

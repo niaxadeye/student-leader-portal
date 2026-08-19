@@ -29,7 +29,7 @@ func TestParseCSVWithRussianHeadersAndSemicolon(t *testing.T) {
 
 func TestParseCSVWithDirectionColumn(t *testing.T) {
 	t.Parallel()
-	data := "ФИО;Дата рождения;Направление\nИванов Иван;02.01.2000;IT\n"
+	data := "ФИО;Дата рождения;Направление подготовки\nИванов Иван;02.01.2000;IT\n"
 	records, err := ParseImportFile("participants.csv", bytes.NewBufferString(data))
 	if err != nil {
 		t.Fatalf("ParseImportFile: %v", err)
@@ -39,13 +39,26 @@ func TestParseCSVWithDirectionColumn(t *testing.T) {
 	}
 }
 
+func TestParseCSVWithMultilineDirectionHeader(t *testing.T) {
+	t.Parallel()
+	data := "ФИО,Дата рождения,\"Направление\nподготовки\"\nИванов Иван,2000-01-02,Медиа\n"
+	records, err := ParseImportFile("participants.csv", bytes.NewBufferString(data))
+	if err != nil {
+		t.Fatalf("ParseImportFile: %v", err)
+	}
+	if len(records) != 1 || records[0].Direction != "Медиа" {
+		t.Fatalf("multiline header: %#v", records)
+	}
+}
+
 func TestXLSXExportImportRoundTrip(t *testing.T) {
 	t.Parallel()
 	union := "U-001"
+	direction := "IT"
 	participants := []Participant{{
 		ID: "p1", ContestID: "c1", FullName: "Иванов Иван",
 		BirthDate:       time.Date(2000, 1, 2, 0, 0, 0, 0, time.UTC),
-		UnionCardNumber: &union, Status: StatusActive,
+		UnionCardNumber: &union, DirectionName: &direction, Status: StatusActive,
 	}}
 	file, err := exportXLSX(participants)
 	if err != nil {
@@ -57,6 +70,9 @@ func TestXLSXExportImportRoundTrip(t *testing.T) {
 	}
 	if len(records) != 1 || records[0].FullName != "Иванов Иван" || records[0].BirthDate != "2000-01-02" {
 		t.Fatalf("round-trip records: %#v", records)
+	}
+	if records[0].Direction != "IT" {
+		t.Fatalf("round-trip direction: %#v", records[0])
 	}
 }
 
@@ -127,6 +143,9 @@ func TestImportAssignsDirectionFromName(t *testing.T) {
 	}
 	if *repo.created[0].DirectionID != "dir-it" {
 		t.Fatalf("direction id = %q", *repo.created[0].DirectionID)
+	}
+	if result.Rows[0].Direction != "IT" {
+		t.Fatalf("result direction = %q", result.Rows[0].Direction)
 	}
 }
 

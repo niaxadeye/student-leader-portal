@@ -134,7 +134,8 @@ func recordsFromRows(rows [][]string) ([]ImportRecord, error) {
 func mapHeaders(row []string) map[string]int {
 	columns := make(map[string]int)
 	for index, raw := range row {
-		switch normalizeHeader(raw) {
+		normalized := normalizeHeader(raw)
+		switch normalized {
 		case "full name", "fio", "фио", "ф и о", "полное имя":
 			columns[headerFullName] = index
 		case "birth date", "date of birth", "дата рождения", "дата рожд":
@@ -143,17 +144,28 @@ func mapHeaders(row []string) map[string]int {
 			columns[headerUnionCard] = index
 		case "sks barcode", "barcode", "barcode скс", "штрихкод скс":
 			columns[headerSKS] = index
-		case "direction", "track", "направление", "направления", "трек":
-			columns[headerDirection] = index
+		default:
+			if isDirectionHeader(normalized) {
+				columns[headerDirection] = index
+			}
 		}
 	}
 	return columns
 }
 
+func isDirectionHeader(normalized string) bool {
+	switch normalized {
+	case "direction", "track", "направление", "направления", "трек", "направ":
+		return true
+	}
+	return strings.Contains(normalized, "направлен") ||
+		strings.Contains(normalized, "direction")
+}
+
 func normalizeHeader(value string) string {
 	value = strings.TrimPrefix(strings.TrimSpace(value), "\uFEFF")
 	value = strings.ToLower(value)
-	value = strings.NewReplacer("_", " ", "-", " ", ".", " ").Replace(value)
+	value = strings.NewReplacer("_", " ", "-", " ", ".", " ", "\n", " ", "\r", " ", "\t", " ").Replace(value)
 	return strings.Join(strings.Fields(value), " ")
 }
 

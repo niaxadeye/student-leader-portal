@@ -174,6 +174,20 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
     )
   }
 
+  function downloadImportTemplate() {
+    const csv =
+      '\uFEFFФИО,Дата рождения,Номер профсоюзного билета,Штрихкод СКС,Направление\n'
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'event-participants-template.csv'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
   function importFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -315,8 +329,17 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
               variant="outline"
               loading={importer.isPending}
               onClick={() => fileInput.current?.click()}
+              title="CSV или XLSX. Колонки: ФИО, дата рождения, профбилет, СКС, направление."
             >
               <Upload className="h-4 w-4" /> Импорт
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={downloadImportTemplate}
+              title="Пустой CSV с колонкой «Направление»"
+            >
+              Шаблон
             </Button>
             <Button
               size="sm"
@@ -360,7 +383,7 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
               description={
                 search || statusFilter !== 'ALL' || directionFilter !== 'ALL'
                   ? 'Измените поисковый запрос или фильтры.'
-                  : 'Добавьте участника вручную или загрузите список CSV/XLSX с колонкой direction/направление.'
+                  : 'Добавьте участника вручную или загрузите CSV/XLSX. В шаблоне есть колонка «Направление».'
               }
               action={
                 search || statusFilter !== 'ALL' || directionFilter !== 'ALL' ? (
