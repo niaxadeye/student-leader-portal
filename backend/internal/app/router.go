@@ -219,6 +219,7 @@ func (a *App) Router() http.Handler {
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Use(middleware.SecurityHeaders)
+			r.Get("/login-options", d.eventParticipantsHandler.LoginOptions)
 			r.With(middleware.CSRFOrigin(origins...)).Post("/login", d.authHandler.Login)
 			r.With(middleware.CSRFOrigin(origins...)).Post("/refresh", d.authHandler.Refresh)
 
@@ -238,10 +239,22 @@ func (a *App) Router() http.Handler {
 		// Независимый participant auth flow, scoped по slug мероприятия.
 		r.Route("/events/{eventSlug}/participant-auth", func(r chi.Router) {
 			r.Use(middleware.SecurityHeaders)
-			r.Use(middleware.CSRFOrigin(origins...))
-			r.Post("/fio", d.eventParticipantsHandler.LoginByName)
-			r.Post("/union-card", d.eventParticipantsHandler.LoginByUnionCard)
-			r.Post("/sks", d.eventParticipantsHandler.LoginBySKSBarcode)
+			r.Get("/telegram/start", d.eventParticipantsHandler.TelegramStart)
+			r.Get("/vk/start", d.eventParticipantsHandler.VKStart)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.CSRFOrigin(origins...))
+				r.Post("/fio", d.eventParticipantsHandler.LoginByName)
+				r.Post("/union-card", d.eventParticipantsHandler.LoginByUnionCard)
+				r.Post("/sks", d.eventParticipantsHandler.LoginBySKSBarcode)
+				r.Post("/telegram", d.eventParticipantsHandler.LoginByTelegram)
+				r.Post("/telegram/webapp", d.eventParticipantsHandler.LoginByTelegramWebApp)
+				r.Post("/vk", d.eventParticipantsHandler.LoginByVKToken)
+			})
+		})
+		r.Route("/participant-auth", func(r chi.Router) {
+			r.Use(middleware.SecurityHeaders)
+			r.Get("/telegram/callback", d.eventParticipantsHandler.TelegramCallback)
+			r.Get("/vk/callback", d.eventParticipantsHandler.VKCallback)
 		})
 
 		r.Route("/participant", func(r chi.Router) {

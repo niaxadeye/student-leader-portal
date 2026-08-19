@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,12 +21,12 @@ type staffDirectory interface {
 }
 
 type Service struct {
-	repo    *Repo
-	jwt     *security.JWTManager
-	audit   Auditor
-	staff   staffDirectory
-	refTTL  time.Duration
-	now     func() time.Time
+	repo   *Repo
+	jwt    *security.JWTManager
+	audit  Auditor
+	staff  staffDirectory
+	refTTL time.Duration
+	now    func() time.Time
 }
 
 func NewService(repo *Repo, jwt *security.JWTManager, audit Auditor, refreshTTL time.Duration) *Service {
@@ -36,7 +37,7 @@ func (s *Service) SetStaffDirectory(d staffDirectory) { s.staff = d }
 
 // LoginInput — параметры входа с контекстом клиента для сессии/аудита.
 type LoginInput struct {
-	Login, Password, UserAgent, IP string
+	Login, Password, UserAgent, IP, Audience string
 }
 
 // Login проверяет пароль, статус и блокировку, создаёт сессию и выдаёт пару токенов.
@@ -57,7 +58,11 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*TokenPair, *User, 
 		return nil, nil, ErrInvalidCredentials
 	}
 
-	role := s.primaryRole(ctx, u.ID)
+	roles, _ := s.repo.RolesByUser(ctx, u.ID)
+	if !roleAllowedForAudience(in.Audience, roles) {
+		return nil, nil, ErrInvalidCredentials
+	}
+	role := primaryRole(roles)
 	pair, err := s.issueSession(ctx, u.ID, role, in.UserAgent, in.IP)
 	if err != nil {
 		return nil, nil, err
@@ -105,7 +110,10 @@ func (s *Service) mintTokenPair(userID, role, sessionID, jti, refresh string, re
 
 func (s *Service) primaryRole(ctx context.Context, userID string) string {
 	roles, _ := s.repo.RolesByUser(ctx, userID)
-	// Приоритет: MEGA_ADMIN > SUPER_ADMIN > ADMIN > STAFF > CONTESTANT.
+	return primaryRole(roles)
+}
+
+func primaryRole(roles []Role) string {
 	rank := map[string]int{"MEGA_ADMIN": 5, "SUPER_ADMIN": 4, "ADMIN": 3, "STAFF": 2, "CONTESTANT": 1}
 	best, bestRank := "CONTESTANT", 0
 	for _, r := range roles {
@@ -114,4 +122,27 @@ func (s *Service) primaryRole(ctx context.Context, userID string) string {
 		}
 	}
 	return best
+}
+
+func roleAllowedForAudience(audience string, roles []Role) bool {
+	audience = strings.TrimSpace(strings.ToLower(audience))
+	if audience == "" {
+		return true
+	}
+	has := func(code string) bool {
+		for _, role := range roles {
+			if role.Code == code {
+				return true
+			}
+		}
+		return false
+	}
+	switch audience {
+	case "admin", "staff":
+		return has("MEGA_ADMIN") || has("SUPER_ADMIN") || has("ADMIN") || has("STAFF")
+	case "contestant":
+		return has("CONTESTANT")
+	default:
+		return false
+	}
 }

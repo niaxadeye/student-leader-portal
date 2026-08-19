@@ -30,7 +30,8 @@ func (r *Repo) AuthenticateSession(ctx context.Context, tokenHash string) (*Prin
 		err := tx.QueryRow(ctx, `
 			SELECT s.id,
 			       p.id, p.contest_id, p.full_name, p.full_name_normalized, p.birth_date,
-			       p.union_card_number, p.sks_barcode, p.vk_url, p.telegram_url, p.status, p.created_at, p.updated_at,
+			       p.union_card_number, p.sks_barcode, p.vk_url, p.telegram_url, p.vk_user_id, p.telegram_user_id,
+			       p.status, p.created_at, p.updated_at,
 			       p.archived_at, p.direction_id, d.name,
 			       c.id, c.slug, c.name, c.status, c.timezone
 			FROM participant_sessions s
@@ -45,7 +46,8 @@ func (r *Repo) AuthenticateSession(ctx context.Context, tokenHash string) (*Prin
 			&principal.Participant.FullName, &principal.Participant.FullNameNormalized,
 			&principal.Participant.BirthDate, &principal.Participant.UnionCardNumber,
 			&principal.Participant.SKSBarcode, &principal.Participant.VKURL,
-			&principal.Participant.TelegramURL, &principal.Participant.Status,
+			&principal.Participant.TelegramURL, &principal.Participant.VKUserID,
+			&principal.Participant.TelegramUserID, &principal.Participant.Status,
 			&principal.Participant.CreatedAt, &principal.Participant.UpdatedAt,
 			&principal.Participant.ArchivedAt,
 			&principal.Participant.DirectionID, &principal.Participant.DirectionName,

@@ -28,6 +28,10 @@ type fakeRepo struct {
 	created                 []*Participant
 	updated                 []*Participant
 	all                     []Participant
+	telegramByID            map[int64]*Participant
+	telegramByUsername      map[string]*Participant
+	vkByID                  map[int64]*Participant
+	boundTelegram           *int64
 }
 
 func (f *fakeRepo) CanManage(context.Context, string, string) (bool, error) { return true, nil }
@@ -83,6 +87,44 @@ func (f *fakeRepo) FindBySKSBarcode(_ context.Context, _, value string) (*Partic
 	}
 	return f.sks, f.sksErr
 }
+func (f *fakeRepo) ListActiveEvents(context.Context) ([]EventRef, error) {
+	if f.event == nil {
+		return []EventRef{}, nil
+	}
+	return []EventRef{*f.event}, nil
+}
+func (f *fakeRepo) FindByTelegramUserID(_ context.Context, _ string, userID int64) (*Participant, error) {
+	if f.telegramByID != nil {
+		if p := f.telegramByID[userID]; p != nil {
+			return p, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+func (f *fakeRepo) FindByVKUserID(_ context.Context, _ string, userID int64) (*Participant, error) {
+	if f.vkByID != nil {
+		if p := f.vkByID[userID]; p != nil {
+			return p, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+func (f *fakeRepo) FindByTelegramUsername(_ context.Context, _ string, username string) (*Participant, error) {
+	if f.telegramByUsername != nil {
+		if p := f.telegramByUsername[strings.ToLower(username)]; p != nil {
+			return p, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+func (f *fakeRepo) FindByVKIdentity(context.Context, string, int64, string) (*Participant, error) {
+	return nil, ErrNotFound
+}
+func (f *fakeRepo) BindTelegram(_ context.Context, _, _ string, userID int64, _ *string) error {
+	f.boundTelegram = &userID
+	return nil
+}
+func (f *fakeRepo) BindVK(context.Context, string, string, int64, *string) error { return nil }
 func (f *fakeRepo) CreateSession(
 	_ context.Context, _, _, tokenHash, _, _ string, expiresAt time.Time,
 ) (string, error) {

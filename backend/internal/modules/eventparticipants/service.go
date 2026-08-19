@@ -2,6 +2,7 @@ package eventparticipants
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 
@@ -26,6 +27,13 @@ type Repository interface {
 	FindByNameBirth(ctx context.Context, contestID, normalizedName string, birthDate time.Time) ([]Participant, error)
 	FindByUnionCard(ctx context.Context, contestID, number string) (*Participant, error)
 	FindBySKSBarcode(ctx context.Context, contestID, barcode string) (*Participant, error)
+	ListActiveEvents(ctx context.Context) ([]EventRef, error)
+	FindByTelegramUserID(ctx context.Context, contestID string, userID int64) (*Participant, error)
+	FindByVKUserID(ctx context.Context, contestID string, userID int64) (*Participant, error)
+	FindByTelegramUsername(ctx context.Context, contestID, username string) (*Participant, error)
+	FindByVKIdentity(ctx context.Context, contestID string, userID int64, screenName string) (*Participant, error)
+	BindTelegram(ctx context.Context, contestID, participantID string, userID int64, profileURL *string) error
+	BindVK(ctx context.Context, contestID, participantID string, userID int64, profileURL *string) error
 	CreateSession(ctx context.Context, contestID, participantID, tokenHash, userAgent, ipHash string, expiresAt time.Time) (string, error)
 	AuthenticateSession(ctx context.Context, tokenHash string) (*Principal, error)
 	RevokeSession(ctx context.Context, tokenHash, reason string) error
@@ -48,6 +56,30 @@ type Service struct {
 	sessionTTL time.Duration
 	now        func() time.Time
 	newToken   func() (string, error)
+	social     SocialAuth
+	http       httpDoer
+}
+
+type SocialAuth struct {
+	TelegramBotToken    string
+	TelegramBotUsername string
+	VKClientID          string
+	VKClientSecret      string
+	VKRedirectURL       string
+	PublicBaseURL       string
+	StateSecret         string
+}
+
+type httpDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+func (c SocialAuth) TelegramEnabled() bool {
+	return strings.TrimSpace(c.TelegramBotToken) != "" && telegramBotID(c.TelegramBotToken) != ""
+}
+
+func (c SocialAuth) VKEnabled() bool {
+	return strings.TrimSpace(c.VKClientID) != "" && strings.TrimSpace(c.VKRedirectURL) != ""
 }
 
 func NewService(repo Repository, audit Auditor, sessionTTL time.Duration) *Service {
@@ -58,6 +90,11 @@ func NewService(repo Repository, audit Auditor, sessionTTL time.Duration) *Servi
 		repo: repo, audit: audit, sessionTTL: sessionTTL,
 		now: time.Now, newToken: security.GenerateRefreshToken,
 	}
+}
+
+func (s *Service) SetSocialAuth(cfg SocialAuth, client httpDoer) {
+	s.social = cfg
+	s.http = client
 }
 
 func (s *Service) ensureManage(ctx context.Context, actor Actor, contestID string) error {

@@ -390,6 +390,9 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrAmbiguousIdentity):
 		httpserver.WriteError(w, r, http.StatusConflict, "PARTICIPANT_IDENTITY_AMBIGUOUS",
 			"Найдено несколько совпадений. Используйте номер профсоюзного билета или barcode СКС", nil)
+	case errors.Is(err, ErrSocialUnavailable):
+		httpserver.WriteError(w, r, http.StatusServiceUnavailable, "SOCIAL_AUTH_UNAVAILABLE",
+			"Вход через соцсеть не настроен", nil)
 	case errors.Is(err, ErrInvalidCredentials), errors.Is(err, ErrEventUnavailable):
 		httpserver.WriteError(w, r, http.StatusUnauthorized, "PARTICIPANT_AUTH_FAILED", "Не удалось войти по указанным данным", nil)
 	case errors.Is(err, ErrSessionExpired):

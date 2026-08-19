@@ -20,6 +20,7 @@ var (
 	ErrDirectionNotFound  = errors.New("event direction not found")
 	ErrDirectionTaken     = errors.New("event direction name already used")
 	ErrDirectionInUse     = errors.New("event direction is in use")
+	ErrSocialUnavailable  = errors.New("social auth is not configured")
 )
 
 const (
@@ -41,6 +42,8 @@ type Participant struct {
 	SKSBarcode         *string
 	VKURL              *string
 	TelegramURL        *string
+	VKUserID           *int64
+	TelegramUserID     *int64
 	Status             string
 	DirectionID        *string
 	DirectionName      *string

@@ -41,6 +41,21 @@ export async function participantApiRequest<T>(
   return json.data as T
 }
 
+export interface LoginOptions {
+  telegram: { enabled: boolean; bot_username?: string }
+  vk: { enabled: boolean; app_id?: string; redirect_url?: string }
+  events: Array<{ slug: string; name: string }>
+}
+
+export function fetchLoginOptions(): Promise<LoginOptions> {
+  return participantApiRequest('/auth/login-options')
+}
+
+export function socialAuthStartURL(eventSlug: string, provider: 'telegram' | 'vk'): string {
+  const base = API_BASE_URL.replace(/\/$/, '')
+  return `${base}/events/${encodeURIComponent(eventSlug)}/participant-auth/${provider}/start`
+}
+
 function authPath(eventSlug: string, method: string): string {
   return `/events/${encodeURIComponent(eventSlug)}/participant-auth/${method}`
 }
@@ -64,6 +79,26 @@ export function loginParticipantBySKS(
   input: IdentifierLoginInput,
 ): Promise<ParticipantSession> {
   return participantApiRequest(authPath(eventSlug, 'sks'), { method: 'POST', body: input })
+}
+
+export function loginParticipantByTelegramWebApp(
+  eventSlug: string,
+  initData: string,
+): Promise<ParticipantSession> {
+  return participantApiRequest(authPath(eventSlug, 'telegram/webapp'), {
+    method: 'POST',
+    body: { init_data: initData },
+  })
+}
+
+export function loginParticipantByVKToken(
+  eventSlug: string,
+  accessToken: string,
+): Promise<ParticipantSession> {
+  return participantApiRequest(authPath(eventSlug, 'vk'), {
+    method: 'POST',
+    body: { access_token: accessToken },
+  })
 }
 
 export function fetchParticipantMe(): Promise<ParticipantSession> {

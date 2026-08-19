@@ -35,6 +35,7 @@ export interface LoginResult {
 export interface LoginInput {
   login: string
   password: string
+  audience?: 'admin' | 'contestant'
 }
 
 export interface ChangePasswordInput {

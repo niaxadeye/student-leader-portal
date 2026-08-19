@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/eazytech/student-leader-cabinet/internal/middleware"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/audit"
@@ -63,6 +64,19 @@ func (a *App) build() *deps {
 	eventParticipantsSvc := eventparticipants.NewService(
 		eventparticipants.NewRepo(a.pool), auditSvc, a.cfg.ParticipantAuth.SessionTTL,
 	)
+	vkRedirect := strings.TrimSpace(a.cfg.VK.RedirectURL)
+	if vkRedirect == "" {
+		vkRedirect = strings.TrimRight(a.cfg.App.BaseURL, "/") + "/api/v1/participant-auth/vk/callback"
+	}
+	eventParticipantsSvc.SetSocialAuth(eventparticipants.SocialAuth{
+		TelegramBotToken:    a.cfg.Telegram.BotToken,
+		TelegramBotUsername: a.cfg.Telegram.BotUsername,
+		VKClientID:          a.cfg.VK.ClientID,
+		VKClientSecret:      a.cfg.VK.ClientSecret,
+		VKRedirectURL:       vkRedirect,
+		PublicBaseURL:       strings.TrimRight(a.cfg.App.BaseURL, "/"),
+		StateSecret:         a.cfg.ParticipantAuth.QRSecret,
+	}, &http.Client{Timeout: 10 * time.Second})
 	pointsRepo := points.NewRepo(a.pool, auditSvc)
 	pointsSvc := points.NewService(pointsRepo)
 	lectureCodes := lectures.NewCodeManager(a.cfg.ParticipantAuth.QRSecret, a.cfg.ParticipantAuth.QRTTL)

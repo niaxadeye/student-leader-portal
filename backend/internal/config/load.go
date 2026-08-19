@@ -53,8 +53,13 @@ func Load() (*Config, error) {
 			QRTTL:             envDur("PARTICIPANT_QR_TTL", 45*time.Second),
 		},
 		Telegram: Telegram{
-			BotToken: env("TELEGRAM_BOT_TOKEN", ""), DefaultChatID: env("TELEGRAM_DEFAULT_CHAT_ID", ""),
+			BotToken: env("TELEGRAM_BOT_TOKEN", ""), BotUsername: env("TELEGRAM_BOT_USERNAME", ""),
+			DefaultChatID:   env("TELEGRAM_DEFAULT_CHAT_ID", ""),
 			DefaultThreadID: env("TELEGRAM_DEFAULT_THREAD_ID", ""), Enabled: envBool("TELEGRAM_NOTIFICATIONS_ENABLED", false),
+		},
+		VK: VK{
+			ClientID: env("VK_CLIENT_ID", ""), ClientSecret: env("VK_CLIENT_SECRET", ""),
+			RedirectURL: env("VK_REDIRECT_URL", ""),
 		},
 		Limits: Limits{
 			MaxJSONBodyMB: envInt("MAX_JSON_BODY_MB", 2), MaxFileSizeMB: envInt("DEFAULT_MAX_FILE_SIZE_MB", 1024),

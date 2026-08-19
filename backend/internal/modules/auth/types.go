@@ -47,15 +47,15 @@ type Role struct {
 
 // Session — активная сессия пользователя.
 type Session struct {
-	ID          string
-	UserID      string
-	UserAgent   string
-	IPHash      string
-	LastUsedAt  time.Time
-	ExpiresAt   time.Time
-	CreatedAt   time.Time
-	RevokedAt   *time.Time
-	Current     bool
+	ID         string
+	UserID     string
+	UserAgent  string
+	IPHash     string
+	LastUsedAt time.Time
+	ExpiresAt  time.Time
+	CreatedAt  time.Time
+	RevokedAt  *time.Time
+	Current    bool
 }
 
 // TokenPair — результат логина/refresh.

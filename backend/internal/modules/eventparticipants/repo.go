@@ -3,6 +3,8 @@ package eventparticipants
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,8 +37,8 @@ func (r *Repo) CanManage(ctx context.Context, userID, contestID string) (bool, e
 }
 
 const participantSelect = `p.id, p.contest_id, p.full_name, p.full_name_normalized, p.birth_date,
-		       p.union_card_number, p.sks_barcode, p.vk_url, p.telegram_url, p.status, p.created_at, p.updated_at,
-		       p.archived_at, p.direction_id, d.name`
+		       p.union_card_number, p.sks_barcode, p.vk_url, p.telegram_url, p.vk_user_id, p.telegram_user_id,
+		       p.status, p.created_at, p.updated_at, p.archived_at, p.direction_id, d.name`
 
 const participantFrom = `event_participants p
 		LEFT JOIN event_directions d ON d.id=p.direction_id AND d.contest_id=p.contest_id`
@@ -202,6 +204,80 @@ func (r *Repo) FindBySKSBarcode(ctx context.Context, contestID, barcode string) 
 	return r.findByIdentifier(ctx, contestID, "sks_barcode", barcode)
 }
 
+func (r *Repo) ListActiveEvents(ctx context.Context) ([]EventRef, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, slug, name, status, timezone
+		FROM contests WHERE status='ACTIVE' ORDER BY name, slug`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]EventRef, 0)
+	for rows.Next() {
+		var event EventRef
+		if err := rows.Scan(&event.ID, &event.Slug, &event.Name, &event.Status, &event.Timezone); err != nil {
+			return nil, err
+		}
+		list = append(list, event)
+	}
+	return list, rows.Err()
+}
+
+func (r *Repo) FindByTelegramUserID(ctx context.Context, contestID string, userID int64) (*Participant, error) {
+	return scanOneParticipant(r.pool.QueryRow(ctx, `
+		SELECT `+participantSelect+` FROM `+participantFrom+`
+		WHERE p.contest_id=$1 AND p.telegram_user_id=$2`, contestID, userID))
+}
+
+func (r *Repo) FindByVKUserID(ctx context.Context, contestID string, userID int64) (*Participant, error) {
+	return scanOneParticipant(r.pool.QueryRow(ctx, `
+		SELECT `+participantSelect+` FROM `+participantFrom+`
+		WHERE p.contest_id=$1 AND p.vk_user_id=$2`, contestID, userID))
+}
+
+func (r *Repo) FindByTelegramUsername(ctx context.Context, contestID, username string) (*Participant, error) {
+	username = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(username), "@"))
+	if username == "" {
+		return nil, ErrNotFound
+	}
+	return scanOneParticipant(r.pool.QueryRow(ctx, `
+		SELECT `+participantSelect+` FROM `+participantFrom+`
+		WHERE p.contest_id=$1 AND p.telegram_url IS NOT NULL
+		  AND lower(regexp_replace(p.telegram_url, '^https://t\\.me/', '')) = $2`, contestID, username))
+}
+
+func (r *Repo) FindByVKIdentity(ctx context.Context, contestID string, userID int64, screenName string) (*Participant, error) {
+	screenName = strings.ToLower(strings.TrimSpace(screenName))
+	candidates := []string{"https://vk.com/id" + strconv.FormatInt(userID, 10), "https://vk.ru/id" + strconv.FormatInt(userID, 10)}
+	if screenName != "" {
+		candidates = append(candidates, "https://vk.com/"+screenName, "https://vk.ru/"+screenName)
+	}
+	return scanOneParticipant(r.pool.QueryRow(ctx, `
+		SELECT `+participantSelect+` FROM `+participantFrom+`
+		WHERE p.contest_id=$1 AND p.vk_url IS NOT NULL AND lower(p.vk_url) = ANY($2::text[])`,
+		contestID, candidates))
+}
+
+func (r *Repo) BindTelegram(ctx context.Context, contestID, participantID string, userID int64, profileURL *string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE event_participants
+		   SET telegram_user_id=$3,
+		       telegram_url=COALESCE(telegram_url, $4),
+		       updated_at=now()
+		 WHERE contest_id=$1 AND id=$2`, contestID, participantID, userID, profileURL)
+	return err
+}
+
+func (r *Repo) BindVK(ctx context.Context, contestID, participantID string, userID int64, profileURL *string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE event_participants
+		   SET vk_user_id=$3,
+		       vk_url=COALESCE(vk_url, $4),
+		       updated_at=now()
+		 WHERE contest_id=$1 AND id=$2`, contestID, participantID, userID, profileURL)
+	return err
+}
+
 func (r *Repo) findByIdentifier(ctx context.Context, contestID, column, value string) (*Participant, error) {
 	// column выбирается только внутренними константными вызовами выше, пользовательские
 	// данные передаются параметрами.
@@ -222,7 +298,8 @@ type rowScanner interface {
 func participantScanDest(p *Participant) []any {
 	return []any{
 		&p.ID, &p.ContestID, &p.FullName, &p.FullNameNormalized,
-		&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.VKURL, &p.TelegramURL, &p.Status,
+		&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.VKURL, &p.TelegramURL,
+		&p.VKUserID, &p.TelegramUserID, &p.Status,
 		&p.CreatedAt, &p.UpdatedAt, &p.ArchivedAt, &p.DirectionID, &p.DirectionName,
 	}
 }

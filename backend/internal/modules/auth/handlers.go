@@ -21,6 +21,7 @@ func NewHandler(svc *Service, cookie CookieConfig) *Handler {
 type loginReq struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
+	Audience string `json:"audience"`
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +31,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pair, user, err := h.svc.Login(r.Context(), LoginInput{
-		Login: req.Login, Password: req.Password,
+		Login: req.Login, Password: req.Password, Audience: req.Audience,
 		UserAgent: r.UserAgent(), IP: clientIP(r),
 	})
 	if err != nil {

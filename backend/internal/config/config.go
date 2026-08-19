@@ -12,6 +12,7 @@ type Config struct {
 	Cookie          Cookie
 	ParticipantAuth ParticipantAuth
 	Telegram        Telegram
+	VK              VK
 	Limits          Limits
 	Features        Features
 	LogLevel        string
@@ -63,8 +64,12 @@ type ParticipantAuth struct {
 }
 
 type Telegram struct {
-	BotToken, DefaultChatID, DefaultThreadID string
-	Enabled                                  bool
+	BotToken, BotUsername, DefaultChatID, DefaultThreadID string
+	Enabled                                               bool
+}
+
+type VK struct {
+	ClientID, ClientSecret, RedirectURL string
 }
 
 type Limits struct {
