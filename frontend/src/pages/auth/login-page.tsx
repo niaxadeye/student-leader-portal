@@ -57,10 +57,12 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { status, user, setUser } = useAuth()
-  const [audience, setAudienceState] = useState<LoginAudience | null>(
-    parseAudience(params.get('as')) ?? (telegramWebApp() || maybeTelegramMiniApp() ? 'participant' : null),
-  )
-  const [miniAppReady, setMiniAppReady] = useState(() => Boolean(telegramWebApp()))
+  const [audience, setAudienceState] = useState<LoginAudience | null>(parseAudience(params.get('as')))
+  // Mini App подтверждается только наличием initData, UA даёт лишь повод подождать SDK.
+  const [miniApp, setMiniApp] = useState<'probing' | 'yes' | 'no'>(() => {
+    if (telegramWebApp()) return 'yes'
+    return maybeTelegramMiniApp() ? 'probing' : 'no'
+  })
 
   function setAudience(next: LoginAudience | null) {
     setAudienceState(next)
@@ -71,21 +73,16 @@ export function LoginPage() {
   }
 
   useEffect(() => {
-    if (maybeTelegramMiniApp()) ensureTelegramWebAppScript()
-    if (telegramWebApp()) {
-      setMiniAppReady(true)
-      if (audience !== 'participant') setAudience('participant')
-      return
-    }
-    if (!maybeTelegramMiniApp()) return
-    void waitForTelegramWebApp().then((app) => {
-      if (!app) return
-      setMiniAppReady(true)
-      setAudience('participant')
-    })
+    if (miniApp !== 'probing') return
+    ensureTelegramWebAppScript()
+    void waitForTelegramWebApp().then((app) => setMiniApp(app ? 'yes' : 'no'))
+  }, [miniApp])
+
+  useEffect(() => {
+    if (miniApp === 'yes' && audience !== 'participant') setAudience('participant')
     // Mini App always enters as a participant.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [miniApp])
 
   useEffect(() => {
     if (status === 'authenticated' && user && audience !== 'participant') {
@@ -95,7 +92,7 @@ export function LoginPage() {
     }
   }, [audience, navigate, status, user])
 
-  if (status === 'loading' && !miniAppReady && !maybeTelegramMiniApp()) return <FullscreenLoader />
+  if (status === 'loading' || miniApp === 'probing') return <FullscreenLoader />
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-2 px-4 py-8">
@@ -113,7 +110,7 @@ export function LoginPage() {
         {!audience ? (
           <RolePicker onPick={setAudience} />
         ) : audience === 'participant' ? (
-          <ParticipantSignIn onBack={() => setAudience(null)} />
+          <ParticipantSignIn miniApp={miniApp === 'yes'} onBack={() => setAudience(null)} />
         ) : (
           <PasswordLogin
             audience={audience}

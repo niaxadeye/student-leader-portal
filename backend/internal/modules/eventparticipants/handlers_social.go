@@ -85,13 +85,15 @@ func (h *Handler) VKCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 type telegramLoginRequest struct {
-	ID        int64  `json:"id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Username  string `json:"username"`
-	PhotoURL  string `json:"photo_url"`
-	AuthDate  int64  `json:"auth_date"`
-	Hash      string `json:"hash"`
+	ID           int64  `json:"id"`
+	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name"`
+	Username     string `json:"username"`
+	PhotoURL     string `json:"photo_url"`
+	AuthDate     int64  `json:"auth_date"`
+	Hash         string `json:"hash"`
+	TgAuthResult string `json:"tg_auth_result"`
+	EventSlug    string `json:"event_slug"`
 }
 
 func (h *Handler) LoginByTelegram(w http.ResponseWriter, r *http.Request) {
@@ -105,28 +107,42 @@ func (h *Handler) LoginByTelegram(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, ErrValidation)
 		return
 	}
-	values := url.Values{}
-	values.Set("id", strconv.FormatInt(req.ID, 10))
-	values.Set("auth_date", strconv.FormatInt(req.AuthDate, 10))
-	values.Set("hash", req.Hash)
-	if req.FirstName != "" {
-		values.Set("first_name", req.FirstName)
+	values, err := telegramLoginValuesFrom(req)
+	if err != nil {
+		writeError(w, r, err)
+		return
 	}
-	if req.LastName != "" {
-		values.Set("last_name", req.LastName)
+	slug := strings.TrimSpace(req.EventSlug)
+	if slug == "" {
+		slug = chi.URLParam(r, "eventSlug")
 	}
-	if req.Username != "" {
-		values.Set("username", req.Username)
-	}
-	if req.PhotoURL != "" {
-		values.Set("photo_url", req.PhotoURL)
-	}
-	result, err := h.svc.LoginByTelegramValues(r.Context(), chi.URLParam(r, "eventSlug"), values, client)
+	result, err := h.svc.LoginByTelegramValues(r.Context(), slug, values, client)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	h.writeSocialResult(w, r, result)
+}
+
+func telegramLoginValuesFrom(req telegramLoginRequest) (url.Values, error) {
+	if strings.TrimSpace(req.TgAuthResult) != "" {
+		return telegramValuesFromAuthResult(req.TgAuthResult)
+	}
+	values := url.Values{}
+	values.Set("id", strconv.FormatInt(req.ID, 10))
+	values.Set("auth_date", strconv.FormatInt(req.AuthDate, 10))
+	values.Set("hash", req.Hash)
+	for key, value := range map[string]string{
+		"first_name": req.FirstName,
+		"last_name":  req.LastName,
+		"username":   req.Username,
+		"photo_url":  req.PhotoURL,
+	} {
+		if value != "" {
+			values.Set(key, value)
+		}
+	}
+	return values, nil
 }
 
 type telegramWebAppRequest struct {

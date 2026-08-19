@@ -65,7 +65,14 @@ func (s *Service) TelegramStartURL(eventSlug string, now time.Time) (string, str
 		return "", "", err
 	}
 	origin := strings.TrimRight(s.social.PublicBaseURL, "/")
-	returnTo := origin + "/api/v1/participant-auth/telegram/callback"
+	// Telegram в режиме Login Widget отдаёт данные во фрагменте #tgAuthResult,
+	// который до сервера не доходит, поэтому возвращаемся на страницу входа.
+	returnQuery := url.Values{}
+	returnQuery.Set("as", "participant")
+	if slug := strings.TrimSpace(eventSlug); slug != "" {
+		returnQuery.Set("event", slug)
+	}
+	returnTo := origin + "/login?" + returnQuery.Encode()
 	values := url.Values{}
 	values.Set("bot_id", telegramBotID(s.social.TelegramBotToken))
 	values.Set("origin", origin)

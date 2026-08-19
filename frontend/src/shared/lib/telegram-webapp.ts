@@ -29,9 +29,23 @@ export function telegramWebApp(): TelegramWebApp | null {
   return app
 }
 
+/** UA/наличие SDK — только повод подождать initData, но не признак Mini App. */
 export function maybeTelegramMiniApp(): boolean {
   if (window.Telegram?.WebApp) return true
   return /Telegram/i.test(navigator.userAgent)
+}
+
+/** Данные Login Widget приходят во фрагменте, сервер их не видит. */
+export function readTelegramAuthResult(): string {
+  const hash = window.location.hash.replace(/^#/, '')
+  if (!hash) return ''
+  return new URLSearchParams(hash).get('tgAuthResult')?.trim() ?? ''
+}
+
+export function clearTelegramAuthResult(): void {
+  if (!window.location.hash) return
+  const { pathname, search } = window.location
+  window.history.replaceState(null, '', pathname + search)
 }
 
 export function ensureTelegramWebAppScript(): void {

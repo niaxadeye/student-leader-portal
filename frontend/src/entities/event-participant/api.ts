@@ -89,6 +89,16 @@ export function loginParticipantByTelegramWebApp(
   })
 }
 
+export function loginParticipantByTelegramWidget(
+  tgAuthResult: string,
+  eventSlug?: string,
+): Promise<SocialLoginResult> {
+  return participantApiRequest(socialAuthPath('telegram'), {
+    method: 'POST',
+    body: { tg_auth_result: tgAuthResult, event_slug: eventSlug || undefined },
+  })
+}
+
 export function loginParticipantByVKToken(
   accessToken: string,
   eventSlug?: string,

@@ -10,6 +10,7 @@ import {
   loginParticipantByName,
   loginParticipantBySKS,
   loginParticipantByTelegramWebApp,
+  loginParticipantByTelegramWidget,
   loginParticipantByUnionCard,
   loginParticipantByVKToken,
   socialAuthStartURL,
@@ -28,8 +29,9 @@ import {
 import { BackButton } from '@/pages/auth/login-back-button'
 import { ApiRequestError } from '@/shared/api/client'
 import {
-  maybeTelegramMiniApp,
-  waitForTelegramWebApp,
+  clearTelegramAuthResult,
+  readTelegramAuthResult,
+  telegramWebApp,
 } from '@/shared/lib/telegram-webapp'
 import { exchangeVkOneTapCode, renderVkOneTap } from '@/shared/lib/vkid'
 import { Button } from '@/shared/ui/button'
@@ -73,7 +75,13 @@ function socialErrorFromQuery(code: string | null): string {
   return ''
 }
 
-export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
+export function ParticipantSignIn({
+  miniApp,
+  onBack,
+}: {
+  miniApp: boolean
+  onBack: () => void
+}) {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { acceptSession, session, status } = useParticipantAuth()
@@ -81,13 +89,13 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
   const [authError, setAuthError] = useState(socialErrorFromQuery(params.get('error')))
   const [backupOpen, setBackupOpen] = useState(false)
   const [backupMethod, setBackupMethod] = useState<BackupMethod>('name')
-  const [webAppBusy, setWebAppBusy] = useState(maybeTelegramMiniApp())
+  const [socialBusy, setSocialBusy] = useState(miniApp || Boolean(readTelegramAuthResult()))
   const [continueToken, setContinueToken] = useState(params.get('continue')?.trim() ?? '')
   const [matchedEvents, setMatchedEvents] = useState<PublicEvent[]>([])
   const miniAppAttempted = useRef(false)
+  const widgetAttempted = useRef(false)
   const continueAttempted = useRef(false)
   const preferredSlug = params.get('event')?.trim() ?? ''
-  const inMiniApp = maybeTelegramMiniApp()
 
   const backupEvents = options?.events ?? []
   const backupSlug = preferredSlug || (backupEvents.length === 1 ? backupEvents[0].slug : '')
@@ -122,27 +130,34 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
   }, [status])
 
   useEffect(() => {
-    if (status === 'loading' || miniAppAttempted.current) return
-    if (!maybeTelegramMiniApp()) {
-      miniAppAttempted.current = true
-      setWebAppBusy(false)
+    if (status === 'loading' || !miniApp || miniAppAttempted.current) return
+    miniAppAttempted.current = true
+    const app = telegramWebApp()
+    if (!app) {
+      setSocialBusy(false)
       return
     }
-    miniAppAttempted.current = true
-    void (async () => {
-      const app = await waitForTelegramWebApp()
-      if (!app) {
-        setWebAppBusy(false)
-        return
-      }
-      app.ready()
-      app.expand()
-      const startEvent = app.initDataUnsafe?.start_param?.trim() || preferredSlug
-      setWebAppBusy(true)
-      await completeSocial(() => loginParticipantByTelegramWebApp(app.initData, startEvent || undefined))
-      setWebAppBusy(false)
-    })()
+    app.ready()
+    app.expand()
+    const startEvent = app.initDataUnsafe?.start_param?.trim() || preferredSlug
+    void completeSocial(() =>
+      loginParticipantByTelegramWebApp(app.initData, startEvent || undefined),
+    ).finally(() => setSocialBusy(false))
     // Mini App: один автологин на запуск.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miniApp, status])
+
+  useEffect(() => {
+    if (status === 'loading' || widgetAttempted.current) return
+    const authResult = readTelegramAuthResult()
+    if (!authResult) return
+    widgetAttempted.current = true
+    clearTelegramAuthResult()
+    setSocialBusy(true)
+    void completeSocial(() =>
+      loginParticipantByTelegramWidget(authResult, preferredSlug || undefined),
+    ).finally(() => setSocialBusy(false))
+    // Возврат из Telegram: данные лежат во фрагменте URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
@@ -198,8 +213,10 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-subtle">
-      {webAppBusy ? (
-        <p className="text-[14px] text-muted">Входим через Telegram Mini App…</p>
+      {socialBusy ? (
+        <p className="text-[14px] text-muted">
+          {miniApp ? 'Входим через Telegram Mini App…' : 'Проверяем данные Telegram…'}
+        </p>
       ) : choosing ? (
         <EventPicker
           title="Выберите мероприятие"
@@ -217,7 +234,7 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
             onToken={(token) => completeSocial(() => loginParticipantByVKToken(token, preferredSlug || undefined))}
             onError={() => setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')}
           />
-          {!inMiniApp && (
+          {!miniApp && (
             <Button
               type="button"
               className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
@@ -244,7 +261,7 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      {!choosing && !webAppBusy && (
+      {!choosing && !socialBusy && (
         <div className="border-t border-border pt-3">
           <button
             type="button"
@@ -315,7 +332,7 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      {!inMiniApp && <BackButton onClick={onBack} />}
+      {!miniApp && <BackButton onClick={onBack} />}
     </div>
   )
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"net/url"
 	"strconv"
 	"testing"
@@ -205,6 +207,36 @@ func TestSocialLoginPreferredSlugPicksAmongSeveral(t *testing.T) {
 	result, err := svc.LoginByTelegramValues(context.Background(), "event-b", values, ClientInfo{})
 	if err != nil || result.Session == nil || result.Session.Event.Slug != "event-b" {
 		t.Fatalf("preferred = %#v %v", result, err)
+	}
+}
+
+func TestTelegramValuesFromAuthResultKeepsSignedFields(t *testing.T) {
+	t.Parallel()
+	token := "123456:ABCDEF"
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	values := url.Values{}
+	values.Set("id", "42")
+	values.Set("first_name", "Иван")
+	values.Set("username", "durov")
+	values.Set("auth_date", strconv.FormatInt(now.Unix(), 10))
+	values.Set("hash", telegramLoginHash(token, values))
+
+	payload := fmt.Sprintf(
+		`{"id":42,"first_name":"Иван","username":"durov","auth_date":%d,"hash":%q}`,
+		now.Unix(), values.Get("hash"),
+	)
+	authResult := base64.RawURLEncoding.EncodeToString([]byte(payload))
+
+	parsed, err := telegramValuesFromAuthResult(authResult)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	identity, err := verifyTelegramLogin(parsed, token, now)
+	if err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if identity.UserID != 42 || identity.Username != "durov" {
+		t.Fatalf("identity = %#v", identity)
 	}
 }
 
