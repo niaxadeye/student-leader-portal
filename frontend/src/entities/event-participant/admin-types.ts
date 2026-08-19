@@ -18,8 +18,10 @@ export interface AdminParticipantList {
 export interface AdminParticipantInput {
   full_name: string
   birth_date: string
-  union_card_number?: string
-  sks_barcode?: string
+  union_card_number?: string | null
+  sks_barcode?: string | null
+  vk_url?: string | null
+  telegram_url?: string | null
   direction_id?: string | null
 }
 

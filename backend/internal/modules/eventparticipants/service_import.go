@@ -53,11 +53,24 @@ func (s *Service) importOne(
 	}
 	union := optionalString(record.UnionCardNumber)
 	sks := optionalString(record.SKSBarcode)
+	vkURL := optionalString(record.VKURL)
+	telegramURL := optionalString(record.TelegramURL)
 	incoming, err := normalizeParticipantInput(contestID, "", CreateInput{
 		FullName: record.FullName, BirthDate: birthDate,
 		UnionCardNumber: union, SKSBarcode: sks,
+		VKURL: vkURL, TelegramURL: telegramURL,
 	}, s.now())
 	if err != nil {
+		if vkURL != nil || telegramURL != nil {
+			if _, vkErr := normalizeOptionalSocialURL(socialVK, vkURL); vkErr != nil {
+				row.Status, row.Message = "error", "Некорректная ссылка ВКонтакте"
+				return row
+			}
+			if _, tgErr := normalizeOptionalSocialURL(socialTelegram, telegramURL); tgErr != nil {
+				row.Status, row.Message = "error", "Некорректная ссылка Telegram"
+				return row
+			}
+		}
 		row.Status, row.Message = "error", "Не заполнены обязательные поля или дата некорректна"
 		return row
 	}
@@ -126,6 +139,12 @@ func (s *Service) importOne(
 	}
 	if incoming.SKSBarcode == nil {
 		incoming.SKSBarcode = existing.SKSBarcode
+	}
+	if incoming.VKURL == nil {
+		incoming.VKURL = existing.VKURL
+	}
+	if incoming.TelegramURL == nil {
+		incoming.TelegramURL = existing.TelegramURL
 	}
 	if incoming.DirectionID == nil {
 		incoming.DirectionID = existing.DirectionID
@@ -211,6 +230,8 @@ func sameImportedParticipant(current, incoming *Participant) bool {
 		current.BirthDate.Equal(incoming.BirthDate) &&
 		equalOptionalIdentifier(current.UnionCardNumber, incoming.UnionCardNumber) &&
 		equalOptionalIdentifier(current.SKSBarcode, incoming.SKSBarcode) &&
+		equalOptionalIdentifier(current.VKURL, incoming.VKURL) &&
+		equalOptionalIdentifier(current.TelegramURL, incoming.TelegramURL) &&
 		equalOptionalIdentifier(current.DirectionID, incoming.DirectionID)
 }
 

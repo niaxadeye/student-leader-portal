@@ -176,7 +176,7 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
 
   function downloadImportTemplate() {
     const csv =
-      '\uFEFFФИО,Дата рождения,Номер профсоюзного билета,Штрихкод СКС,Направление\n'
+      '\uFEFFФИО,Дата рождения,Номер профсоюзного билета,Штрихкод СКС,Направление,ВКонтакте,Telegram\n'
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
@@ -329,7 +329,7 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
               variant="outline"
               loading={importer.isPending}
               onClick={() => fileInput.current?.click()}
-              title="CSV или XLSX. Колонки: ФИО, дата рождения, профбилет, СКС, направление."
+              title="CSV или XLSX. Колонки: ФИО, дата рождения, профбилет, СКС, направление, ВК, Telegram."
             >
               <Upload className="h-4 w-4" /> Импорт
             </Button>
@@ -408,12 +408,13 @@ export function EventParticipantsSection({ contestId }: { contestId: string }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-[14px]">
+            <table className="w-full min-w-[1080px] text-left text-[14px]">
               <thead className="text-[11px] uppercase tracking-wide text-muted-2">
                 <tr className="border-b border-border">
                   <th className="px-4 py-2 font-medium">Участник</th>
                   <th className="px-4 py-2 font-medium">Направление</th>
                   <th className="px-4 py-2 font-medium">Идентификаторы</th>
+                  <th className="px-4 py-2 font-medium">Контакты</th>
                   <th className="px-4 py-2 font-medium">Статус</th>
                   <th className="px-4 py-2 text-right font-medium">Действия</th>
                 </tr>
@@ -523,6 +524,14 @@ function ParticipantRow({
           СКС: <span className="font-medium text-ink">{participant.sks_barcode || '—'}</span>
         </p>
       </td>
+      <td className="px-4 py-3 text-[12px]">
+        <p className="text-muted">
+          ВК: <SocialLink href={participant.vk_url} kind="vk" />
+        </p>
+        <p className="mt-1 text-muted">
+          ТГ: <SocialLink href={participant.telegram_url} kind="tg" />
+        </p>
+      </td>
       <td className="px-4 py-3">
         <Badge tone={status.tone}>{status.label}</Badge>
       </td>
@@ -569,6 +578,33 @@ function ParticipantRow({
       </td>
     </tr>
   )
+}
+
+function SocialLink({ href, kind }: { href: string | null; kind: 'vk' | 'tg' }) {
+  if (!href) {
+    return <span className="font-medium text-ink">—</span>
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-brand hover:underline"
+    >
+      {socialLinkLabel(href, kind)}
+    </a>
+  )
+}
+
+function socialLinkLabel(href: string, kind: 'vk' | 'tg'): string {
+  try {
+    const path = new URL(href).pathname.replace(/^\/+/, '').split('/')[0]
+    if (!path) return kind === 'vk' ? 'VK' : 'Telegram'
+    if (kind === 'tg' && !path.startsWith('+')) return `@${path}`
+    return path
+  } catch {
+    return kind === 'vk' ? 'VK' : 'Telegram'
+  }
 }
 
 function IconButton({

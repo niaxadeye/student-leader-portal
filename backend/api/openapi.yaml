@@ -1165,6 +1165,8 @@ components:
         birth_date: { type: string, format: date }
         union_card_number: { type: string, nullable: true }
         sks_barcode: { type: string, nullable: true }
+        vk_url: { type: string, nullable: true }
+        telegram_url: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/ParticipantStatus' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -1198,6 +1200,8 @@ components:
         birth_date: { type: string, format: date }
         union_card_number: { type: string, nullable: true }
         sks_barcode: { type: string, nullable: true }
+        vk_url: { type: string, nullable: true }
+        telegram_url: { type: string, nullable: true }
     PointsAdjustmentInput:
       type: object
       required: [amount, reason]

@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	headerFullName   = "full_name"
-	headerBirthDate  = "birth_date"
-	headerUnionCard  = "union_card_number"
-	headerSKS        = "sks_barcode"
-	headerDirection  = "direction"
+	headerFullName  = "full_name"
+	headerBirthDate = "birth_date"
+	headerUnionCard = "union_card_number"
+	headerSKS       = "sks_barcode"
+	headerVK        = "vk_url"
+	headerTelegram  = "telegram_url"
+	headerDirection = "direction"
 )
 
 // ParseImportFile преобразует CSV/XLSX в единый набор строк. Бизнес-валидация
@@ -125,6 +127,8 @@ func recordsFromRows(rows [][]string) ([]ImportRecord, error) {
 			BirthDate:       valueAt(rows[i], columns[headerBirthDate]),
 			UnionCardNumber: valueForHeader(rows[i], columns, headerUnionCard),
 			SKSBarcode:      valueForHeader(rows[i], columns, headerSKS),
+			VKURL:           valueForHeader(rows[i], columns, headerVK),
+			TelegramURL:     valueForHeader(rows[i], columns, headerTelegram),
 			Direction:       valueForHeader(rows[i], columns, headerDirection),
 		})
 	}
@@ -144,6 +148,10 @@ func mapHeaders(row []string) map[string]int {
 			columns[headerUnionCard] = index
 		case "sks barcode", "barcode", "barcode скс", "штрихкод скс":
 			columns[headerSKS] = index
+		case "vk url", "vk", "vk com", "vkcom", "вконтакте", "ссылка вк", "вк", "ссылка вконтакте":
+			columns[headerVK] = index
+		case "telegram url", "telegram", "tg", "t me", "телеграм", "телеграмм", "ссылка тг", "тг", "ссылка телеграм":
+			columns[headerTelegram] = index
 		default:
 			if isDirectionHeader(normalized) {
 				columns[headerDirection] = index
@@ -215,7 +223,7 @@ func parseBirthDate(value string) (time.Time, error) {
 func exportCSV(participants []Participant) (*ExportFile, error) {
 	var buffer bytes.Buffer
 	writer := csv.NewWriter(&buffer)
-	if err := writer.Write([]string{"full_name", "birth_date", "union_card_number", "sks_barcode", "direction", "status"}); err != nil {
+	if err := writer.Write([]string{"full_name", "birth_date", "union_card_number", "sks_barcode", "direction", "vk_url", "telegram_url", "status"}); err != nil {
 		return nil, err
 	}
 	for i := range participants {
@@ -234,7 +242,7 @@ func exportXLSX(participants []Participant) (*ExportFile, error) {
 	book := excelize.NewFile()
 	defer book.Close()
 	sheet := book.GetSheetName(0)
-	headers := []string{"full_name", "birth_date", "union_card_number", "sks_barcode", "direction", "status"}
+	headers := []string{"full_name", "birth_date", "union_card_number", "sks_barcode", "direction", "vk_url", "telegram_url", "status"}
 	for column, value := range headers {
 		cell, _ := excelize.CoordinatesToCellName(column+1, 1)
 		if err := book.SetCellValue(sheet, cell, value); err != nil {
@@ -264,7 +272,9 @@ func exportRow(participant *Participant) []string {
 	return []string{
 		participant.FullName, participant.BirthDate.Format("2006-01-02"),
 		optionalValue(participant.UnionCardNumber), optionalValue(participant.SKSBarcode),
-		optionalValue(participant.DirectionName), participant.Status,
+		optionalValue(participant.DirectionName),
+		optionalValue(participant.VKURL), optionalValue(participant.TelegramURL),
+		participant.Status,
 	}
 }
 

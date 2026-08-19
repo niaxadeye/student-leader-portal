@@ -35,7 +35,7 @@ func (r *Repo) CanManage(ctx context.Context, userID, contestID string) (bool, e
 }
 
 const participantSelect = `p.id, p.contest_id, p.full_name, p.full_name_normalized, p.birth_date,
-		       p.union_card_number, p.sks_barcode, p.status, p.created_at, p.updated_at,
+		       p.union_card_number, p.sks_barcode, p.vk_url, p.telegram_url, p.status, p.created_at, p.updated_at,
 		       p.archived_at, p.direction_id, d.name`
 
 const participantFrom = `event_participants p
@@ -49,6 +49,8 @@ func (r *Repo) List(ctx context.Context, contestID string, f ListFilter) ([]Part
 		  AND ($2='' OR p.full_name ILIKE '%'||$2||'%'
 		       OR p.union_card_number::text ILIKE '%'||$2||'%'
 		       OR p.sks_barcode::text ILIKE '%'||$2||'%'
+		       OR p.vk_url ILIKE '%'||$2||'%'
+		       OR p.telegram_url ILIKE '%'||$2||'%'
 		       OR d.name ILIKE '%'||$2||'%')
 		  AND ($3='' OR p.status=$3)
 		  AND ($4='' OR p.direction_id::text=$4)
@@ -104,10 +106,10 @@ func (r *Repo) Create(ctx context.Context, p *Participant) (string, error) {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO event_participants
 		  (contest_id, full_name, full_name_normalized, birth_date,
-		   union_card_number, sks_barcode, status, direction_id)
-		VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE',$7) RETURNING id`,
+		   union_card_number, sks_barcode, vk_url, telegram_url, status, direction_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACTIVE',$9) RETURNING id`,
 		p.ContestID, p.FullName, p.FullNameNormalized, p.BirthDate,
-		p.UnionCardNumber, p.SKSBarcode, p.DirectionID).Scan(&id)
+		p.UnionCardNumber, p.SKSBarcode, p.VKURL, p.TelegramURL, p.DirectionID).Scan(&id)
 	if isUniqueViolation(err) {
 		return "", ErrIdentifierTaken
 	}
@@ -118,10 +120,11 @@ func (r *Repo) Update(ctx context.Context, p *Participant) error {
 	ct, err := r.pool.Exec(ctx, `
 		UPDATE event_participants SET
 		  full_name=$3, full_name_normalized=$4, birth_date=$5,
-		  union_card_number=$6, sks_barcode=$7, direction_id=$8, updated_at=now()
+		  union_card_number=$6, sks_barcode=$7, vk_url=$8, telegram_url=$9,
+		  direction_id=$10, updated_at=now()
 		WHERE contest_id=$1 AND id=$2`,
 		p.ContestID, p.ID, p.FullName, p.FullNameNormalized, p.BirthDate,
-		p.UnionCardNumber, p.SKSBarcode, p.DirectionID)
+		p.UnionCardNumber, p.SKSBarcode, p.VKURL, p.TelegramURL, p.DirectionID)
 	if isUniqueViolation(err) {
 		return ErrIdentifierTaken
 	}
@@ -219,7 +222,7 @@ type rowScanner interface {
 func participantScanDest(p *Participant) []any {
 	return []any{
 		&p.ID, &p.ContestID, &p.FullName, &p.FullNameNormalized,
-		&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.Status,
+		&p.BirthDate, &p.UnionCardNumber, &p.SKSBarcode, &p.VKURL, &p.TelegramURL, &p.Status,
 		&p.CreatedAt, &p.UpdatedAt, &p.ArchivedAt, &p.DirectionID, &p.DirectionName,
 	}
 }

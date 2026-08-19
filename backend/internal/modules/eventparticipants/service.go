@@ -196,11 +196,21 @@ func normalizeParticipantInput(contestID, participantID string, input CreateInpu
 	if name == "" || normalized == "" || input.BirthDate.IsZero() || input.BirthDate.After(now) {
 		return nil, ErrValidation
 	}
+	vkURL, err := normalizeOptionalSocialURL(socialVK, input.VKURL)
+	if err != nil {
+		return nil, err
+	}
+	telegramURL, err := normalizeOptionalSocialURL(socialTelegram, input.TelegramURL)
+	if err != nil {
+		return nil, err
+	}
 	return &Participant{
 		ID: participantID, ContestID: contestID, FullName: name,
 		FullNameNormalized: normalized, BirthDate: input.BirthDate,
 		UnionCardNumber: normalizeOptionalIdentifier(input.UnionCardNumber),
 		SKSBarcode:      normalizeOptionalIdentifier(input.SKSBarcode),
+		VKURL:           vkURL,
+		TelegramURL:     telegramURL,
 	}, nil
 }
 

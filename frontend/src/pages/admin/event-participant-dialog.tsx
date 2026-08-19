@@ -25,7 +25,7 @@ function mutationError(error: unknown): string {
     if (error.code === 'PARTICIPANT_IDENTIFIER_TAKEN') {
       return 'Профбилет или barcode уже назначен другому участнику этого мероприятия.'
     }
-    if (error.code === 'VALIDATION_ERROR') return 'Проверьте ФИО и дату рождения.'
+    if (error.code === 'VALIDATION_ERROR') return 'Проверьте ФИО, дату рождения и ссылки.'
   }
   return 'Не удалось сохранить участника. Попробуйте ещё раз.'
 }
@@ -47,6 +47,8 @@ export function EventParticipantDialog({
   const [birthDate, setBirthDate] = useState('')
   const [unionCard, setUnionCard] = useState('')
   const [sksBarcode, setSKSBarcode] = useState('')
+  const [vkUrl, setVkUrl] = useState('')
+  const [telegramUrl, setTelegramUrl] = useState('')
   const [directionId, setDirectionId] = useState('none')
   const [error, setError] = useState('')
   const directions = useEventDirections(open ? contestId : undefined)
@@ -59,6 +61,8 @@ export function EventParticipantDialog({
     setBirthDate(participant?.birth_date.slice(0, 10) ?? '')
     setUnionCard(participant?.union_card_number ?? '')
     setSKSBarcode(participant?.sks_barcode ?? '')
+    setVkUrl(participant?.vk_url ?? '')
+    setTelegramUrl(participant?.telegram_url ?? '')
     setDirectionId(participant?.direction_id ?? 'none')
     setError('')
   }, [open, participant])
@@ -83,8 +87,10 @@ export function EventParticipantDialog({
     const input: AdminParticipantInput = {
       full_name: name,
       birth_date: birthDate,
-      union_card_number: unionCard.trim() || undefined,
-      sks_barcode: sksBarcode.trim() || undefined,
+      union_card_number: unionCard.trim() || null,
+      sks_barcode: sksBarcode.trim() || null,
+      vk_url: vkUrl.trim() || null,
+      telegram_url: telegramUrl.trim() || null,
       direction_id: directionId === 'none' ? null : directionId,
     }
     const options = {
@@ -148,6 +154,34 @@ export function EventParticipantDialog({
                 autoComplete="off"
                 value={sksBarcode}
                 onChange={(event) => setSKSBarcode(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field
+            label="Ссылка ВКонтакте"
+            description="Полная ссылка, vk.com/имя или id123. Необязательное поле"
+          >
+            {(props) => (
+              <Input
+                {...props}
+                autoComplete="off"
+                value={vkUrl}
+                onChange={(event) => setVkUrl(event.target.value)}
+                placeholder="https://vk.com/id123"
+              />
+            )}
+          </Field>
+          <Field
+            label="Ссылка Telegram"
+            description="@username, t.me/имя или полная ссылка. Необязательное поле"
+          >
+            {(props) => (
+              <Input
+                {...props}
+                autoComplete="off"
+                value={telegramUrl}
+                onChange={(event) => setTelegramUrl(event.target.value)}
+                placeholder="https://t.me/username"
               />
             )}
           </Field>

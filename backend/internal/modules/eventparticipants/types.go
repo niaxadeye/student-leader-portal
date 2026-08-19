@@ -39,6 +39,8 @@ type Participant struct {
 	BirthDate          time.Time
 	UnionCardNumber    *string
 	SKSBarcode         *string
+	VKURL              *string
+	TelegramURL        *string
 	Status             string
 	DirectionID        *string
 	DirectionName      *string
@@ -91,6 +93,8 @@ type CreateInput struct {
 	BirthDate       time.Time
 	UnionCardNumber *string
 	SKSBarcode      *string
+	VKURL           *string
+	TelegramURL     *string
 	DirectionID     *string
 }
 
@@ -103,6 +107,8 @@ type ImportRecord struct {
 	BirthDate       string
 	UnionCardNumber string
 	SKSBarcode      string
+	VKURL           string
+	TelegramURL     string
 	Direction       string
 }
 

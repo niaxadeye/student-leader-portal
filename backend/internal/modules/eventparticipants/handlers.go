@@ -49,6 +49,7 @@ func participantJSON(p *Participant) map[string]any {
 		"id": p.ID, "event_id": p.ContestID, "full_name": p.FullName,
 		"birth_date":        p.BirthDate.Format("2006-01-02"),
 		"union_card_number": p.UnionCardNumber, "sks_barcode": p.SKSBarcode,
+		"vk_url": p.VKURL, "telegram_url": p.TelegramURL,
 		"direction_id": p.DirectionID, "direction_name": p.DirectionName,
 		"status": p.Status, "created_at": p.CreatedAt, "updated_at": p.UpdatedAt,
 		"archived_at": p.ArchivedAt,
@@ -90,6 +91,8 @@ type participantRequest struct {
 	BirthDate       string  `json:"birth_date"`
 	UnionCardNumber *string `json:"union_card_number"`
 	SKSBarcode      *string `json:"sks_barcode"`
+	VKURL           *string `json:"vk_url"`
+	TelegramURL     *string `json:"telegram_url"`
 	DirectionID     *string `json:"direction_id"`
 }
 
@@ -101,6 +104,7 @@ func parseParticipantRequest(req participantRequest) (CreateInput, error) {
 	return CreateInput{
 		FullName: req.FullName, BirthDate: birthDate,
 		UnionCardNumber: req.UnionCardNumber, SKSBarcode: req.SKSBarcode,
+		VKURL: req.VKURL, TelegramURL: req.TelegramURL,
 		DirectionID: req.DirectionID,
 	}, nil
 }

@@ -7,6 +7,8 @@ export interface EventParticipant {
   birth_date: string
   union_card_number: string | null
   sks_barcode: string | null
+  vk_url: string | null
+  telegram_url: string | null
   direction_id: string | null
   direction_name: string | null
   status: EventParticipantStatus

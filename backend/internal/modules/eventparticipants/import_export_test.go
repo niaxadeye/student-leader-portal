@@ -27,6 +27,18 @@ func TestParseCSVWithRussianHeadersAndSemicolon(t *testing.T) {
 	}
 }
 
+func TestParseCSVWithSocialLinks(t *testing.T) {
+	t.Parallel()
+	data := "ФИО;Дата рождения;ВК;ТГ\nИванов Иван;02.01.2000;vk.com/durov;@durov\n"
+	records, err := ParseImportFile("participants.csv", bytes.NewBufferString(data))
+	if err != nil {
+		t.Fatalf("ParseImportFile: %v", err)
+	}
+	if len(records) != 1 || records[0].VKURL != "vk.com/durov" || records[0].TelegramURL != "@durov" {
+		t.Fatalf("social records: %#v", records)
+	}
+}
+
 func TestParseCSVWithDirectionColumn(t *testing.T) {
 	t.Parallel()
 	data := "ФИО;Дата рождения;Направление подготовки\nИванов Иван;02.01.2000;IT\n"
@@ -55,10 +67,13 @@ func TestXLSXExportImportRoundTrip(t *testing.T) {
 	t.Parallel()
 	union := "U-001"
 	direction := "IT"
+	vk := "https://vk.com/durov"
+	tg := "https://t.me/durov"
 	participants := []Participant{{
 		ID: "p1", ContestID: "c1", FullName: "Иванов Иван",
 		BirthDate:       time.Date(2000, 1, 2, 0, 0, 0, 0, time.UTC),
 		UnionCardNumber: &union, DirectionName: &direction, Status: StatusActive,
+		VKURL: &vk, TelegramURL: &tg,
 	}}
 	file, err := exportXLSX(participants)
 	if err != nil {
@@ -73,6 +88,9 @@ func TestXLSXExportImportRoundTrip(t *testing.T) {
 	}
 	if records[0].Direction != "IT" {
 		t.Fatalf("round-trip direction: %#v", records[0])
+	}
+	if records[0].VKURL != vk || records[0].TelegramURL != tg {
+		t.Fatalf("round-trip social: %#v", records[0])
 	}
 }
 
@@ -146,6 +164,21 @@ func TestImportAssignsDirectionFromName(t *testing.T) {
 	}
 	if result.Rows[0].Direction != "IT" {
 		t.Fatalf("result direction = %q", result.Rows[0].Direction)
+	}
+}
+
+func TestImportRejectsInvalidSocialURL(t *testing.T) {
+	t.Parallel()
+	repo := &fakeRepo{}
+	svc := testService(repo, &fakeAudit{})
+	result, err := svc.Import(context.Background(), Actor{UserID: "owner"}, "contest-1", []ImportRecord{
+		{Line: 2, FullName: "Новый Человек", BirthDate: "01.01.2001", VKURL: "https://evil.com/durov"},
+	})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if result.Errors != 1 || result.Rows[0].Message != "Некорректная ссылка ВКонтакте" {
+		t.Fatalf("invalid vk import: %#v", result)
 	}
 }
 

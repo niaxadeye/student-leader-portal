@@ -1,4 +1,4 @@
-import { useEffect, type ComponentType } from 'react'
+import { useEffect, type ComponentType, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CalendarDays,
@@ -21,7 +21,7 @@ import { Button } from '@/shared/ui/button'
 import { Card, CardBody, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Skeleton } from '@/shared/ui/states'
 
-function DataRow({ label, value }: { label: string; value: string }) {
+function DataRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 border-b border-border py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <span className="text-[13px] text-muted">{label}</span>
@@ -126,6 +126,40 @@ export function ParticipantMePage() {
               value={participant.union_card_number || 'Не указан'}
             />
             <DataRow label="Barcode СКС" value={participant.sks_barcode || 'Не указан'} />
+            <DataRow
+              label="ВКонтакте"
+              value={
+                participant.vk_url ? (
+                  <a
+                    href={participant.vk_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand hover:underline"
+                  >
+                    {participant.vk_url}
+                  </a>
+                ) : (
+                  'Не указан'
+                )
+              }
+            />
+            <DataRow
+              label="Telegram"
+              value={
+                participant.telegram_url ? (
+                  <a
+                    href={participant.telegram_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand hover:underline"
+                  >
+                    {participant.telegram_url}
+                  </a>
+                ) : (
+                  'Не указан'
+                )
+              }
+            />
             <DataRow label="Направление" value={participant.direction_name || 'Не указано'} />
           </CardBody>
         </Card>
