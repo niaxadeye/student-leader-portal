@@ -157,6 +157,7 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
             <div className="flex flex-col gap-3">
               <VkOneTapButton
                 enabled={vkOn}
+                eventSlug={eventSlug}
                 appId={options?.vk.app_id}
                 redirectUrl={options?.vk.redirect_url}
                 onToken={(token) => completeLogin(() => loginParticipantByVKToken(eventSlug, token))}
@@ -258,12 +259,14 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
 
 function VkOneTapButton({
   enabled,
+  eventSlug,
   appId,
   redirectUrl,
   onToken,
   onError,
 }: {
   enabled: boolean
+  eventSlug: string
   appId?: string
   redirectUrl?: string
   onToken: (accessToken: string) => void
@@ -298,10 +301,7 @@ function VkOneTapButton({
           })
       },
       onError: () => {
-        if (!disposed) {
-          setFailed(true)
-          onErrorRef.current()
-        }
+        if (!disposed) setFailed(true)
       },
     })
       .then((destroy) => {
@@ -319,9 +319,20 @@ function VkOneTapButton({
   if (!enabled || !appId || !redirectUrl) return null
   return (
     <div className="w-full">
-      <div ref={container} className="min-h-[44px] w-full overflow-hidden" />
+      <div
+        ref={container}
+        className={failed ? 'hidden' : 'min-h-[44px] w-full overflow-hidden'}
+      />
       {failed && (
-        <p className="mt-2 text-[13px] text-muted">Не удалось показать кнопку VK. Обновите страницу.</p>
+        <Button
+          type="button"
+          className="w-full bg-[#0077FF] hover:bg-[#0066dd]"
+          onClick={() => {
+            window.location.href = socialAuthStartURL(eventSlug, 'vk')
+          }}
+        >
+          Войти через VK
+        </Button>
       )}
     </div>
   )

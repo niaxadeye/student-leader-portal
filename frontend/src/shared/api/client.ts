@@ -40,6 +40,10 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 // Один общий in-flight refresh, чтобы параллельные 401 не плодили запросы.
 let refreshInFlight: Promise<boolean> | null = null
 
+export async function restoreAccessToken(): Promise<boolean> {
+  return tryRefresh()
+}
+
 async function tryRefresh(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {

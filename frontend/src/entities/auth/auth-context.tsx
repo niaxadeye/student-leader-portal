@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { getAccessToken, restoreAccessToken } from '@/shared/api/client'
 import { fetchMe, logout as apiLogout } from './api'
 import type { CurrentUser } from './types'
 
@@ -22,6 +23,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
+      if (!getAccessToken()) {
+        const restored = await restoreAccessToken()
+        if (!restored) {
+          setUserState(null)
+          setStatus('unauthenticated')
+          return
+        }
+      }
       const me = await fetchMe()
       setUserState(me)
       setStatus('authenticated')
@@ -45,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Восстановление сессии на старте: /me → интерцептор при 401 сделает refresh.
+  // Восстановление сессии на старте: сначала refresh-cookie, затем /me.
   useEffect(() => {
     void refresh()
   }, [refresh])
