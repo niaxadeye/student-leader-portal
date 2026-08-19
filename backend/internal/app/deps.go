@@ -71,6 +71,7 @@ func (a *App) build() *deps {
 	eventParticipantsSvc.SetSocialAuth(eventparticipants.SocialAuth{
 		TelegramBotToken:    a.cfg.Telegram.BotToken,
 		TelegramBotUsername: a.cfg.Telegram.BotUsername,
+		TelegramMiniAppName: a.cfg.Telegram.MiniAppName,
 		VKClientID:          a.cfg.VK.ClientID,
 		VKClientSecret:      a.cfg.VK.ClientSecret,
 		VKRedirectURL:       vkRedirect,

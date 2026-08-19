@@ -20,5 +20,8 @@ func New(level string) *slog.Logger {
 		lvl = slog.LevelInfo
 	}
 	h := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})
-	return slog.New(h)
+	l := slog.New(h)
+	// Модули без прокинутого логгера пишут через slog.Default в тот же поток.
+	slog.SetDefault(l)
+	return l
 }

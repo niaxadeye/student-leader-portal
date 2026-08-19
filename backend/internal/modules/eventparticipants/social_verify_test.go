@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/url"
@@ -12,31 +11,6 @@ import (
 	"testing"
 	"time"
 )
-
-func TestVerifyTelegramLogin(t *testing.T) {
-	t.Parallel()
-	token := "123456:ABCDEF"
-	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	values := url.Values{}
-	values.Set("id", "42")
-	values.Set("first_name", "Ivan")
-	values.Set("username", "durov")
-	values.Set("auth_date", strconv.FormatInt(now.Unix(), 10))
-	values.Set("hash", telegramLoginHash(token, values))
-
-	got, err := verifyTelegramLogin(values, token, now)
-	if err != nil {
-		t.Fatalf("verify: %v", err)
-	}
-	if got.UserID != 42 || got.Username != "durov" {
-		t.Fatalf("identity = %#v", got)
-	}
-
-	values.Set("hash", "deadbeef")
-	if _, err := verifyTelegramLogin(values, token, now); err == nil {
-		t.Fatal("bad hash must fail")
-	}
-}
 
 func TestVerifyTelegramWebApp(t *testing.T) {
 	t.Parallel()
@@ -53,6 +27,11 @@ func TestVerifyTelegramWebApp(t *testing.T) {
 	}
 	if got.UserID != 99 || got.Username != "webapp" {
 		t.Fatalf("identity = %#v", got)
+	}
+
+	values.Set("hash", "deadbeef")
+	if _, err := verifyTelegramWebApp(values.Encode(), token, now); err == nil {
+		t.Fatal("bad hash must fail")
 	}
 }
 
@@ -73,13 +52,6 @@ func TestOAuthStateRoundTrip(t *testing.T) {
 	if _, err := svc.parseOAuthState(raw, "vk", now); err == nil {
 		t.Fatal("provider mismatch must fail")
 	}
-}
-
-func telegramLoginHash(token string, values url.Values) string {
-	secret := sha256.Sum256([]byte(token))
-	mac := hmac.New(sha256.New, secret[:])
-	mac.Write([]byte(telegramCheckString(values)))
-	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func telegramWebAppHash(token string, values url.Values) string {
@@ -114,13 +86,9 @@ func TestLoginByTelegramMatchesUsernameAndBindsID(t *testing.T) {
 	svc.social = SocialAuth{TelegramBotToken: token, TelegramBotUsername: "testbot"}
 	svc.now = func() time.Time { return now }
 
-	values := url.Values{}
-	values.Set("id", "42")
-	values.Set("username", "durov")
-	values.Set("auth_date", strconv.FormatInt(now.Unix(), 10))
-	values.Set("hash", telegramLoginHash(token, values))
+	initData := telegramWebAppInitData(token, 42, "durov", now)
 
-	result, err := svc.LoginByTelegramValues(context.Background(), "event-2026", values, ClientInfo{})
+	result, err := svc.LoginByTelegramWebApp(context.Background(), "event-2026", initData, ClientInfo{})
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
@@ -143,9 +111,9 @@ func TestSocialLoginChoosesSingleActiveEventWithoutSlug(t *testing.T) {
 	svc.social = SocialAuth{TelegramBotToken: "123456:ABCDEF", StateSecret: "state-secret"}
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
-	values := telegramLoginValues("123456:ABCDEF", 42, "durov", now)
+	initData := telegramWebAppInitData("123456:ABCDEF", 42, "durov", now)
 
-	result, err := svc.LoginByTelegramValues(context.Background(), "", values, ClientInfo{})
+	result, err := svc.LoginByTelegramWebApp(context.Background(), "", initData, ClientInfo{})
 	if err != nil || result.Session == nil {
 		t.Fatalf("login = %#v %v", result, err)
 	}
@@ -170,9 +138,9 @@ func TestSocialLoginAsksToChooseWhenSeveralActiveEvents(t *testing.T) {
 	svc.social = SocialAuth{TelegramBotToken: "123456:ABCDEF", StateSecret: "state-secret"}
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
-	values := telegramLoginValues("123456:ABCDEF", 42, "durov", now)
+	initData := telegramWebAppInitData("123456:ABCDEF", 42, "durov", now)
 
-	result, err := svc.LoginByTelegramValues(context.Background(), "", values, ClientInfo{})
+	result, err := svc.LoginByTelegramWebApp(context.Background(), "", initData, ClientInfo{})
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
@@ -202,49 +170,31 @@ func TestSocialLoginPreferredSlugPicksAmongSeveral(t *testing.T) {
 	svc.social = SocialAuth{TelegramBotToken: "123456:ABCDEF", StateSecret: "state-secret"}
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
-	values := telegramLoginValues("123456:ABCDEF", 42, "durov", now)
+	initData := telegramWebAppInitData("123456:ABCDEF", 42, "durov", now)
 
-	result, err := svc.LoginByTelegramValues(context.Background(), "event-b", values, ClientInfo{})
+	result, err := svc.LoginByTelegramWebApp(context.Background(), "event-b", initData, ClientInfo{})
 	if err != nil || result.Session == nil || result.Session.Event.Slug != "event-b" {
 		t.Fatalf("preferred = %#v %v", result, err)
 	}
 }
 
-func TestTelegramValuesFromAuthResultKeepsSignedFields(t *testing.T) {
+func TestTelegramMiniAppURL(t *testing.T) {
 	t.Parallel()
-	token := "123456:ABCDEF"
-	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	values := url.Values{}
-	values.Set("id", "42")
-	values.Set("first_name", "Иван")
-	values.Set("username", "durov")
-	values.Set("auth_date", strconv.FormatInt(now.Unix(), 10))
-	values.Set("hash", telegramLoginHash(token, values))
-
-	payload := fmt.Sprintf(
-		`{"id":42,"first_name":"Иван","username":"durov","auth_date":%d,"hash":%q}`,
-		now.Unix(), values.Get("hash"),
-	)
-	authResult := base64.RawURLEncoding.EncodeToString([]byte(payload))
-
-	parsed, err := telegramValuesFromAuthResult(authResult)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
+	svc := &Service{social: SocialAuth{TelegramBotUsername: "@eazytech_bot", TelegramMiniAppName: "cabinet"}}
+	if got := svc.TelegramMiniAppURL(); got != "https://t.me/eazytech_bot/cabinet" {
+		t.Fatalf("with app name = %q", got)
 	}
-	identity, err := verifyTelegramLogin(parsed, token, now)
-	if err != nil {
-		t.Fatalf("verify: %v", err)
-	}
-	if identity.UserID != 42 || identity.Username != "durov" {
-		t.Fatalf("identity = %#v", identity)
+	bare := &Service{social: SocialAuth{TelegramBotUsername: "eazytech_bot"}}
+	if got := bare.TelegramMiniAppURL(); got != "https://t.me/eazytech_bot" {
+		t.Fatalf("without app name = %q", got)
 	}
 }
 
-func telegramLoginValues(token string, userID int64, username string, now time.Time) url.Values {
+// telegramWebAppInitData собирает initData так, как его присылает Mini App.
+func telegramWebAppInitData(token string, userID int64, username string, now time.Time) string {
 	values := url.Values{}
-	values.Set("id", strconv.FormatInt(userID, 10))
-	values.Set("username", username)
 	values.Set("auth_date", strconv.FormatInt(now.Unix(), 10))
-	values.Set("hash", telegramLoginHash(token, values))
-	return values
+	values.Set("user", fmt.Sprintf(`{"id":%d,"username":%q}`, userID, username))
+	values.Set("hash", telegramWebAppHash(token, values))
+	return values.Encode()
 }

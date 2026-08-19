@@ -231,17 +231,26 @@ func (r *Repo) ListActiveByTelegramUserID(ctx context.Context, userID int64) ([]
 		ORDER BY c.name, c.slug`, userID)
 }
 
-func (r *Repo) ListActiveByTelegramUsername(ctx context.Context, username string) ([]ParticipantEventMatch, error) {
+// telegramProfileURL повторяет канонический вид, в котором ссылка лежит в базе.
+func telegramProfileURL(username string) string {
 	username = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(username), "@"))
 	if username == "" {
+		return ""
+	}
+	return "https://t.me/" + username
+}
+
+func (r *Repo) ListActiveByTelegramUsername(ctx context.Context, username string) ([]ParticipantEventMatch, error) {
+	profileURL := telegramProfileURL(username)
+	if profileURL == "" {
 		return nil, nil
 	}
 	return r.listActiveMatches(ctx, `
 		SELECT `+participantSelect+`, `+eventSelect+`
 		FROM `+activeMatchFrom+`
 		WHERE `+activeMatchWhere+` AND p.telegram_url IS NOT NULL
-		  AND lower(regexp_replace(p.telegram_url, '^https://t\\.me/', '')) = $1
-		ORDER BY c.name, c.slug`, username)
+		  AND lower(p.telegram_url) = $1
+		ORDER BY c.name, c.slug`, profileURL)
 }
 
 func (r *Repo) ListActiveByVKUserID(ctx context.Context, userID int64) ([]ParticipantEventMatch, error) {
@@ -304,14 +313,14 @@ func (r *Repo) FindByVKUserID(ctx context.Context, contestID string, userID int6
 }
 
 func (r *Repo) FindByTelegramUsername(ctx context.Context, contestID, username string) (*Participant, error) {
-	username = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(username), "@"))
-	if username == "" {
+	profileURL := telegramProfileURL(username)
+	if profileURL == "" {
 		return nil, ErrNotFound
 	}
 	return scanOneParticipant(r.pool.QueryRow(ctx, `
 		SELECT `+participantSelect+` FROM `+participantFrom+`
 		WHERE p.contest_id=$1 AND p.telegram_url IS NOT NULL
-		  AND lower(regexp_replace(p.telegram_url, '^https://t\\.me/', '')) = $2`, contestID, username))
+		  AND lower(p.telegram_url) = $2`, contestID, profileURL))
 }
 
 func (r *Repo) FindByVKIdentity(ctx context.Context, contestID string, userID int64, screenName string) (*Participant, error) {

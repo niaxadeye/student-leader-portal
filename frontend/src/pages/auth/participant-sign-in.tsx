@@ -10,7 +10,6 @@ import {
   loginParticipantByName,
   loginParticipantBySKS,
   loginParticipantByTelegramWebApp,
-  loginParticipantByTelegramWidget,
   loginParticipantByUnionCard,
   loginParticipantByVKToken,
   socialAuthStartURL,
@@ -28,11 +27,7 @@ import {
 } from '@/features/participant-auth/login-schema'
 import { BackButton } from '@/pages/auth/login-back-button'
 import { ApiRequestError } from '@/shared/api/client'
-import {
-  clearTelegramAuthResult,
-  readTelegramAuthResult,
-  telegramWebApp,
-} from '@/shared/lib/telegram-webapp'
+import { miniAppEventSlug, telegramWebApp } from '@/shared/lib/telegram-webapp'
 import { exchangeVkOneTapCode, renderVkOneTap } from '@/shared/lib/vkid'
 import { Button } from '@/shared/ui/button'
 import { Field } from '@/shared/ui/field'
@@ -59,6 +54,8 @@ function loginErrorMessage(error: unknown): string {
         return 'Слишком много попыток. Подождите несколько минут и попробуйте снова.'
       case 'PARTICIPANT_AUTH_FAILED':
         return 'Участник с такими данными не найден.'
+      case 'PARTICIPANT_NOT_LINKED':
+        return 'Ваш аккаунт не привязан ни к одному активному мероприятию. Попросите организатора указать вашу ссылку или войдите резервным способом.'
       case 'SOCIAL_AUTH_UNAVAILABLE':
         return 'Вход через соцсеть ещё не настроен. Используйте резервный способ.'
       case 'NETWORK_ERROR':
@@ -71,6 +68,8 @@ function loginErrorMessage(error: unknown): string {
 function socialErrorFromQuery(code: string | null): string {
   if (code === 'rate') return 'Слишком много попыток. Подождите несколько минут и попробуйте снова.'
   if (code === 'unavailable') return 'Вход через соцсеть ещё не настроен.'
+  if (code === 'unlinked')
+    return 'Ваш аккаунт не привязан ни к одному активному мероприятию. Попросите организатора указать вашу ссылку или войдите резервным способом.'
   if (code === 'social') return 'Не удалось войти через соцсеть. Проверьте, что вы есть в списке участников.'
   return ''
 }
@@ -89,11 +88,10 @@ export function ParticipantSignIn({
   const [authError, setAuthError] = useState(socialErrorFromQuery(params.get('error')))
   const [backupOpen, setBackupOpen] = useState(false)
   const [backupMethod, setBackupMethod] = useState<BackupMethod>('name')
-  const [socialBusy, setSocialBusy] = useState(miniApp || Boolean(readTelegramAuthResult()))
+  const [socialBusy, setSocialBusy] = useState(miniApp)
   const [continueToken, setContinueToken] = useState(params.get('continue')?.trim() ?? '')
   const [matchedEvents, setMatchedEvents] = useState<PublicEvent[]>([])
   const miniAppAttempted = useRef(false)
-  const widgetAttempted = useRef(false)
   const continueAttempted = useRef(false)
   const preferredSlug = params.get('event')?.trim() ?? ''
 
@@ -139,27 +137,13 @@ export function ParticipantSignIn({
     }
     app.ready()
     app.expand()
-    const startEvent = app.initDataUnsafe?.start_param?.trim() || preferredSlug
+    const startEvent = miniAppEventSlug(app.initDataUnsafe?.start_param) || preferredSlug
     void completeSocial(() =>
       loginParticipantByTelegramWebApp(app.initData, startEvent || undefined),
     ).finally(() => setSocialBusy(false))
     // Mini App: один автологин на запуск.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [miniApp, status])
-
-  useEffect(() => {
-    if (status === 'loading' || widgetAttempted.current) return
-    const authResult = readTelegramAuthResult()
-    if (!authResult) return
-    widgetAttempted.current = true
-    clearTelegramAuthResult()
-    setSocialBusy(true)
-    void completeSocial(() =>
-      loginParticipantByTelegramWidget(authResult, preferredSlug || undefined),
-    ).finally(() => setSocialBusy(false))
-    // Возврат из Telegram: данные лежат во фрагменте URL.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status])
 
   function applySocialResult(result: SocialLoginResult) {
     if (isAuthenticatedSession(result)) {
@@ -210,13 +194,18 @@ export function ParticipantSignIn({
   const telegramOn = options?.telegram.enabled ?? false
   const vkOn = options?.vk.enabled ?? false
   const choosing = matchedEvents.length > 0 && Boolean(continueToken)
+  const telegramMiniAppLink = useMemo(() => {
+    const base = options?.telegram.mini_app_url
+    if (!telegramOn || !base) return ''
+    // startapp обязателен, иначе ссылка открывает чат бота, а не Mini App.
+    const startParam = preferredSlug ? `event_${preferredSlug}` : 'login'
+    return `${base}?startapp=${encodeURIComponent(startParam)}`
+  }, [options, preferredSlug, telegramOn])
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-subtle">
       {socialBusy ? (
-        <p className="text-[14px] text-muted">
-          {miniApp ? 'Входим через Telegram Mini App…' : 'Проверяем данные Telegram…'}
-        </p>
+        <p className="text-[14px] text-muted">Входим через Telegram…</p>
       ) : choosing ? (
         <EventPicker
           title="Выберите мероприятие"
@@ -234,13 +223,13 @@ export function ParticipantSignIn({
             onToken={(token) => completeSocial(() => loginParticipantByVKToken(token, preferredSlug || undefined))}
             onError={() => setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')}
           />
-          {!miniApp && (
+          {!miniApp && telegramMiniAppLink && (
             <Button
               type="button"
               className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
-              disabled={!telegramOn}
               onClick={() => {
-                window.location.href = socialAuthStartURL('telegram', preferredSlug || undefined)
+                // Вход через Telegram работает только из Mini App, поэтому открываем её.
+                window.open(telegramMiniAppLink, '_blank', 'noopener')
               }}
             >
               <Send className="h-4 w-4" aria-hidden />

@@ -1,12 +1,9 @@
 package eventparticipants
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"net/url"
 	"sort"
 	"strconv"
@@ -19,66 +16,6 @@ const socialAuthMaxAge = 24 * time.Hour
 type telegramIdentity struct {
 	UserID   int64
 	Username string
-}
-
-// telegramValuesFromAuthResult разбирает base64 из фрагмента #tgAuthResult.
-// Все поля переносятся как есть: подпись Telegram считается по всему набору.
-func telegramValuesFromAuthResult(raw string) (url.Values, error) {
-	data, err := decodeLooseBase64(strings.TrimSpace(raw))
-	if err != nil {
-		return nil, ErrInvalidCredentials
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	var payload map[string]any
-	if err := decoder.Decode(&payload); err != nil {
-		return nil, ErrInvalidCredentials
-	}
-	values := url.Values{}
-	for key, value := range payload {
-		switch typed := value.(type) {
-		case nil:
-			continue
-		case string:
-			values.Set(key, typed)
-		case json.Number:
-			values.Set(key, typed.String())
-		case bool:
-			values.Set(key, strconv.FormatBool(typed))
-		default:
-			encoded, err := json.Marshal(typed)
-			if err != nil {
-				return nil, ErrInvalidCredentials
-			}
-			values.Set(key, string(encoded))
-		}
-	}
-	return values, nil
-}
-
-func decodeLooseBase64(raw string) ([]byte, error) {
-	unpadded := strings.TrimRight(raw, "=")
-	for _, encoding := range []*base64.Encoding{base64.RawURLEncoding, base64.RawStdEncoding} {
-		if data, err := encoding.DecodeString(unpadded); err == nil {
-			return data, nil
-		}
-	}
-	return nil, ErrInvalidCredentials
-}
-
-func verifyTelegramLogin(values url.Values, botToken string, now time.Time) (telegramIdentity, error) {
-	identity, checkString, hash, authDate, err := parseTelegramPayload(values)
-	if err != nil || hash == "" {
-		return telegramIdentity{}, ErrInvalidCredentials
-	}
-	secret := sha256.Sum256([]byte(botToken))
-	if !hmacSHA256Hex(secret[:], checkString, hash) {
-		return telegramIdentity{}, ErrInvalidCredentials
-	}
-	if now.Sub(authDate) > socialAuthMaxAge || authDate.After(now.Add(5*time.Minute)) {
-		return telegramIdentity{}, ErrInvalidCredentials
-	}
-	return identity, nil
 }
 
 func verifyTelegramWebApp(initData, botToken string, now time.Time) (telegramIdentity, error) {

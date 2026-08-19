@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,6 +18,7 @@ type LoginOptions struct {
 	Telegram struct {
 		Enabled     bool   `json:"enabled"`
 		BotUsername string `json:"bot_username,omitempty"`
+		MiniAppURL  string `json:"mini_app_url,omitempty"`
 	} `json:"telegram"`
 	VK struct {
 		Enabled     bool   `json:"enabled"`
@@ -40,6 +42,9 @@ func (s *Service) LoginOptions(ctx context.Context) (*LoginOptions, error) {
 	options := &LoginOptions{}
 	options.Telegram.Enabled = s.social.TelegramEnabled()
 	options.Telegram.BotUsername = strings.TrimPrefix(strings.TrimSpace(s.social.TelegramBotUsername), "@")
+	if options.Telegram.Enabled {
+		options.Telegram.MiniAppURL = s.TelegramMiniAppURL()
+	}
 	options.VK.Enabled = s.social.VKEnabled()
 	if options.VK.Enabled {
 		options.VK.AppID = strings.TrimSpace(s.social.VKClientID)
@@ -56,29 +61,18 @@ func (s *Service) LoginOptions(ctx context.Context) (*LoginOptions, error) {
 	return options, nil
 }
 
-func (s *Service) TelegramStartURL(eventSlug string, now time.Time) (string, string, error) {
-	if !s.social.TelegramEnabled() {
-		return "", "", ErrSocialUnavailable
+// TelegramMiniAppURL — единственный вход через Telegram: данные берём из Mini App.
+// Параметр startapp добавляет клиент, он же знает про выбранное мероприятие.
+func (s *Service) TelegramMiniAppURL() string {
+	bot := strings.TrimPrefix(strings.TrimSpace(s.social.TelegramBotUsername), "@")
+	if bot == "" {
+		return ""
 	}
-	state, err := s.signOAuthState(strings.TrimSpace(eventSlug), "telegram", now)
-	if err != nil {
-		return "", "", err
+	target := "https://t.me/" + bot
+	if app := strings.TrimSpace(s.social.TelegramMiniAppName); app != "" {
+		target += "/" + app
 	}
-	origin := strings.TrimRight(s.social.PublicBaseURL, "/")
-	// Telegram в режиме Login Widget отдаёт данные во фрагменте #tgAuthResult,
-	// который до сервера не доходит, поэтому возвращаемся на страницу входа.
-	returnQuery := url.Values{}
-	returnQuery.Set("as", "participant")
-	if slug := strings.TrimSpace(eventSlug); slug != "" {
-		returnQuery.Set("event", slug)
-	}
-	returnTo := origin + "/login?" + returnQuery.Encode()
-	values := url.Values{}
-	values.Set("bot_id", telegramBotID(s.social.TelegramBotToken))
-	values.Set("origin", origin)
-	values.Set("request_access", "write")
-	values.Set("return_to", returnTo)
-	return "https://oauth.telegram.org/auth?" + values.Encode(), state, nil
+	return target
 }
 
 func (s *Service) VKStartURL(eventSlug string, now time.Time) (string, string, error) {
@@ -98,22 +92,6 @@ func (s *Service) VKStartURL(eventSlug string, now time.Time) (string, string, e
 	values.Set("state", state)
 	values.Set("v", "5.199")
 	return "https://oauth.vk.com/authorize?" + values.Encode(), state, nil
-}
-
-func (s *Service) LoginByTelegramValues(
-	ctx context.Context,
-	eventSlug string,
-	values url.Values,
-	client ClientInfo,
-) (*SocialAuthResult, error) {
-	if !s.social.TelegramEnabled() {
-		return nil, ErrSocialUnavailable
-	}
-	identity, err := verifyTelegramLogin(values, s.social.TelegramBotToken, s.now().UTC())
-	if err != nil {
-		return nil, err
-	}
-	return s.loginByTelegramIdentity(ctx, eventSlug, false, identity, client, "telegram")
 }
 
 func (s *Service) LoginByTelegramWebApp(
@@ -253,7 +231,10 @@ func (s *Service) resolveSocialMatches(
 	extra string,
 ) (*SocialAuthResult, error) {
 	if len(matches) == 0 {
-		return nil, ErrInvalidCredentials
+		// Без этого «участник не найден» невозможно отличить от несовпадения ссылок.
+		slog.WarnContext(ctx, "social_login_no_match",
+			"provider", provider, "social_user_id", userID, "social_identity", extra)
+		return nil, ErrSocialNotLinked
 	}
 	preferredSlug = strings.TrimSpace(preferredSlug)
 	var chosen *ParticipantEventMatch
@@ -428,8 +409,15 @@ func (s *Service) fetchVKProfile(ctx context.Context, accessToken string) (strin
 		Response []struct {
 			ScreenName string `json:"screen_name"`
 		} `json:"response"`
+		Error struct {
+			Code int    `json:"error_code"`
+			Msg  string `json:"error_msg"`
+		} `json:"error"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil || len(payload.Response) == 0 {
+		// Токен VK ID не всегда допущен к users.get — без screen_name ссылку не сопоставить.
+		slog.WarnContext(ctx, "vk_screen_name_unavailable",
+			"status", resp.StatusCode, "vk_error_code", payload.Error.Code, "vk_error", payload.Error.Msg)
 		return "", ErrInvalidCredentials
 	}
 	return payload.Response[0].ScreenName, nil

@@ -35,17 +35,10 @@ export function maybeTelegramMiniApp(): boolean {
   return /Telegram/i.test(navigator.userAgent)
 }
 
-/** Данные Login Widget приходят во фрагменте, сервер их не видит. */
-export function readTelegramAuthResult(): string {
-  const hash = window.location.hash.replace(/^#/, '')
-  if (!hash) return ''
-  return new URLSearchParams(hash).get('tgAuthResult')?.trim() ?? ''
-}
-
-export function clearTelegramAuthResult(): void {
-  if (!window.location.hash) return
-  const { pathname, search } = window.location
-  window.history.replaceState(null, '', pathname + search)
+/** startapp может нести не только слаг, поэтому мероприятие помечено префиксом. */
+export function miniAppEventSlug(startParam?: string): string {
+  const value = startParam?.trim() ?? ''
+  return value.startsWith('event_') ? value.slice('event_'.length) : ''
 }
 
 export function ensureTelegramWebAppScript(): void {

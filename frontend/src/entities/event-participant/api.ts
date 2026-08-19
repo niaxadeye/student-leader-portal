@@ -42,7 +42,7 @@ export async function participantApiRequest<T>(
 }
 
 export interface LoginOptions {
-  telegram: { enabled: boolean; bot_username?: string }
+  telegram: { enabled: boolean; bot_username?: string; mini_app_url?: string }
   vk: { enabled: boolean; app_id?: string; redirect_url?: string }
   events: Array<{ slug: string; name: string }>
 }
@@ -51,7 +51,7 @@ export function fetchLoginOptions(): Promise<LoginOptions> {
   return participantApiRequest('/auth/login-options')
 }
 
-export function socialAuthStartURL(provider: 'telegram' | 'vk', eventSlug?: string): string {
+export function socialAuthStartURL(provider: 'vk', eventSlug?: string): string {
   const base = API_BASE_URL.replace(/\/$/, '')
   const slug = eventSlug?.trim()
   if (slug) {
@@ -86,16 +86,6 @@ export function loginParticipantByTelegramWebApp(
   return participantApiRequest(socialAuthPath('telegram/webapp'), {
     method: 'POST',
     body: { init_data: initData, event_slug: eventSlug || undefined },
-  })
-}
-
-export function loginParticipantByTelegramWidget(
-  tgAuthResult: string,
-  eventSlug?: string,
-): Promise<SocialLoginResult> {
-  return participantApiRequest(socialAuthPath('telegram'), {
-    method: 'POST',
-    body: { tg_auth_result: tgAuthResult, event_slug: eventSlug || undefined },
   })
 }
 

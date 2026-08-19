@@ -13,6 +13,7 @@ var (
 	ErrValidation         = errors.New("validation error")
 	ErrIdentifierTaken    = errors.New("participant identifier already used")
 	ErrInvalidCredentials = errors.New("invalid participant credentials")
+	ErrSocialNotLinked    = errors.New("social account is not linked to an active event")
 	ErrAmbiguousIdentity  = errors.New("multiple participants match identity")
 	ErrSessionExpired     = errors.New("participant session expired")
 	ErrEventUnavailable   = errors.New("event is unavailable")

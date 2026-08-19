@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,16 +25,6 @@ func (h *Handler) LoginOptions(w http.ResponseWriter, r *http.Request) {
 	httpserver.WriteJSON(w, r, http.StatusOK, options, nil)
 }
 
-func (h *Handler) TelegramStart(w http.ResponseWriter, r *http.Request) {
-	target, state, err := h.svc.TelegramStartURL(chi.URLParam(r, "eventSlug"), time.Now())
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	h.setOAuthCookie(w, state)
-	http.Redirect(w, r, target, http.StatusFound)
-}
-
 func (h *Handler) VKStart(w http.ResponseWriter, r *http.Request) {
 	target, state, err := h.svc.VKStartURL(chi.URLParam(r, "eventSlug"), time.Now())
 	if err != nil {
@@ -44,25 +33,6 @@ func (h *Handler) VKStart(w http.ResponseWriter, r *http.Request) {
 	}
 	h.setOAuthCookie(w, state)
 	http.Redirect(w, r, target, http.StatusFound)
-}
-
-func (h *Handler) TelegramCallback(w http.ResponseWriter, r *http.Request) {
-	client := requestClientInfo(r)
-	if !h.allowSocialLogin(r, client) {
-		h.redirectSocialError(w, r, "", ErrRateLimited)
-		return
-	}
-	slug, err := h.svc.parseOAuthState(h.oauthState(r), "telegram", time.Now())
-	if err != nil {
-		h.redirectSocialError(w, r, "", err)
-		return
-	}
-	result, err := h.svc.LoginByTelegramValues(r.Context(), slug, r.URL.Query(), client)
-	if err != nil {
-		h.redirectSocialError(w, r, slug, err)
-		return
-	}
-	h.finishSocialOutcome(w, r, result)
 }
 
 func (h *Handler) VKCallback(w http.ResponseWriter, r *http.Request) {
@@ -82,67 +52,6 @@ func (h *Handler) VKCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.finishSocialOutcome(w, r, result)
-}
-
-type telegramLoginRequest struct {
-	ID           int64  `json:"id"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	Username     string `json:"username"`
-	PhotoURL     string `json:"photo_url"`
-	AuthDate     int64  `json:"auth_date"`
-	Hash         string `json:"hash"`
-	TgAuthResult string `json:"tg_auth_result"`
-	EventSlug    string `json:"event_slug"`
-}
-
-func (h *Handler) LoginByTelegram(w http.ResponseWriter, r *http.Request) {
-	client := requestClientInfo(r)
-	if !h.allowLogin(r, client) {
-		writeError(w, r, ErrRateLimited)
-		return
-	}
-	var req telegramLoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, r, ErrValidation)
-		return
-	}
-	values, err := telegramLoginValuesFrom(req)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	slug := strings.TrimSpace(req.EventSlug)
-	if slug == "" {
-		slug = chi.URLParam(r, "eventSlug")
-	}
-	result, err := h.svc.LoginByTelegramValues(r.Context(), slug, values, client)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	h.writeSocialResult(w, r, result)
-}
-
-func telegramLoginValuesFrom(req telegramLoginRequest) (url.Values, error) {
-	if strings.TrimSpace(req.TgAuthResult) != "" {
-		return telegramValuesFromAuthResult(req.TgAuthResult)
-	}
-	values := url.Values{}
-	values.Set("id", strconv.FormatInt(req.ID, 10))
-	values.Set("auth_date", strconv.FormatInt(req.AuthDate, 10))
-	values.Set("hash", req.Hash)
-	for key, value := range map[string]string{
-		"first_name": req.FirstName,
-		"last_name":  req.LastName,
-		"username":   req.Username,
-		"photo_url":  req.PhotoURL,
-	} {
-		if value != "" {
-			values.Set(key, value)
-		}
-	}
-	return values, nil
 }
 
 type telegramWebAppRequest struct {
@@ -285,6 +194,8 @@ func socialErrorCode(err error) string {
 		return "rate"
 	case errors.Is(err, ErrSocialUnavailable):
 		return "unavailable"
+	case errors.Is(err, ErrSocialNotLinked):
+		return "unlinked"
 	default:
 		return "social"
 	}
