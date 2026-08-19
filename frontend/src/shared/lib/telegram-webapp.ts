@@ -11,6 +11,8 @@ export interface TelegramWebApp {
     user?: TelegramWebAppUser
     start_param?: string
   }
+  platform?: string
+  version?: string
   ready: () => void
   expand: () => void
 }
@@ -18,7 +20,14 @@ export interface TelegramWebApp {
 declare global {
   interface Window {
     Telegram?: { WebApp?: TelegramWebApp }
+    TelegramWebviewProxy?: unknown
   }
+}
+
+/** Telegram передаёт параметры запуска во фрагменте, оттуда же их читает SDK. */
+export function telegramLaunchParams(): string {
+  const hash = window.location.hash.replace(/^#/, '')
+  return hash.includes('tgWebApp') ? hash : ''
 }
 
 const TELEGRAM_WEBAPP_SRC = 'https://telegram.org/js/telegram-web-app.js'
@@ -29,9 +38,12 @@ export function telegramWebApp(): TelegramWebApp | null {
   return app
 }
 
-/** UA/наличие SDK — только повод подождать initData, но не признак Mini App. */
+/** Повод подождать initData. В вебвью Telegram user-agent обычно обычный,
+ *  поэтому опираемся на инжектированный мост и параметры запуска. */
 export function maybeTelegramMiniApp(): boolean {
   if (window.Telegram?.WebApp) return true
+  if (window.TelegramWebviewProxy) return true
+  if (telegramLaunchParams()) return true
   return /Telegram/i.test(navigator.userAgent)
 }
 

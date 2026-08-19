@@ -13,6 +13,7 @@ import { landingPath } from '@/entities/auth/roles'
 import { loginSchema, type LoginValues } from '@/features/auth/login-schema'
 import { FullscreenLoader } from '@/app/guards'
 import { BackButton } from '@/pages/auth/login-back-button'
+import { MiniAppDebug } from '@/pages/auth/mini-app-debug'
 import { ParticipantSignIn } from '@/pages/auth/participant-sign-in'
 import { telegramWebApp, maybeTelegramMiniApp, waitForTelegramWebApp, ensureTelegramWebAppScript } from '@/shared/lib/telegram-webapp'
 
@@ -126,6 +127,8 @@ export function LoginPage() {
             }}
           />
         )}
+
+        <MiniAppDebug probe={miniApp} />
       </div>
     </div>
   )
