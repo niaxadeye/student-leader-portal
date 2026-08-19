@@ -60,6 +60,19 @@ export const uploadTaskImage = (
 export const deleteTaskImage = (contestId: string, taskId: string): Promise<EventTask> =>
   apiRequest(`${taskPath(contestId, taskId)}/image`, { method: 'DELETE' })
 
+export const uploadTaskIcon = (
+  contestId: string,
+  taskId: string,
+  image: File,
+): Promise<EventTask> => {
+  const form = new FormData()
+  form.append('image', image)
+  return apiPostForm(`${taskPath(contestId, taskId)}/icon`, form)
+}
+
+export const deleteTaskIcon = (contestId: string, taskId: string): Promise<EventTask> =>
+  apiRequest(`${taskPath(contestId, taskId)}/icon`, { method: 'DELETE' })
+
 export const listTaskSubmissions = (
   contestId: string,
   status: TaskSubmissionStatus,

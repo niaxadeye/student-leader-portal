@@ -109,6 +109,47 @@ func (s *Service) SetImage(
 	image ImageUpload,
 	store FileStore,
 ) (*Task, error) {
+	return s.replaceTaskFile(ctx, actor, contestID, taskID, image, store, "cover", s.repo.SetImage, "EVENT_TASK_IMAGE_UPDATED")
+}
+
+func (s *Service) DeleteImage(
+	ctx context.Context,
+	actor Actor,
+	contestID, taskID string,
+	store FileStore,
+) (*Task, error) {
+	return s.clearTaskFile(ctx, actor, contestID, taskID, store, s.repo.SetImage, "EVENT_TASK_IMAGE_DELETED")
+}
+
+func (s *Service) SetIcon(
+	ctx context.Context,
+	actor Actor,
+	contestID, taskID string,
+	image ImageUpload,
+	store FileStore,
+) (*Task, error) {
+	return s.replaceTaskFile(ctx, actor, contestID, taskID, image, store, "icon", s.repo.SetIcon, "EVENT_TASK_ICON_UPDATED")
+}
+
+func (s *Service) DeleteIcon(
+	ctx context.Context,
+	actor Actor,
+	contestID, taskID string,
+	store FileStore,
+) (*Task, error) {
+	return s.clearTaskFile(ctx, actor, contestID, taskID, store, s.repo.SetIcon, "EVENT_TASK_ICON_DELETED")
+}
+
+func (s *Service) replaceTaskFile(
+	ctx context.Context,
+	actor Actor,
+	contestID, taskID string,
+	image ImageUpload,
+	store FileStore,
+	kind string,
+	set func(context.Context, string, string, *string) (*Task, *string, error),
+	auditAction string,
+) (*Task, error) {
 	if err := s.ensure(ctx, actor, contestID, PermissionManage); err != nil {
 		return nil, err
 	}
@@ -119,12 +160,12 @@ func (s *Service) SetImage(
 	if err != nil {
 		return nil, err
 	}
-	objectKey := fmt.Sprintf("event-tasks/%s/%s/cover-%s-%s",
-		contestID, taskID, image.KeySuffix, safeName(image.OriginalName))
+	objectKey := fmt.Sprintf("event-tasks/%s/%s/%s-%s-%s",
+		contestID, taskID, kind, image.KeySuffix, safeName(image.OriginalName))
 	if err := store.Put(ctx, objectKey, image.Reader, image.Size, image.ContentType); err != nil {
 		return nil, err
 	}
-	task, previous, err := s.repo.SetImage(ctx, contestID, taskID, &objectKey)
+	task, previous, err := set(ctx, contestID, taskID, &objectKey)
 	if err != nil {
 		_ = store.Remove(ctx, objectKey)
 		return nil, err
@@ -133,23 +174,25 @@ func (s *Service) SetImage(
 		_ = store.Remove(ctx, *previous)
 	}
 	if s.audit != nil {
-		s.audit.Log(ctx, actor.UserID, "EVENT_TASK_IMAGE_UPDATED", "event_task", taskID,
+		s.audit.Log(ctx, actor.UserID, auditAction, "event_task", taskID,
 			map[string]any{"contest_id": contestID})
 	}
 	s.decorateTask(ctx, task)
 	return task, nil
 }
 
-func (s *Service) DeleteImage(
+func (s *Service) clearTaskFile(
 	ctx context.Context,
 	actor Actor,
 	contestID, taskID string,
 	store FileStore,
+	set func(context.Context, string, string, *string) (*Task, *string, error),
+	auditAction string,
 ) (*Task, error) {
 	if err := s.ensure(ctx, actor, contestID, PermissionManage); err != nil {
 		return nil, err
 	}
-	task, previous, err := s.repo.SetImage(ctx, contestID, taskID, nil)
+	task, previous, err := set(ctx, contestID, taskID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -157,9 +200,10 @@ func (s *Service) DeleteImage(
 		_ = store.Remove(ctx, *previous)
 	}
 	if s.audit != nil {
-		s.audit.Log(ctx, actor.UserID, "EVENT_TASK_IMAGE_DELETED", "event_task", taskID,
+		s.audit.Log(ctx, actor.UserID, auditAction, "event_task", taskID,
 			map[string]any{"contest_id": contestID})
 	}
+	s.decorateTask(ctx, task)
 	return task, nil
 }
 

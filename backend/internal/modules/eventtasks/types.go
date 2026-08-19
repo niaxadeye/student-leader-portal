@@ -45,6 +45,8 @@ type Task struct {
 	Description            string      `json:"description"`
 	ImageKey               *string     `json:"-"`
 	ImageURL               *string     `json:"image_url"`
+	IconKey                *string     `json:"-"`
+	IconURL                *string     `json:"icon_url"`
 	Icon                   *string     `json:"icon"`
 	Points                 int64       `json:"points"`
 	StartsAt               *time.Time  `json:"starts_at"`

@@ -55,6 +55,7 @@ export interface EventTask {
   title: string
   description: string
   image_url: string | null
+  icon_url: string | null
   icon: string | null
   points: number
   starts_at: string | null

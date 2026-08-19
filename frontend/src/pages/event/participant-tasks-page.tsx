@@ -59,10 +59,13 @@ export function ParticipantTasksPage() {
                 to={`/event/${encodeURIComponent(session.event.slug)}/tasks/${task.id}`}
                 className="group"
               >
-                <Card className="h-full transition-colors group-hover:border-brand">
+                <Card className="h-full overflow-hidden transition-colors group-hover:border-brand">
+                  {task.image_url && (
+                    <img src={task.image_url} alt="" className="h-32 w-full object-cover" />
+                  )}
                   <CardBody className="flex h-full flex-col p-5">
                     <div className="flex items-start justify-between gap-3">
-                      <TaskIcon url={task.image_url} />
+                      <TaskIcon url={task.icon_url} />
                       <Badge tone="brand">+{task.points} баллов</Badge>
                     </div>
                     <h2 className="mt-3 text-[17px] font-semibold text-ink">{task.title}</h2>

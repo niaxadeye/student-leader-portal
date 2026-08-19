@@ -91,11 +91,14 @@ export function ParticipantTaskPage() {
       >
         <ArrowLeft className="h-4 w-4" /> Все задания
       </Link>
-      <Card>
+      <Card className="overflow-hidden">
+        {value.image_url && (
+          <img src={value.image_url} alt="" className="max-h-72 w-full object-cover" />
+        )}
         <CardBody className="p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-4">
-              <TaskIcon url={value.image_url} />
+              <TaskIcon url={value.icon_url} />
               <div>
                 <h1 className="text-[26px] font-bold text-ink">{value.title}</h1>
                 <p className="mt-0.5 text-[13px] text-muted">

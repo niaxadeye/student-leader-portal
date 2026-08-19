@@ -18,6 +18,7 @@ interface FileUploadProps {
   hint?: string
   accept?: string
   multiple?: boolean
+  label?: string
   onAdd: (files: FileList) => void
   onRemove: (id: string) => void
 }
@@ -33,6 +34,7 @@ export function FileUpload({
   hint,
   accept,
   multiple = true,
+  label = 'Нажмите, чтобы загрузить файлы',
   onAdd,
   onRemove,
 }: FileUploadProps) {
@@ -45,7 +47,7 @@ export function FileUpload({
         className="flex flex-col items-center gap-2 rounded-card border border-dashed border-border bg-surface-2 px-6 py-8 text-center transition-colors hover:border-brand hover:bg-brand-subtle"
       >
         <UploadCloud className="h-7 w-7 text-brand" />
-        <span className="text-[15px] font-medium text-ink">Нажмите, чтобы загрузить файлы</span>
+        <span className="text-[15px] font-medium text-ink">{label}</span>
         {hint && <span className="text-[13px] text-muted">{hint}</span>}
       </button>
       <input

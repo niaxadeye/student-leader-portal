@@ -100,7 +100,7 @@ export function EventTasksSection({
           {tasks.data.map((task) => (
             <Card key={task.id}>
               <CardBody className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center">
-                <TaskIcon url={task.image_url} />
+                <TaskIcon url={task.icon_url} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-ink">{task.title}</p>

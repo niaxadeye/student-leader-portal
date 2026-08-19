@@ -20,6 +20,7 @@ type Repository interface {
 	Transition(ctx context.Context, contestID, taskID string, allowedFrom []string, to string) (*Task, error)
 	Delete(ctx context.Context, contestID, taskID string) error
 	SetImage(ctx context.Context, contestID, taskID string, imageKey *string) (*Task, *string, error)
+	SetIcon(ctx context.Context, contestID, taskID string, iconKey *string) (*Task, *string, error)
 	ParticipantSubmission(ctx context.Context, contestID, taskID, participantID string) (*Submission, error)
 	SubmitAttempt(ctx context.Context, params SubmitParams) (*Submission, error)
 	ModerationList(ctx context.Context, contestID, status string) ([]Submission, error)
@@ -292,6 +293,11 @@ func (s *Service) decorateTask(ctx context.Context, task *Task) {
 	if task.ImageKey != nil && s.presign != nil {
 		if value, err := s.presign(ctx, *task.ImageKey); err == nil {
 			task.ImageURL = &value
+		}
+	}
+	if task.IconKey != nil && s.presign != nil {
+		if value, err := s.presign(ctx, *task.IconKey); err == nil {
+			task.IconURL = &value
 		}
 	}
 }

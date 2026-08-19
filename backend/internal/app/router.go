@@ -103,6 +103,8 @@ func (a *App) Router() http.Handler {
 							r.Post("/archive", d.eventTasksHandler.AdminTransition("archive"))
 							r.Post("/image", d.eventTasksHandler.AdminSetImage)
 							r.Delete("/image", d.eventTasksHandler.AdminDeleteImage)
+							r.Post("/icon", d.eventTasksHandler.AdminSetIcon)
+							r.Delete("/icon", d.eventTasksHandler.AdminDeleteIcon)
 						})
 					})
 					r.Route("/merch/products", func(r chi.Router) {

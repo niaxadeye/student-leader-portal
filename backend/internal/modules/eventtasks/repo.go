@@ -47,7 +47,7 @@ func (r *Repo) Can(ctx context.Context, userID, contestID, permission string) (b
 	return allowed, err
 }
 
-const taskCols = `id, contest_id, title, description, image_key, icon, points,
+const taskCols = `id, contest_id, title, description, image_key, icon_key, icon, points,
 	starts_at, ends_at, status, sort_order, allowed_submission_types, created_at, updated_at`
 
 func (r *Repo) List(ctx context.Context, contestID string) ([]Task, error) {
@@ -142,10 +142,26 @@ func (r *Repo) SetImage(ctx context.Context, contestID, taskID string, imageKey 
 		WITH old AS (SELECT image_key FROM event_tasks WHERE contest_id=$1 AND id=$2)
 		UPDATE event_tasks SET image_key=$3, updated_at=now()
 		WHERE contest_id=$1 AND id=$2 AND status<>'ARCHIVED'
-		RETURNING id, contest_id, title, description, image_key, icon, points,
-		  starts_at, ends_at, status, sort_order, allowed_submission_types, created_at, updated_at,
-		  (SELECT image_key FROM old)`, contestID, taskID, imageKey).
-		Scan(&task.ID, &task.ContestID, &task.Title, &task.Description, &task.ImageKey,
+		RETURNING `+taskCols+`, (SELECT image_key FROM old)`, contestID, taskID, imageKey).
+		Scan(&task.ID, &task.ContestID, &task.Title, &task.Description, &task.ImageKey, &task.IconKey,
+			&task.Icon, &task.Points, &task.StartsAt, &task.EndsAt, &task.Status,
+			&task.SortOrder, &task.AllowedSubmissionTypes, &task.CreatedAt, &task.UpdatedAt,
+			&previous)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, r.notFoundOrTransition(ctx, contestID, taskID)
+	}
+	return &task, previous, err
+}
+
+func (r *Repo) SetIcon(ctx context.Context, contestID, taskID string, iconKey *string) (*Task, *string, error) {
+	var task Task
+	var previous *string
+	err := r.pool.QueryRow(ctx, `
+		WITH old AS (SELECT icon_key FROM event_tasks WHERE contest_id=$1 AND id=$2)
+		UPDATE event_tasks SET icon_key=$3, updated_at=now()
+		WHERE contest_id=$1 AND id=$2 AND status<>'ARCHIVED'
+		RETURNING `+taskCols+`, (SELECT icon_key FROM old)`, contestID, taskID, iconKey).
+		Scan(&task.ID, &task.ContestID, &task.Title, &task.Description, &task.ImageKey, &task.IconKey,
 			&task.Icon, &task.Points, &task.StartsAt, &task.EndsAt, &task.Status,
 			&task.SortOrder, &task.AllowedSubmissionTypes, &task.CreatedAt, &task.UpdatedAt,
 			&previous)
@@ -502,7 +518,7 @@ type rowScanner interface{ Scan(...any) error }
 func scanTask(row rowScanner) (*Task, error) {
 	var task Task
 	err := row.Scan(&task.ID, &task.ContestID, &task.Title, &task.Description,
-		&task.ImageKey, &task.Icon, &task.Points, &task.StartsAt, &task.EndsAt,
+		&task.ImageKey, &task.IconKey, &task.Icon, &task.Points, &task.StartsAt, &task.EndsAt,
 		&task.Status, &task.SortOrder, &task.AllowedSubmissionTypes,
 		&task.CreatedAt, &task.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {

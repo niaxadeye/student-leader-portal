@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ImagePlus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { deleteTaskImage, uploadTaskImage } from '@/entities/event-task/api'
+import { deleteTaskIcon, deleteTaskImage, uploadTaskIcon, uploadTaskImage } from '@/entities/event-task/api'
 import { useCreateTask, useUpdateTask } from '@/entities/event-task/queries'
 import type { EventTask, EventTaskInput, TaskAssetType } from '@/entities/event-task/types'
 import { isoToLocalInput, localInputToIso } from '@/shared/lib/format'
@@ -11,6 +11,7 @@ import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/choice'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
+import { FileUpload, type UploadedFile } from '@/shared/ui/file-upload'
 import { Input, Textarea } from '@/shared/ui/input'
 
 const SUBMISSION_TYPES: { value: TaskAssetType; label: string }[] = [
@@ -43,6 +44,8 @@ export function EventTaskDialog({
   const [iconFile, setIconFile] = useState<File | null>(null)
   const [iconPreview, setIconPreview] = useState<string | null>(null)
   const [iconRemoved, setIconRemoved] = useState(false)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverRemoved, setCoverRemoved] = useState(false)
   const [error, setError] = useState<string>()
   const [imageBusy, setImageBusy] = useState(false)
 
@@ -57,7 +60,9 @@ export function EventTaskDialog({
     setTypes(task?.allowed_submission_types ?? ['IMAGE', 'LINK'])
     setIconFile(null)
     setIconRemoved(false)
-    setIconPreview(task?.image_url ?? null)
+    setIconPreview(task?.icon_url ?? null)
+    setCoverFile(null)
+    setCoverRemoved(false)
     setError(undefined)
   }, [open, task])
 
@@ -126,8 +131,10 @@ export function EventTaskDialog({
     }
     try {
       const saved = task ? await update.mutateAsync(input) : await create.mutateAsync(input)
-      if (iconFile) await uploadTaskImage(contestId, saved.id, iconFile)
-      else if (iconRemoved && task?.image_url) await deleteTaskImage(contestId, saved.id)
+      if (iconFile) await uploadTaskIcon(contestId, saved.id, iconFile)
+      else if (iconRemoved && task?.icon_url) await deleteTaskIcon(contestId, saved.id)
+      if (coverFile) await uploadTaskImage(contestId, saved.id, coverFile)
+      else if (coverRemoved && task?.image_url) await deleteTaskImage(contestId, saved.id)
       await queryClient.invalidateQueries({ queryKey: ['admin', 'event-tasks', contestId] })
       toast.success(task ? 'Задание обновлено' : 'Задание создано')
       onOpenChange(false)
@@ -135,6 +142,10 @@ export function EventTaskDialog({
       setError('Не удалось сохранить задание. Проверьте поля и повторите.')
     }
   }
+
+  const coverFiles: UploadedFile[] = coverFile
+    ? [{ id: 'cover', name: coverFile.name, size: coverFile.size, status: 'READY', progress: 100 }]
+    : []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -271,6 +282,38 @@ export function EventTaskDialog({
                 )
               })}
             </ul>
+          </div>
+          <div>
+            <p className="text-[14px] font-medium text-ink">Обложка</p>
+            <p className="mt-1 text-[13px] text-muted">
+              Широкое изображение карточки задания. JPG, PNG, WEBP или GIF, до 20 МБ.
+            </p>
+            <div className="mt-2">
+              <FileUpload
+                files={coverFiles}
+                multiple={false}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                label="Нажмите, чтобы загрузить обложку"
+                hint="JPG, PNG, WEBP или GIF"
+                onAdd={(list) => {
+                  setCoverFile(list[0] ?? null)
+                  setCoverRemoved(false)
+                }}
+                onRemove={() => setCoverFile(null)}
+              />
+            </div>
+            {task?.image_url && !coverRemoved && !coverFile && (
+              <div className="mt-3 flex items-center gap-3 rounded-[12px] bg-surface-2 p-3">
+                <img
+                  src={task.image_url}
+                  alt="Обложка задания"
+                  className="h-16 w-24 rounded-lg object-cover"
+                />
+                <Button type="button" size="sm" variant="ghost" onClick={() => setCoverRemoved(true)}>
+                  <Trash2 className="h-4 w-4 text-danger" /> Удалить обложку
+                </Button>
+              </div>
+            )}
           </div>
           <div className="mt-1 flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

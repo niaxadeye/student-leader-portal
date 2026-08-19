@@ -101,6 +101,32 @@ func (h *Handler) AdminDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AdminSetImage(w http.ResponseWriter, r *http.Request) {
+	h.setTaskFile(w, r, true)
+}
+
+func (h *Handler) AdminDeleteImage(w http.ResponseWriter, r *http.Request) {
+	task, err := h.svc.DeleteImage(r.Context(), actorFrom(r), chi.URLParam(r, "contestId"), chi.URLParam(r, "taskId"), h.store)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, task, nil)
+}
+
+func (h *Handler) AdminSetIcon(w http.ResponseWriter, r *http.Request) {
+	h.setTaskFile(w, r, false)
+}
+
+func (h *Handler) AdminDeleteIcon(w http.ResponseWriter, r *http.Request) {
+	task, err := h.svc.DeleteIcon(r.Context(), actorFrom(r), chi.URLParam(r, "contestId"), chi.URLParam(r, "taskId"), h.store)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, task, nil)
+}
+
+func (h *Handler) setTaskFile(w http.ResponseWriter, r *http.Request, cover bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, h.maxUploadBytes)
 	if err := r.ParseMultipartForm(h.maxUploadBytes); err != nil {
 		writeError(w, r, ErrValidation)
@@ -115,19 +141,17 @@ func (h *Handler) AdminSetImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	task, err := h.svc.SetImage(r.Context(), actorFrom(r), chi.URLParam(r, "contestId"), chi.URLParam(r, "taskId"), ImageUpload{
+	upload := ImageUpload{
 		OriginalName: header.Filename, ContentType: header.Header.Get("Content-Type"),
 		Size: header.Size, Reader: file, KeySuffix: uuid.NewString(),
-	}, h.store)
-	if err != nil {
-		writeError(w, r, err)
-		return
 	}
-	httpserver.WriteJSON(w, r, http.StatusOK, task, nil)
-}
-
-func (h *Handler) AdminDeleteImage(w http.ResponseWriter, r *http.Request) {
-	task, err := h.svc.DeleteImage(r.Context(), actorFrom(r), chi.URLParam(r, "contestId"), chi.URLParam(r, "taskId"), h.store)
+	contestID, taskID := chi.URLParam(r, "contestId"), chi.URLParam(r, "taskId")
+	var task *Task
+	if cover {
+		task, err = h.svc.SetImage(r.Context(), actorFrom(r), contestID, taskID, upload, h.store)
+	} else {
+		task, err = h.svc.SetIcon(r.Context(), actorFrom(r), contestID, taskID, upload, h.store)
+	}
 	if err != nil {
 		writeError(w, r, err)
 		return
