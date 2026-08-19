@@ -122,10 +122,97 @@ func TestLoginByTelegramMatchesUsernameAndBindsID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
-	if result.Participant.ID != p.ID {
-		t.Fatalf("participant = %q", result.Participant.ID)
+	if result.Session == nil || result.Session.Participant.ID != p.ID {
+		t.Fatalf("participant = %#v", result.Session)
 	}
 	if repo.boundTelegram == nil || *repo.boundTelegram != 42 {
 		t.Fatalf("bind = %v", repo.boundTelegram)
 	}
+}
+
+func TestSocialLoginChoosesSingleActiveEventWithoutSlug(t *testing.T) {
+	t.Parallel()
+	p := activeParticipant()
+	repo := &fakeRepo{
+		event:        activeEvent(),
+		telegramByID: map[int64]*Participant{42: &p},
+	}
+	svc := testService(repo, &fakeAudit{})
+	svc.social = SocialAuth{TelegramBotToken: "123456:ABCDEF", StateSecret: "state-secret"}
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	values := telegramLoginValues("123456:ABCDEF", 42, "durov", now)
+
+	result, err := svc.LoginByTelegramValues(context.Background(), "", values, ClientInfo{})
+	if err != nil || result.Session == nil {
+		t.Fatalf("login = %#v %v", result, err)
+	}
+	if result.Session.Event.Slug != "event-2026" {
+		t.Fatalf("event = %q", result.Session.Event.Slug)
+	}
+}
+
+func TestSocialLoginAsksToChooseWhenSeveralActiveEvents(t *testing.T) {
+	t.Parallel()
+	first := activeParticipant()
+	second := activeParticipant()
+	second.ID = "participant-2"
+	second.ContestID = "contest-2"
+	repo := &fakeRepo{
+		telegramMatches: []ParticipantEventMatch{
+			{Participant: first, Event: *activeEvent()},
+			{Participant: second, Event: EventRef{ID: "contest-2", Slug: "event-b", Name: "B", Status: "ACTIVE"}},
+		},
+	}
+	svc := testService(repo, &fakeAudit{})
+	svc.social = SocialAuth{TelegramBotToken: "123456:ABCDEF", StateSecret: "state-secret"}
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	values := telegramLoginValues("123456:ABCDEF", 42, "durov", now)
+
+	result, err := svc.LoginByTelegramValues(context.Background(), "", values, ClientInfo{})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if result.Session != nil || len(result.Events) != 2 || result.ContinueToken == "" {
+		t.Fatalf("want choose_event, got %#v", result)
+	}
+
+	chosen, err := svc.ContinueSocialLogin(context.Background(), result.ContinueToken, "event-b", ClientInfo{})
+	if err != nil || chosen.Session == nil || chosen.Session.Event.Slug != "event-b" {
+		t.Fatalf("continue = %#v %v", chosen, err)
+	}
+}
+
+func TestSocialLoginPreferredSlugPicksAmongSeveral(t *testing.T) {
+	t.Parallel()
+	first := activeParticipant()
+	second := activeParticipant()
+	second.ID = "participant-2"
+	second.ContestID = "contest-2"
+	repo := &fakeRepo{
+		telegramMatches: []ParticipantEventMatch{
+			{Participant: first, Event: *activeEvent()},
+			{Participant: second, Event: EventRef{ID: "contest-2", Slug: "event-b", Name: "B", Status: "ACTIVE"}},
+		},
+	}
+	svc := testService(repo, &fakeAudit{})
+	svc.social = SocialAuth{TelegramBotToken: "123456:ABCDEF", StateSecret: "state-secret"}
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	values := telegramLoginValues("123456:ABCDEF", 42, "durov", now)
+
+	result, err := svc.LoginByTelegramValues(context.Background(), "event-b", values, ClientInfo{})
+	if err != nil || result.Session == nil || result.Session.Event.Slug != "event-b" {
+		t.Fatalf("preferred = %#v %v", result, err)
+	}
+}
+
+func telegramLoginValues(token string, userID int64, username string, now time.Time) url.Values {
+	values := url.Values{}
+	values.Set("id", strconv.FormatInt(userID, 10))
+	values.Set("username", username)
+	values.Set("auth_date", strconv.FormatInt(now.Unix(), 10))
+	values.Set("hash", telegramLoginHash(token, values))
+	return values
 }

@@ -152,6 +152,19 @@ type SessionResult struct {
 	Event       EventRef
 }
 
+// ParticipantEventMatch — участник в конкретном активном мероприятии.
+type ParticipantEventMatch struct {
+	Participant Participant
+	Event       EventRef
+}
+
+// SocialAuthResult — либо готовая сессия, либо список мероприятий для выбора.
+type SocialAuthResult struct {
+	Session       *SessionResult
+	Events        []PublicEvent
+	ContinueToken string
+}
+
 // Principal — аутентифицированный participant, полученный из отдельной cookie session.
 type Principal struct {
 	SessionID   string

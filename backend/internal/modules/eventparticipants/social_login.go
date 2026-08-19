@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -61,11 +60,7 @@ func (s *Service) TelegramStartURL(eventSlug string, now time.Time) (string, str
 	if !s.social.TelegramEnabled() {
 		return "", "", ErrSocialUnavailable
 	}
-	eventSlug = strings.TrimSpace(eventSlug)
-	if eventSlug == "" {
-		return "", "", ErrValidation
-	}
-	state, err := s.signOAuthState(eventSlug, "telegram", now)
+	state, err := s.signOAuthState(strings.TrimSpace(eventSlug), "telegram", now)
 	if err != nil {
 		return "", "", err
 	}
@@ -83,11 +78,7 @@ func (s *Service) VKStartURL(eventSlug string, now time.Time) (string, string, e
 	if !s.social.VKEnabled() {
 		return "", "", ErrSocialUnavailable
 	}
-	eventSlug = strings.TrimSpace(eventSlug)
-	if eventSlug == "" {
-		return "", "", ErrValidation
-	}
-	state, err := s.signOAuthState(eventSlug, "vk", now)
+	state, err := s.signOAuthState(strings.TrimSpace(eventSlug), "vk", now)
 	if err != nil {
 		return "", "", err
 	}
@@ -107,7 +98,7 @@ func (s *Service) LoginByTelegramValues(
 	eventSlug string,
 	values url.Values,
 	client ClientInfo,
-) (*SessionResult, error) {
+) (*SocialAuthResult, error) {
 	if !s.social.TelegramEnabled() {
 		return nil, ErrSocialUnavailable
 	}
@@ -115,14 +106,14 @@ func (s *Service) LoginByTelegramValues(
 	if err != nil {
 		return nil, err
 	}
-	return s.loginByTelegramIdentity(ctx, eventSlug, identity, client, "telegram")
+	return s.loginByTelegramIdentity(ctx, eventSlug, false, identity, client, "telegram")
 }
 
 func (s *Service) LoginByTelegramWebApp(
 	ctx context.Context,
 	eventSlug, initData string,
 	client ClientInfo,
-) (*SessionResult, error) {
+) (*SocialAuthResult, error) {
 	if !s.social.TelegramEnabled() {
 		return nil, ErrSocialUnavailable
 	}
@@ -130,14 +121,14 @@ func (s *Service) LoginByTelegramWebApp(
 	if err != nil {
 		return nil, err
 	}
-	return s.loginByTelegramIdentity(ctx, eventSlug, identity, client, "telegram_webapp")
+	return s.loginByTelegramIdentity(ctx, eventSlug, false, identity, client, "telegram_webapp")
 }
 
 func (s *Service) LoginByVKAccessToken(
 	ctx context.Context,
 	eventSlug, accessToken string,
 	client ClientInfo,
-) (*SessionResult, error) {
+) (*SocialAuthResult, error) {
 	if !s.social.VKEnabled() {
 		return nil, ErrSocialUnavailable
 	}
@@ -145,14 +136,14 @@ func (s *Service) LoginByVKAccessToken(
 	if err != nil {
 		return nil, err
 	}
-	return s.loginByVKIdentity(ctx, eventSlug, identity, client)
+	return s.loginByVKIdentity(ctx, eventSlug, false, identity, client)
 }
 
 func (s *Service) LoginByVKCallback(
 	ctx context.Context,
 	code, state string,
 	client ClientInfo,
-) (*SessionResult, error) {
+) (*SocialAuthResult, error) {
 	if !s.social.VKEnabled() {
 		return nil, ErrSocialUnavailable
 	}
@@ -164,60 +155,132 @@ func (s *Service) LoginByVKCallback(
 	if err != nil {
 		return nil, err
 	}
-	return s.loginByVKIdentity(ctx, eventSlug, identity, client)
+	return s.loginByVKIdentity(ctx, eventSlug, false, identity, client)
+}
+
+func (s *Service) ContinueSocialLogin(
+	ctx context.Context,
+	token, eventSlug string,
+	client ClientInfo,
+) (*SocialAuthResult, error) {
+	cont, err := s.parseSocialContinue(token, s.now())
+	if err != nil {
+		return nil, err
+	}
+	eventSlug = strings.TrimSpace(eventSlug)
+	switch cont.Provider {
+	case "telegram", "telegram_webapp":
+		return s.loginByTelegramIdentity(ctx, eventSlug, eventSlug != "", telegramIdentity{
+			UserID: cont.UserID, Username: cont.Extra,
+		}, client, cont.Provider)
+	case "vk":
+		return s.loginByVKIdentity(ctx, eventSlug, eventSlug != "", vkIdentity{
+			UserID: cont.UserID, ScreenName: cont.Extra,
+		}, client)
+	default:
+		return nil, ErrInvalidCredentials
+	}
 }
 
 func (s *Service) loginByTelegramIdentity(
 	ctx context.Context,
 	eventSlug string,
+	requirePreferred bool,
 	identity telegramIdentity,
 	client ClientInfo,
 	method string,
-) (*SessionResult, error) {
+) (*SocialAuthResult, error) {
 	if identity.UserID <= 0 {
 		return nil, ErrInvalidCredentials
 	}
-	event, err := s.loginEvent(ctx, eventSlug)
+	matches, err := s.repo.ListActiveByTelegramUserID(ctx, identity.UserID)
 	if err != nil {
 		return nil, err
 	}
-	participant, err := s.repo.FindByTelegramUserID(ctx, event.ID, identity.UserID)
-	if isMissingParticipant(err) && identity.Username != "" {
-		participant, err = s.repo.FindByTelegramUsername(ctx, event.ID, identity.Username)
+	if len(matches) == 0 && identity.Username != "" {
+		matches, err = s.repo.ListActiveByTelegramUsername(ctx, identity.Username)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if err != nil || participant == nil {
-		return nil, ErrInvalidCredentials
-	}
-	_ = s.repo.BindTelegram(ctx, event.ID, participant.ID, identity.UserID, canonicalTelegramURL(identity.Username))
-	return s.issueSession(ctx, event, participant, client, method)
+	return s.resolveSocialMatches(ctx, matches, eventSlug, requirePreferred, client, method, func(match ParticipantEventMatch) error {
+		return s.repo.BindTelegram(ctx, match.Event.ID, match.Participant.ID, identity.UserID, canonicalTelegramURL(identity.Username))
+	}, method, identity.UserID, identity.Username)
 }
 
 func (s *Service) loginByVKIdentity(
 	ctx context.Context,
 	eventSlug string,
+	requirePreferred bool,
 	identity vkIdentity,
 	client ClientInfo,
-) (*SessionResult, error) {
+) (*SocialAuthResult, error) {
 	if identity.UserID <= 0 {
 		return nil, ErrInvalidCredentials
 	}
-	event, err := s.loginEvent(ctx, eventSlug)
+	matches, err := s.repo.ListActiveByVKUserID(ctx, identity.UserID)
 	if err != nil {
 		return nil, err
 	}
-	participant, err := s.repo.FindByVKUserID(ctx, event.ID, identity.UserID)
-	if isMissingParticipant(err) {
-		participant, err = s.repo.FindByVKIdentity(ctx, event.ID, identity.UserID, identity.ScreenName)
+	if len(matches) == 0 {
+		matches, err = s.repo.ListActiveByVKIdentity(ctx, identity.UserID, identity.ScreenName)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if err != nil || participant == nil {
-		return nil, ErrInvalidCredentials
-	}
-	_ = s.repo.BindVK(ctx, event.ID, participant.ID, identity.UserID, canonicalVKURL(identity.UserID, identity.ScreenName))
-	return s.issueSession(ctx, event, participant, client, "vk")
+	return s.resolveSocialMatches(ctx, matches, eventSlug, requirePreferred, client, "vk", func(match ParticipantEventMatch) error {
+		return s.repo.BindVK(ctx, match.Event.ID, match.Participant.ID, identity.UserID, canonicalVKURL(identity.UserID, identity.ScreenName))
+	}, "vk", identity.UserID, identity.ScreenName)
 }
 
-func isMissingParticipant(err error) bool {
-	return errors.Is(err, ErrNotFound) || errors.Is(err, ErrInvalidCredentials)
+func (s *Service) resolveSocialMatches(
+	ctx context.Context,
+	matches []ParticipantEventMatch,
+	preferredSlug string,
+	requirePreferred bool,
+	client ClientInfo,
+	method string,
+	bind func(ParticipantEventMatch) error,
+	provider string,
+	userID int64,
+	extra string,
+) (*SocialAuthResult, error) {
+	if len(matches) == 0 {
+		return nil, ErrInvalidCredentials
+	}
+	preferredSlug = strings.TrimSpace(preferredSlug)
+	var chosen *ParticipantEventMatch
+	if preferredSlug != "" {
+		for i := range matches {
+			if matches[i].Event.Slug == preferredSlug {
+				chosen = &matches[i]
+				break
+			}
+		}
+		if chosen == nil && requirePreferred {
+			return nil, ErrInvalidCredentials
+		}
+	}
+	if chosen == nil && len(matches) == 1 {
+		chosen = &matches[0]
+	}
+	if chosen != nil {
+		_ = bind(*chosen)
+		session, err := s.issueSession(ctx, &chosen.Event, &chosen.Participant, client, method)
+		if err != nil {
+			return nil, err
+		}
+		return &SocialAuthResult{Session: session}, nil
+	}
+	token, err := s.signSocialContinue(provider, userID, extra, s.now())
+	if err != nil {
+		return nil, err
+	}
+	events := make([]PublicEvent, 0, len(matches))
+	for _, match := range matches {
+		events = append(events, PublicEvent{Slug: match.Event.Slug, Name: match.Event.Name})
+	}
+	return &SocialAuthResult{Events: events, ContinueToken: token}, nil
 }
 
 func canonicalTelegramURL(username string) *string {

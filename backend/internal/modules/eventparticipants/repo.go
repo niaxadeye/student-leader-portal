@@ -223,6 +223,74 @@ func (r *Repo) ListActiveEvents(ctx context.Context) ([]EventRef, error) {
 	return list, rows.Err()
 }
 
+func (r *Repo) ListActiveByTelegramUserID(ctx context.Context, userID int64) ([]ParticipantEventMatch, error) {
+	return r.listActiveMatches(ctx, `
+		SELECT `+participantSelect+`, `+eventSelect+`
+		FROM `+activeMatchFrom+`
+		WHERE `+activeMatchWhere+` AND p.telegram_user_id=$1
+		ORDER BY c.name, c.slug`, userID)
+}
+
+func (r *Repo) ListActiveByTelegramUsername(ctx context.Context, username string) ([]ParticipantEventMatch, error) {
+	username = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(username), "@"))
+	if username == "" {
+		return nil, nil
+	}
+	return r.listActiveMatches(ctx, `
+		SELECT `+participantSelect+`, `+eventSelect+`
+		FROM `+activeMatchFrom+`
+		WHERE `+activeMatchWhere+` AND p.telegram_url IS NOT NULL
+		  AND lower(regexp_replace(p.telegram_url, '^https://t\\.me/', '')) = $1
+		ORDER BY c.name, c.slug`, username)
+}
+
+func (r *Repo) ListActiveByVKUserID(ctx context.Context, userID int64) ([]ParticipantEventMatch, error) {
+	return r.listActiveMatches(ctx, `
+		SELECT `+participantSelect+`, `+eventSelect+`
+		FROM `+activeMatchFrom+`
+		WHERE `+activeMatchWhere+` AND p.vk_user_id=$1
+		ORDER BY c.name, c.slug`, userID)
+}
+
+func (r *Repo) ListActiveByVKIdentity(ctx context.Context, userID int64, screenName string) ([]ParticipantEventMatch, error) {
+	screenName = strings.ToLower(strings.TrimSpace(screenName))
+	candidates := []string{"https://vk.com/id" + strconv.FormatInt(userID, 10), "https://vk.ru/id" + strconv.FormatInt(userID, 10)}
+	if screenName != "" {
+		candidates = append(candidates, "https://vk.com/"+screenName, "https://vk.ru/"+screenName)
+	}
+	return r.listActiveMatches(ctx, `
+		SELECT `+participantSelect+`, `+eventSelect+`
+		FROM `+activeMatchFrom+`
+		WHERE `+activeMatchWhere+` AND p.vk_url IS NOT NULL AND lower(p.vk_url) = ANY($1::text[])
+		ORDER BY c.name, c.slug`, candidates)
+}
+
+const eventSelect = `c.id, c.slug, c.name, c.status, c.timezone`
+
+const activeMatchFrom = participantFrom + `
+		JOIN contests c ON c.id=p.contest_id`
+
+const activeMatchWhere = `p.status='ACTIVE' AND c.status='ACTIVE'`
+
+func (r *Repo) listActiveMatches(ctx context.Context, query string, args ...any) ([]ParticipantEventMatch, error) {
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]ParticipantEventMatch, 0)
+	for rows.Next() {
+		var match ParticipantEventMatch
+		dest := append(participantScanDest(&match.Participant),
+			&match.Event.ID, &match.Event.Slug, &match.Event.Name, &match.Event.Status, &match.Event.Timezone)
+		if err := rows.Scan(dest...); err != nil {
+			return nil, err
+		}
+		list = append(list, match)
+	}
+	return list, rows.Err()
+}
+
 func (r *Repo) FindByTelegramUserID(ctx context.Context, contestID string, userID int64) (*Participant, error) {
 	return scanOneParticipant(r.pool.QueryRow(ctx, `
 		SELECT `+participantSelect+` FROM `+participantFrom+`

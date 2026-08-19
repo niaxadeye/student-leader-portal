@@ -345,6 +345,7 @@ func (h *Handler) writeLoginResult(w http.ResponseWriter, r *http.Request, resul
 		Expires: result.ExpiresAt, HttpOnly: true, Secure: h.cookie.Secure, SameSite: h.cookie.SameSite,
 	})
 	httpserver.WriteJSON(w, r, http.StatusOK, map[string]any{
+		"status":      "authenticated",
 		"participant": participantJSON(&result.Participant),
 		"event": map[string]any{"id": result.Event.ID, "slug": result.Event.Slug, "name": result.Event.Name,
 			"timezone": result.Event.Timezone},

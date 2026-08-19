@@ -31,6 +31,8 @@ type fakeRepo struct {
 	telegramByID            map[int64]*Participant
 	telegramByUsername      map[string]*Participant
 	vkByID                  map[int64]*Participant
+	telegramMatches         []ParticipantEventMatch
+	vkMatches               []ParticipantEventMatch
 	boundTelegram           *int64
 }
 
@@ -119,6 +121,45 @@ func (f *fakeRepo) FindByTelegramUsername(_ context.Context, _ string, username 
 }
 func (f *fakeRepo) FindByVKIdentity(context.Context, string, int64, string) (*Participant, error) {
 	return nil, ErrNotFound
+}
+func (f *fakeRepo) ListActiveByTelegramUserID(_ context.Context, userID int64) ([]ParticipantEventMatch, error) {
+	if f.telegramMatches != nil {
+		return f.telegramMatches, nil
+	}
+	if f.telegramByID != nil {
+		if p := f.telegramByID[userID]; p != nil && f.event != nil {
+			return []ParticipantEventMatch{{Participant: *p, Event: *f.event}}, nil
+		}
+	}
+	return nil, nil
+}
+func (f *fakeRepo) ListActiveByTelegramUsername(_ context.Context, username string) ([]ParticipantEventMatch, error) {
+	if f.telegramMatches != nil {
+		return f.telegramMatches, nil
+	}
+	if f.telegramByUsername != nil {
+		if p := f.telegramByUsername[strings.ToLower(username)]; p != nil && f.event != nil {
+			return []ParticipantEventMatch{{Participant: *p, Event: *f.event}}, nil
+		}
+	}
+	return nil, nil
+}
+func (f *fakeRepo) ListActiveByVKUserID(_ context.Context, userID int64) ([]ParticipantEventMatch, error) {
+	if f.vkMatches != nil {
+		return f.vkMatches, nil
+	}
+	if f.vkByID != nil {
+		if p := f.vkByID[userID]; p != nil && f.event != nil {
+			return []ParticipantEventMatch{{Participant: *p, Event: *f.event}}, nil
+		}
+	}
+	return nil, nil
+}
+func (f *fakeRepo) ListActiveByVKIdentity(context.Context, int64, string) ([]ParticipantEventMatch, error) {
+	if f.vkMatches != nil {
+		return f.vkMatches, nil
+	}
+	return nil, nil
 }
 func (f *fakeRepo) BindTelegram(_ context.Context, _, _ string, userID int64, _ *string) error {
 	f.boundTelegram = &userID

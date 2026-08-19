@@ -4,7 +4,9 @@ import { ChevronDown, IdCard, ScanLine, Send, UserRound } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
+  continueSocialLogin,
   fetchLoginOptions,
+  isAuthenticatedSession,
   loginParticipantByName,
   loginParticipantBySKS,
   loginParticipantByTelegramWebApp,
@@ -12,6 +14,8 @@ import {
   loginParticipantByVKToken,
   socialAuthStartURL,
   type LoginOptions,
+  type PublicEvent,
+  type SocialLoginResult,
 } from '@/entities/event-participant/api'
 import { useParticipantAuth } from '@/entities/event-participant/auth-context'
 import type { ParticipantSession } from '@/entities/event-participant/types'
@@ -23,7 +27,10 @@ import {
 } from '@/features/participant-auth/login-schema'
 import { BackButton } from '@/pages/auth/login-back-button'
 import { ApiRequestError } from '@/shared/api/client'
-import { telegramWebApp } from '@/shared/lib/telegram-webapp'
+import {
+  maybeTelegramMiniApp,
+  waitForTelegramWebApp,
+} from '@/shared/lib/telegram-webapp'
 import { exchangeVkOneTapCode, renderVkOneTap } from '@/shared/lib/vkid'
 import { Button } from '@/shared/ui/button'
 import { Field } from '@/shared/ui/field'
@@ -74,13 +81,19 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
   const [authError, setAuthError] = useState(socialErrorFromQuery(params.get('error')))
   const [backupOpen, setBackupOpen] = useState(false)
   const [backupMethod, setBackupMethod] = useState<BackupMethod>('name')
-  const [webAppBusy, setWebAppBusy] = useState(false)
-  const attempted = useRef('')
-  const eventSlug = params.get('event')?.trim() ?? ''
+  const [webAppBusy, setWebAppBusy] = useState(maybeTelegramMiniApp())
+  const [continueToken, setContinueToken] = useState(params.get('continue')?.trim() ?? '')
+  const [matchedEvents, setMatchedEvents] = useState<PublicEvent[]>([])
+  const miniAppAttempted = useRef(false)
+  const continueAttempted = useRef(false)
+  const preferredSlug = params.get('event')?.trim() ?? ''
+  const inMiniApp = maybeTelegramMiniApp()
 
-  const eventName = useMemo(
-    () => options?.events.find((event) => event.slug === eventSlug)?.name ?? eventSlug,
-    [eventSlug, options],
+  const backupEvents = options?.events ?? []
+  const backupSlug = preferredSlug || (backupEvents.length === 1 ? backupEvents[0].slug : '')
+  const backupEventName = useMemo(
+    () => backupEvents.find((event) => event.slug === backupSlug)?.name ?? backupSlug,
+    [backupEvents, backupSlug],
   )
 
   useEffect(() => {
@@ -90,38 +103,72 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
   }, [])
 
   useEffect(() => {
-    const app = telegramWebApp()
-    if (!app) return
-    app.ready()
-    app.expand()
-    const startEvent = app.initDataUnsafe?.start_param?.trim()
-    if (startEvent && startEvent !== eventSlug) {
+    if (session?.event.slug) {
+      navigate(`/event/${encodeURIComponent(session.event.slug)}/me`, { replace: true })
+    }
+  }, [navigate, session])
+
+  useEffect(() => {
+    const token = params.get('continue')?.trim()
+    if (!token || status === 'loading' || continueAttempted.current) return
+    continueAttempted.current = true
+    void completeSocial(() => continueSocialLogin(token)).then(() => {
       const next = new URLSearchParams(params)
-      next.set('event', startEvent)
+      next.delete('continue')
       setParams(next, { replace: true })
-    }
-  }, [eventSlug, params, setParams])
-
-  useEffect(() => {
-    if (session?.event.slug && session.event.slug === eventSlug) {
-      navigate(`/event/${encodeURIComponent(eventSlug)}/me`, { replace: true })
-    }
-  }, [eventSlug, navigate, session])
-
-  useEffect(() => {
-    const app = telegramWebApp()
-    if (!app || !eventSlug || status === 'loading') return
-    if (attempted.current === eventSlug) return
-    attempted.current = eventSlug
-    setWebAppBusy(true)
-    void completeLogin(() => loginParticipantByTelegramWebApp(eventSlug, app.initData)).finally(() => {
-      setWebAppBusy(false)
     })
-    // Mini App: один автологин на выбранное мероприятие.
+    // OAuth вернул несколько мероприятий — добираем список.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventSlug, status])
+  }, [status])
 
-  async function completeLogin(request: () => Promise<ParticipantSession>) {
+  useEffect(() => {
+    if (status === 'loading' || miniAppAttempted.current) return
+    if (!maybeTelegramMiniApp()) {
+      miniAppAttempted.current = true
+      setWebAppBusy(false)
+      return
+    }
+    miniAppAttempted.current = true
+    void (async () => {
+      const app = await waitForTelegramWebApp()
+      if (!app) {
+        setWebAppBusy(false)
+        return
+      }
+      app.ready()
+      app.expand()
+      const startEvent = app.initDataUnsafe?.start_param?.trim() || preferredSlug
+      setWebAppBusy(true)
+      await completeSocial(() => loginParticipantByTelegramWebApp(app.initData, startEvent || undefined))
+      setWebAppBusy(false)
+    })()
+    // Mini App: один автологин на запуск.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
+
+  function applySocialResult(result: SocialLoginResult) {
+    if (isAuthenticatedSession(result)) {
+      acceptSession(result)
+      navigate(`/event/${encodeURIComponent(result.event.slug)}/me`, { replace: true })
+      return
+    }
+    if (result.status === 'choose_event') {
+      setContinueToken(result.continue_token)
+      setMatchedEvents(result.events ?? [])
+      return
+    }
+  }
+
+  async function completeSocial(request: () => Promise<SocialLoginResult>) {
+    setAuthError('')
+    try {
+      applySocialResult(await request())
+    } catch (error) {
+      setAuthError(loginErrorMessage(error))
+    }
+  }
+
+  async function completeBackup(request: () => Promise<ParticipantSession>) {
     setAuthError('')
     try {
       const next = await request()
@@ -132,7 +179,12 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
     }
   }
 
-  function chooseEvent(slug: string) {
+  function chooseMatchedEvent(slug: string) {
+    if (!continueToken) return
+    void completeSocial(() => continueSocialLogin(continueToken, slug))
+  }
+
+  function chooseBackupEvent(slug: string) {
     const next = new URLSearchParams(params)
     next.set('event', slug)
     next.delete('error')
@@ -140,48 +192,50 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
     setAuthError('')
   }
 
-  const needEvent = !eventSlug
   const telegramOn = options?.telegram.enabled ?? false
   const vkOn = options?.vk.enabled ?? false
+  const choosing = matchedEvents.length > 0 && Boolean(continueToken)
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-subtle">
-      {needEvent ? (
-        <EventPicker events={options?.events ?? []} loading={!options} onPick={chooseEvent} />
+      {webAppBusy ? (
+        <p className="text-[14px] text-muted">Входим через Telegram Mini App…</p>
+      ) : choosing ? (
+        <EventPicker
+          title="Выберите мероприятие"
+          events={matchedEvents}
+          loading={false}
+          onPick={chooseMatchedEvent}
+        />
       ) : (
-        <>
-          <p className="text-[13px] font-medium text-brand">Мероприятие · {eventName || eventSlug}</p>
-          {webAppBusy ? (
-            <p className="text-[14px] text-muted">Входим через Telegram Mini App…</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <VkOneTapButton
-                enabled={vkOn}
-                eventSlug={eventSlug}
-                appId={options?.vk.app_id}
-                redirectUrl={options?.vk.redirect_url}
-                onToken={(token) => completeLogin(() => loginParticipantByVKToken(eventSlug, token))}
-                onError={() => setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')}
-              />
-              <Button
-                type="button"
-                className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
-                disabled={!telegramOn}
-                onClick={() => {
-                  window.location.href = socialAuthStartURL(eventSlug, 'telegram')
-                }}
-              >
-                <Send className="h-4 w-4" aria-hidden />
-                Войти через Telegram
-              </Button>
-              {!vkOn && !telegramOn && (
-                <p className="text-[13px] text-muted">
-                  Социальный вход ещё не подключён. Используйте резервный способ ниже.
-                </p>
-              )}
-            </div>
+        <div className="flex flex-col gap-3">
+          <VkOneTapButton
+            enabled={vkOn}
+            eventSlug={preferredSlug}
+            appId={options?.vk.app_id}
+            redirectUrl={options?.vk.redirect_url}
+            onToken={(token) => completeSocial(() => loginParticipantByVKToken(token, preferredSlug || undefined))}
+            onError={() => setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')}
+          />
+          {!inMiniApp && (
+            <Button
+              type="button"
+              className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
+              disabled={!telegramOn}
+              onClick={() => {
+                window.location.href = socialAuthStartURL('telegram', preferredSlug || undefined)
+              }}
+            >
+              <Send className="h-4 w-4" aria-hidden />
+              Войти через Telegram
+            </Button>
           )}
-        </>
+          {!vkOn && !telegramOn && (
+            <p className="text-[13px] text-muted">
+              Социальный вход ещё не подключён. Используйте резервный способ ниже.
+            </p>
+          )}
+        </div>
       )}
 
       {authError && (
@@ -190,69 +244,78 @@ export function ParticipantSignIn({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      <div className="border-t border-border pt-3">
-        <button
-          type="button"
-          onClick={() => setBackupOpen((open) => !open)}
-          className="flex w-full items-center justify-between text-[13px] font-medium text-muted hover:text-ink"
-        >
-          Резервный вход
-          <ChevronDown className={`h-4 w-4 transition-transform ${backupOpen ? 'rotate-180' : ''}`} />
-        </button>
-        {backupOpen && (
-          <div className="mt-4 flex flex-col gap-4">
-            {!eventSlug && (
-              <p className="text-[13px] text-muted">Сначала выберите мероприятие.</p>
-            )}
-            {eventSlug && (
-              <>
-                <div className="grid grid-cols-3 gap-1 rounded-[12px] bg-surface-2 p-1">
-                  {backupMethods.map(({ id, label, icon: Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        setBackupMethod(id)
-                        setAuthError('')
-                      }}
-                      className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-[9px] px-1 text-[11px] font-medium sm:text-[12px] ${
-                        backupMethod === id ? 'bg-surface text-brand shadow-micro' : 'text-muted'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" aria-hidden />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {backupMethod === 'name' && (
-                  <NameLoginForm
-                    error=""
-                    onSubmit={(values) => completeLogin(() => loginParticipantByName(eventSlug, values))}
-                  />
-                )}
-                {backupMethod === 'union' && (
-                  <IdentifierLoginForm
-                    method="union"
-                    error=""
-                    onSubmit={(values) =>
-                      completeLogin(() => loginParticipantByUnionCard(eventSlug, values))
-                    }
-                  />
-                )}
-                {backupMethod === 'sks' && (
-                  <IdentifierLoginForm
-                    method="sks"
-                    error=""
-                    onSubmit={(values) => completeLogin(() => loginParticipantBySKS(eventSlug, values))}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {!choosing && !webAppBusy && (
+        <div className="border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setBackupOpen((open) => !open)}
+            className="flex w-full items-center justify-between text-[13px] font-medium text-muted hover:text-ink"
+          >
+            Резервный вход
+            <ChevronDown className={`h-4 w-4 transition-transform ${backupOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {backupOpen && (
+            <div className="mt-4 flex flex-col gap-4">
+              {!backupSlug ? (
+                <EventPicker
+                  title="Сначала выберите мероприятие"
+                  events={backupEvents}
+                  loading={!options}
+                  onPick={chooseBackupEvent}
+                />
+              ) : (
+                <>
+                  {backupEvents.length > 1 && (
+                    <p className="text-[13px] font-medium text-brand">Мероприятие · {backupEventName}</p>
+                  )}
+                  <div className="grid grid-cols-3 gap-1 rounded-[12px] bg-surface-2 p-1">
+                    {backupMethods.map(({ id, label, icon: Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          setBackupMethod(id)
+                          setAuthError('')
+                        }}
+                        className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-[9px] px-1 text-[11px] font-medium sm:text-[12px] ${
+                          backupMethod === id ? 'bg-surface text-brand shadow-micro' : 'text-muted'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {backupMethod === 'name' && (
+                    <NameLoginForm
+                      error=""
+                      onSubmit={(values) => completeBackup(() => loginParticipantByName(backupSlug, values))}
+                    />
+                  )}
+                  {backupMethod === 'union' && (
+                    <IdentifierLoginForm
+                      method="union"
+                      error=""
+                      onSubmit={(values) =>
+                        completeBackup(() => loginParticipantByUnionCard(backupSlug, values))
+                      }
+                    />
+                  )}
+                  {backupMethod === 'sks' && (
+                    <IdentifierLoginForm
+                      method="sks"
+                      error=""
+                      onSubmit={(values) => completeBackup(() => loginParticipantBySKS(backupSlug, values))}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-      <BackButton onClick={onBack} />
+      {!inMiniApp && <BackButton onClick={onBack} />}
     </div>
   )
 }
@@ -266,7 +329,7 @@ function VkOneTapButton({
   onError,
 }: {
   enabled: boolean
-  eventSlug: string
+  eventSlug?: string
   appId?: string
   redirectUrl?: string
   onToken: (accessToken: string) => void
@@ -328,7 +391,7 @@ function VkOneTapButton({
           type="button"
           className="w-full bg-[#0077FF] hover:bg-[#0066dd]"
           onClick={() => {
-            window.location.href = socialAuthStartURL(eventSlug, 'vk')
+            window.location.href = socialAuthStartURL('vk', eventSlug)
           }}
         >
           Войти через VK
@@ -339,11 +402,13 @@ function VkOneTapButton({
 }
 
 function EventPicker({
+  title,
   events,
   loading,
   onPick,
 }: {
-  events: Array<{ slug: string; name: string }>
+  title: string
+  events: PublicEvent[]
   loading: boolean
   onPick: (slug: string) => void
 }) {
@@ -355,7 +420,7 @@ function EventPicker({
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[14px] font-medium text-ink">Выберите мероприятие</p>
+      <p className="text-[14px] font-medium text-ink">{title}</p>
       {events.map((event) => (
         <button
           key={event.slug}
@@ -364,7 +429,6 @@ function EventPicker({
           className="rounded-[12px] border border-border px-3.5 py-3 text-left hover:border-brand/40 hover:bg-brand-subtle/40"
         >
           <span className="block font-medium text-ink">{event.name}</span>
-          <span className="mt-0.5 block text-[12px] text-muted">{event.slug}</span>
         </button>
       ))}
     </div>

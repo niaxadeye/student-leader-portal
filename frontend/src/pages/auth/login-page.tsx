@@ -14,7 +14,7 @@ import { loginSchema, type LoginValues } from '@/features/auth/login-schema'
 import { FullscreenLoader } from '@/app/guards'
 import { BackButton } from '@/pages/auth/login-back-button'
 import { ParticipantSignIn } from '@/pages/auth/participant-sign-in'
-import { telegramWebApp } from '@/shared/lib/telegram-webapp'
+import { telegramWebApp, maybeTelegramMiniApp, waitForTelegramWebApp, ensureTelegramWebAppScript } from '@/shared/lib/telegram-webapp'
 
 export type LoginAudience = 'admin' | 'contestant' | 'participant'
 
@@ -58,8 +58,9 @@ export function LoginPage() {
   const [params, setParams] = useSearchParams()
   const { status, user, setUser } = useAuth()
   const [audience, setAudienceState] = useState<LoginAudience | null>(
-    parseAudience(params.get('as')) ?? (telegramWebApp() ? 'participant' : null),
+    parseAudience(params.get('as')) ?? (telegramWebApp() || maybeTelegramMiniApp() ? 'participant' : null),
   )
+  const [miniAppReady, setMiniAppReady] = useState(() => Boolean(telegramWebApp()))
 
   function setAudience(next: LoginAudience | null) {
     setAudienceState(next)
@@ -70,9 +71,18 @@ export function LoginPage() {
   }
 
   useEffect(() => {
-    if (telegramWebApp() && audience !== 'participant') {
-      setAudience('participant')
+    if (maybeTelegramMiniApp()) ensureTelegramWebAppScript()
+    if (telegramWebApp()) {
+      setMiniAppReady(true)
+      if (audience !== 'participant') setAudience('participant')
+      return
     }
+    if (!maybeTelegramMiniApp()) return
+    void waitForTelegramWebApp().then((app) => {
+      if (!app) return
+      setMiniAppReady(true)
+      setAudience('participant')
+    })
     // Mini App always enters as a participant.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -85,7 +95,7 @@ export function LoginPage() {
     }
   }, [audience, navigate, status, user])
 
-  if (status === 'loading') return <FullscreenLoader />
+  if (status === 'loading' && !miniAppReady && !maybeTelegramMiniApp()) return <FullscreenLoader />
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-2 px-4 py-8">

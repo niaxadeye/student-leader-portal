@@ -32,6 +32,10 @@ type Repository interface {
 	FindByVKUserID(ctx context.Context, contestID string, userID int64) (*Participant, error)
 	FindByTelegramUsername(ctx context.Context, contestID, username string) (*Participant, error)
 	FindByVKIdentity(ctx context.Context, contestID string, userID int64, screenName string) (*Participant, error)
+	ListActiveByTelegramUserID(ctx context.Context, userID int64) ([]ParticipantEventMatch, error)
+	ListActiveByTelegramUsername(ctx context.Context, username string) ([]ParticipantEventMatch, error)
+	ListActiveByVKUserID(ctx context.Context, userID int64) ([]ParticipantEventMatch, error)
+	ListActiveByVKIdentity(ctx context.Context, userID int64, screenName string) ([]ParticipantEventMatch, error)
 	BindTelegram(ctx context.Context, contestID, participantID string, userID int64, profileURL *string) error
 	BindVK(ctx context.Context, contestID, participantID string, userID int64, profileURL *string) error
 	CreateSession(ctx context.Context, contestID, participantID, tokenHash, userAgent, ipHash string, expiresAt time.Time) (string, error)

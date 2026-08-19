@@ -62,7 +62,7 @@ func (h *Handler) TelegramCallback(w http.ResponseWriter, r *http.Request) {
 		h.redirectSocialError(w, r, slug, err)
 		return
 	}
-	h.finishSocialRedirect(w, r, result)
+	h.finishSocialOutcome(w, r, result)
 }
 
 func (h *Handler) VKCallback(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func (h *Handler) VKCallback(w http.ResponseWriter, r *http.Request) {
 		h.redirectSocialError(w, r, slug, err)
 		return
 	}
-	h.finishSocialRedirect(w, r, result)
+	h.finishSocialOutcome(w, r, result)
 }
 
 type telegramLoginRequest struct {
@@ -126,11 +126,12 @@ func (h *Handler) LoginByTelegram(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	h.writeLoginResult(w, r, result)
+	h.writeSocialResult(w, r, result)
 }
 
 type telegramWebAppRequest struct {
-	InitData string `json:"init_data"`
+	InitData  string `json:"init_data"`
+	EventSlug string `json:"event_slug"`
 }
 
 func (h *Handler) LoginByTelegramWebApp(w http.ResponseWriter, r *http.Request) {
@@ -144,16 +145,21 @@ func (h *Handler) LoginByTelegramWebApp(w http.ResponseWriter, r *http.Request) 
 		writeError(w, r, ErrValidation)
 		return
 	}
-	result, err := h.svc.LoginByTelegramWebApp(r.Context(), chi.URLParam(r, "eventSlug"), req.InitData, client)
+	slug := strings.TrimSpace(req.EventSlug)
+	if slug == "" {
+		slug = chi.URLParam(r, "eventSlug")
+	}
+	result, err := h.svc.LoginByTelegramWebApp(r.Context(), slug, req.InitData, client)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	h.writeLoginResult(w, r, result)
+	h.writeSocialResult(w, r, result)
 }
 
 type vkTokenRequest struct {
 	AccessToken string `json:"access_token"`
+	EventSlug   string `json:"event_slug"`
 }
 
 func (h *Handler) LoginByVKToken(w http.ResponseWriter, r *http.Request) {
@@ -167,12 +173,74 @@ func (h *Handler) LoginByVKToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, ErrValidation)
 		return
 	}
-	result, err := h.svc.LoginByVKAccessToken(r.Context(), chi.URLParam(r, "eventSlug"), req.AccessToken, client)
+	slug := strings.TrimSpace(req.EventSlug)
+	if slug == "" {
+		slug = chi.URLParam(r, "eventSlug")
+	}
+	result, err := h.svc.LoginByVKAccessToken(r.Context(), slug, req.AccessToken, client)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	h.writeLoginResult(w, r, result)
+	h.writeSocialResult(w, r, result)
+}
+
+type continueSocialRequest struct {
+	ContinueToken string `json:"continue_token"`
+	EventSlug     string `json:"event_slug"`
+}
+
+func (h *Handler) ContinueSocialLogin(w http.ResponseWriter, r *http.Request) {
+	client := requestClientInfo(r)
+	if !h.allowLogin(r, client) {
+		writeError(w, r, ErrRateLimited)
+		return
+	}
+	var req continueSocialRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, r, ErrValidation)
+		return
+	}
+	result, err := h.svc.ContinueSocialLogin(r.Context(), req.ContinueToken, req.EventSlug, client)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	h.writeSocialResult(w, r, result)
+}
+
+func (h *Handler) writeSocialResult(w http.ResponseWriter, r *http.Request, result *SocialAuthResult) {
+	if result == nil {
+		writeError(w, r, ErrInvalidCredentials)
+		return
+	}
+	if result.Session != nil {
+		h.writeLoginResult(w, r, result.Session)
+		return
+	}
+	events := result.Events
+	if events == nil {
+		events = []PublicEvent{}
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, map[string]any{
+		"status":         "choose_event",
+		"events":         events,
+		"continue_token": result.ContinueToken,
+	}, nil)
+}
+
+func (h *Handler) finishSocialOutcome(w http.ResponseWriter, r *http.Request, result *SocialAuthResult) {
+	if result != nil && result.Session != nil {
+		h.finishSocialRedirect(w, r, result.Session)
+		return
+	}
+	h.clearOAuthCookie(w)
+	query := url.Values{}
+	query.Set("as", "participant")
+	if result != nil && result.ContinueToken != "" {
+		query.Set("continue", result.ContinueToken)
+	}
+	http.Redirect(w, r, h.publicURL("/login?"+query.Encode()), http.StatusFound)
 }
 
 func (h *Handler) finishSocialRedirect(w http.ResponseWriter, r *http.Request, result *SessionResult) {

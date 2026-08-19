@@ -51,9 +51,62 @@ export function fetchLoginOptions(): Promise<LoginOptions> {
   return participantApiRequest('/auth/login-options')
 }
 
-export function socialAuthStartURL(eventSlug: string, provider: 'telegram' | 'vk'): string {
+export function socialAuthStartURL(provider: 'telegram' | 'vk', eventSlug?: string): string {
   const base = API_BASE_URL.replace(/\/$/, '')
-  return `${base}/events/${encodeURIComponent(eventSlug)}/participant-auth/${provider}/start`
+  const slug = eventSlug?.trim()
+  if (slug) {
+    return `${base}/events/${encodeURIComponent(slug)}/participant-auth/${provider}/start`
+  }
+  return `${base}/participant-auth/${provider}/start`
+}
+
+function socialAuthPath(method: string): string {
+  return `/participant-auth/${method}`
+}
+
+export interface PublicEvent {
+  slug: string
+  name: string
+}
+
+export type SocialLoginResult =
+  | (ParticipantSession & { status?: 'authenticated' })
+  | { status: 'choose_event'; events: PublicEvent[]; continue_token: string }
+
+export function isAuthenticatedSession(
+  result: SocialLoginResult,
+): result is ParticipantSession & { status?: 'authenticated' } {
+  return 'participant' in result && 'event' in result && Boolean(result.event?.slug)
+}
+
+export function loginParticipantByTelegramWebApp(
+  initData: string,
+  eventSlug?: string,
+): Promise<SocialLoginResult> {
+  return participantApiRequest(socialAuthPath('telegram/webapp'), {
+    method: 'POST',
+    body: { init_data: initData, event_slug: eventSlug || undefined },
+  })
+}
+
+export function loginParticipantByVKToken(
+  accessToken: string,
+  eventSlug?: string,
+): Promise<SocialLoginResult> {
+  return participantApiRequest(socialAuthPath('vk'), {
+    method: 'POST',
+    body: { access_token: accessToken, event_slug: eventSlug || undefined },
+  })
+}
+
+export function continueSocialLogin(
+  continueToken: string,
+  eventSlug?: string,
+): Promise<SocialLoginResult> {
+  return participantApiRequest(socialAuthPath('continue'), {
+    method: 'POST',
+    body: { continue_token: continueToken, event_slug: eventSlug || undefined },
+  })
 }
 
 function authPath(eventSlug: string, method: string): string {
@@ -79,26 +132,6 @@ export function loginParticipantBySKS(
   input: IdentifierLoginInput,
 ): Promise<ParticipantSession> {
   return participantApiRequest(authPath(eventSlug, 'sks'), { method: 'POST', body: input })
-}
-
-export function loginParticipantByTelegramWebApp(
-  eventSlug: string,
-  initData: string,
-): Promise<ParticipantSession> {
-  return participantApiRequest(authPath(eventSlug, 'telegram/webapp'), {
-    method: 'POST',
-    body: { init_data: initData },
-  })
-}
-
-export function loginParticipantByVKToken(
-  eventSlug: string,
-  accessToken: string,
-): Promise<ParticipantSession> {
-  return participantApiRequest(authPath(eventSlug, 'vk'), {
-    method: 'POST',
-    body: { access_token: accessToken },
-  })
 }
 
 export function fetchParticipantMe(): Promise<ParticipantSession> {

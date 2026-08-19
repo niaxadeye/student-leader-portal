@@ -49,7 +49,7 @@ func TestLoginByVKAccessToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
-	if result.Participant.ID != p.ID {
-		t.Fatalf("participant = %q", result.Participant.ID)
+	if result.Session == nil || result.Session.Participant.ID != p.ID {
+		t.Fatalf("participant = %#v", result.Session)
 	}
 }
