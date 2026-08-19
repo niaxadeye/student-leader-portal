@@ -1,4 +1,8 @@
-import { maybeTelegramMiniApp, telegramLaunchParams } from '@/shared/lib/telegram-webapp'
+import {
+  maybeTelegramMiniApp,
+  telegramLaunchParams,
+  telegramLaunchParamsAtLoad,
+} from '@/shared/lib/telegram-webapp'
 
 /**
  * Временная панель для разбора запуска Mini App: показывает, что именно
@@ -14,7 +18,8 @@ export function MiniAppDebug({ probe }: { probe: string }) {
   const rows: Array<[string, string]> = [
     ['SDK window.Telegram.WebApp', app ? 'есть' : 'нет'],
     ['TelegramWebviewProxy', window.TelegramWebviewProxy ? 'есть' : 'нет'],
-    ['параметры запуска (#tgWebApp…)', telegramLaunchParams() ? 'есть' : 'нет'],
+    ['#tgWebApp при загрузке', telegramLaunchParamsAtLoad() ? 'есть' : 'нет'],
+    ['#tgWebApp сейчас', telegramLaunchParams() ? 'есть' : 'нет'],
     ['initData', app?.initData ? `${app.initData.length} символов` : 'пусто'],
     ['user.id', user?.id ? String(user.id) : '—'],
     ['username', user?.username ? `@${user.username}` : '—'],

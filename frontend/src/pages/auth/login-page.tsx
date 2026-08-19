@@ -15,7 +15,7 @@ import { FullscreenLoader } from '@/app/guards'
 import { BackButton } from '@/pages/auth/login-back-button'
 import { MiniAppDebug } from '@/pages/auth/mini-app-debug'
 import { ParticipantSignIn } from '@/pages/auth/participant-sign-in'
-import { telegramWebApp, maybeTelegramMiniApp, waitForTelegramWebApp, ensureTelegramWebAppScript } from '@/shared/lib/telegram-webapp'
+import { telegramWebApp, maybeTelegramMiniApp, waitForTelegramWebApp } from '@/shared/lib/telegram-webapp'
 
 export type LoginAudience = 'admin' | 'contestant' | 'participant'
 
@@ -75,7 +75,6 @@ export function LoginPage() {
 
   useEffect(() => {
     if (miniApp !== 'probing') return
-    ensureTelegramWebAppScript()
     void waitForTelegramWebApp().then((app) => setMiniApp(app ? 'yes' : 'no'))
   }, [miniApp])
 

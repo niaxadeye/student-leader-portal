@@ -30,7 +30,12 @@ export function telegramLaunchParams(): string {
   return hash.includes('tgWebApp') ? hash : ''
 }
 
-const TELEGRAM_WEBAPP_SRC = 'https://telegram.org/js/telegram-web-app.js'
+// Снимок на момент загрузки бандла: навигация роутера стирает фрагмент.
+const launchParamsAtLoad = telegramLaunchParams()
+
+export function telegramLaunchParamsAtLoad(): string {
+  return launchParamsAtLoad
+}
 
 export function telegramWebApp(): TelegramWebApp | null {
   const app = window.Telegram?.WebApp
@@ -53,20 +58,11 @@ export function miniAppEventSlug(startParam?: string): string {
   return value.startsWith('event_') ? value.slice('event_'.length) : value
 }
 
-export function ensureTelegramWebAppScript(): void {
-  if (document.querySelector('script[data-telegram-web-app]')) return
-  const script = document.createElement('script')
-  script.src = TELEGRAM_WEBAPP_SRC
-  script.async = true
-  script.dataset.telegramWebApp = '1'
-  document.head.appendChild(script)
-}
-
+// Скрипт подключён в index.html, здесь только ждём, пока он отработает.
 export function waitForTelegramWebApp(timeoutMs = 2500): Promise<TelegramWebApp | null> {
   const existing = telegramWebApp()
   if (existing) return Promise.resolve(existing)
   if (!maybeTelegramMiniApp()) return Promise.resolve(null)
-  ensureTelegramWebAppScript()
   const deadline = Date.now() + timeoutMs
   return new Promise((resolve) => {
     const tick = () => {
