@@ -1,5 +1,15 @@
 package lectures
 
+import (
+	"strings"
+	"unicode/utf8"
+)
+
+const (
+	maxPeopleNameRunes = 120
+	maxPeoplePerRole   = 20
+)
+
 func lectureAllowsParticipant(restrictedDirectionIDs []string, participantDirectionID *string) bool {
 	if len(restrictedDirectionIDs) == 0 {
 		return true
@@ -29,4 +39,28 @@ func uniqueDirectionIDs(ids []string) []string {
 		out = append(out, id)
 	}
 	return out
+}
+
+func normalizePeopleNames(names []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(names))
+	out := make([]string, 0, len(names))
+	for _, raw := range names {
+		name := strings.Join(strings.Fields(strings.TrimSpace(raw)), " ")
+		if name == "" {
+			continue
+		}
+		if utf8.RuneCountInString(name) > maxPeopleNameRunes {
+			return nil, ErrValidation
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	if len(out) > maxPeoplePerRole {
+		return nil, ErrValidation
+	}
+	return out, nil
 }

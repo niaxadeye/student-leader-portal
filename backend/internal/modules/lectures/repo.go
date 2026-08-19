@@ -68,7 +68,7 @@ func (r *Repo) List(ctx context.Context, contestID string) ([]Lecture, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return r.withDirections(ctx, r.pool, list)
+	return r.withRelations(ctx, r.pool, list)
 }
 
 func (r *Repo) Get(ctx context.Context, contestID, lectureID string) (*Lecture, error) {
@@ -79,7 +79,7 @@ func (r *Repo) Get(ctx context.Context, contestID, lectureID string) (*Lecture, 
 	if err != nil {
 		return nil, err
 	}
-	list, err := r.withDirections(ctx, r.pool, []Lecture{*lecture})
+	list, err := r.withRelations(ctx, r.pool, []Lecture{*lecture})
 	if err != nil {
 		return nil, err
 	}
@@ -104,13 +104,16 @@ func (r *Repo) Create(ctx context.Context, contestID string, input LectureInput)
 		if err := replaceLectureDirections(ctx, tx, contestID, created.ID, input.DirectionIDs); err != nil {
 			return err
 		}
+		if err := replaceLecturePeople(ctx, tx, contestID, created.ID, input.Speakers, input.Moderators); err != nil {
+			return err
+		}
 		lecture = created
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	list, err := r.withDirections(ctx, r.pool, []Lecture{*lecture})
+	list, err := r.withRelations(ctx, r.pool, []Lecture{*lecture})
 	if err != nil {
 		return nil, err
 	}
@@ -137,13 +140,16 @@ func (r *Repo) Update(ctx context.Context, contestID, lectureID string, input Le
 		if err := replaceLectureDirections(ctx, tx, contestID, updated.ID, input.DirectionIDs); err != nil {
 			return err
 		}
+		if err := replaceLecturePeople(ctx, tx, contestID, updated.ID, input.Speakers, input.Moderators); err != nil {
+			return err
+		}
 		lecture = updated
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	list, err := r.withDirections(ctx, r.pool, []Lecture{*lecture})
+	list, err := r.withRelations(ctx, r.pool, []Lecture{*lecture})
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +169,7 @@ func (r *Repo) Transition(ctx context.Context, contestID, lectureID, from, to st
 	if err != nil {
 		return nil, err
 	}
-	list, err := r.withDirections(ctx, r.pool, []Lecture{*lecture})
+	list, err := r.withRelations(ctx, r.pool, []Lecture{*lecture})
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +464,7 @@ func (r *Repo) ParticipantLectures(ctx context.Context, contestID, participantID
 	for i := range list {
 		lectures[i] = list[i].Lecture
 	}
-	lectures, err = r.withDirections(ctx, r.pool, lectures)
+	lectures, err = r.withRelations(ctx, r.pool, lectures)
 	if err != nil {
 		return nil, err
 	}
@@ -485,6 +491,8 @@ func scanLecture(row rowScanner) (*Lecture, error) {
 	}
 	lecture.DirectionIDs = []string{}
 	lecture.Directions = []DirectionRef{}
+	lecture.Speakers = []string{}
+	lecture.Moderators = []string{}
 	return &lecture, nil
 }
 
@@ -598,4 +606,74 @@ func (r *Repo) withDirections(ctx context.Context, q directionQuerier, lectures 
 		lectures[i].Directions = append(lectures[i].Directions, DirectionRef{ID: directionID, Name: name})
 	}
 	return lectures, rows.Err()
+}
+
+func replaceLecturePeople(ctx context.Context, q directionQuerier, contestID, lectureID string, speakers, moderators []string) error {
+	if _, err := q.Exec(ctx, `DELETE FROM lecture_people WHERE lecture_id=$1`, lectureID); err != nil {
+		return err
+	}
+	insert := func(role string, names []string) error {
+		for i, name := range names {
+			if _, err := q.Exec(ctx, `
+				INSERT INTO lecture_people (contest_id, lecture_id, role, name, sort_order)
+				VALUES ($1,$2,$3,$4,$5)`, contestID, lectureID, role, name, i); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := insert(RoleSpeaker, speakers); err != nil {
+		return err
+	}
+	return insert(RoleModerator, moderators)
+}
+
+func (r *Repo) withPeople(ctx context.Context, q directionQuerier, lectures []Lecture) ([]Lecture, error) {
+	for i := range lectures {
+		lectures[i].Speakers = []string{}
+		lectures[i].Moderators = []string{}
+	}
+	if len(lectures) == 0 {
+		return lectures, nil
+	}
+	ids := make([]string, len(lectures))
+	index := make(map[string]int, len(lectures))
+	for i := range lectures {
+		ids[i] = lectures[i].ID
+		index[lectures[i].ID] = i
+	}
+	rows, err := q.Query(ctx, `
+		SELECT lecture_id, role, name
+		FROM lecture_people
+		WHERE lecture_id=ANY($1::uuid[])
+		ORDER BY role, sort_order, id`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var lectureID, role, name string
+		if err := rows.Scan(&lectureID, &role, &name); err != nil {
+			return nil, err
+		}
+		i, ok := index[lectureID]
+		if !ok {
+			continue
+		}
+		switch role {
+		case RoleSpeaker:
+			lectures[i].Speakers = append(lectures[i].Speakers, name)
+		case RoleModerator:
+			lectures[i].Moderators = append(lectures[i].Moderators, name)
+		}
+	}
+	return lectures, rows.Err()
+}
+
+func (r *Repo) withRelations(ctx context.Context, q directionQuerier, lectures []Lecture) ([]Lecture, error) {
+	lectures, err := r.withDirections(ctx, q, lectures)
+	if err != nil {
+		return nil, err
+	}
+	return r.withPeople(ctx, q, lectures)
 }

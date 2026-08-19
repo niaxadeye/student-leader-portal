@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEventDirections } from '@/entities/event-participant/admin-queries'
 import type { Lecture, LectureInput } from '@/entities/lecture/types'
@@ -9,6 +10,26 @@ import { Checkbox } from '@/shared/ui/choice'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Field } from '@/shared/ui/field'
 import { Input, Textarea } from '@/shared/ui/input'
+
+const MAX_PEOPLE_PER_ROLE = 20
+
+function namesOrBlank(names: string[] | undefined): string[] {
+  return names && names.length > 0 ? names : ['']
+}
+
+function cleanedNames(names: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of names) {
+    const name = raw.trim().replace(/\s+/g, ' ')
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(name)
+  }
+  return out
+}
 
 export function LectureDialog({
   contestId,
@@ -29,6 +50,8 @@ export function LectureDialog({
   const [attendanceStartsAt, setAttendanceStartsAt] = useState('')
   const [attendanceEndsAt, setAttendanceEndsAt] = useState('')
   const [directionIds, setDirectionIds] = useState<string[]>([])
+  const [speakers, setSpeakers] = useState<string[]>([''])
+  const [moderators, setModerators] = useState<string[]>([''])
   const [error, setError] = useState<string>()
   const directions = useEventDirections(open ? contestId : undefined)
   const create = useCreateLecture(contestId)
@@ -44,6 +67,8 @@ export function LectureDialog({
     setAttendanceStartsAt(isoToLocalInput(lecture?.attendance_starts_at ?? null))
     setAttendanceEndsAt(isoToLocalInput(lecture?.attendance_ends_at ?? null))
     setDirectionIds(lecture?.direction_ids ?? [])
+    setSpeakers(namesOrBlank(lecture?.speakers))
+    setModerators(namesOrBlank(lecture?.moderators))
     setError(undefined)
   }, [lecture, open])
 
@@ -75,6 +100,8 @@ export function LectureDialog({
       attendance_starts_at: attendanceStarts,
       attendance_ends_at: attendanceEnds,
       direction_ids: directionIds,
+      speakers: cleanedNames(speakers),
+      moderators: cleanedNames(moderators),
     }
     const mutation = lecture ? update : create
     mutation.mutate(input, {
@@ -167,6 +194,20 @@ export function LectureDialog({
               )}
             </Field>
           </div>
+          <PeopleNamesEditor
+            label="Спикеры"
+            description="Можно указать одного или нескольких. Поле можно оставить пустым."
+            names={speakers}
+            onChange={setSpeakers}
+            placeholder="ФИО спикера"
+          />
+          <PeopleNamesEditor
+            label="Модераторы"
+            description="Можно указать одного или нескольких. Поле можно оставить пустым."
+            names={moderators}
+            onChange={setModerators}
+            placeholder="ФИО модератора"
+          />
           <div>
             <p className="text-[14px] font-medium text-ink">Направления</p>
             <p className="mt-1 text-[13px] text-muted">
@@ -217,5 +258,65 @@ export function LectureDialog({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function PeopleNamesEditor({
+  label,
+  description,
+  names,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  description: string
+  names: string[]
+  onChange: (next: string[]) => void
+  placeholder: string
+}) {
+  function update(index: number, value: string) {
+    const next = names.slice()
+    next[index] = value
+    onChange(next)
+  }
+  function add() {
+    if (names.length >= MAX_PEOPLE_PER_ROLE) return
+    onChange([...names, ''])
+  }
+  function remove(index: number) {
+    const next = names.filter((_, i) => i !== index)
+    onChange(next.length ? next : [''])
+  }
+
+  return (
+    <div>
+      <p className="text-[14px] font-medium text-ink">{label}</p>
+      <p className="mt-1 text-[13px] text-muted">{description}</p>
+      <div className="mt-2 flex flex-col gap-2">
+        {names.map((name, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <Input
+              value={name}
+              onChange={(event) => update(index, event.target.value)}
+              placeholder={placeholder}
+              maxLength={120}
+            />
+            <button
+              type="button"
+              onClick={() => remove(index)}
+              className="shrink-0 rounded-md p-2 text-muted hover:bg-danger/10 hover:text-danger"
+              aria-label={`Удалить: ${label}`}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        {names.length < MAX_PEOPLE_PER_ROLE && (
+          <Button type="button" variant="ghost" size="sm" onClick={add} className="self-start">
+            <Plus className="h-4 w-4" /> Добавить
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }

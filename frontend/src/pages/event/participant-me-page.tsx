@@ -13,6 +13,7 @@ import { useParticipantAuth } from '@/entities/event-participant/auth-context'
 import { formatPoints, signedPoints } from '@/entities/points/format'
 import { useParticipantPoints } from '@/entities/points/queries'
 import { useParticipantLectures } from '@/entities/lecture/queries'
+import { lecturePeopleLine } from '@/entities/lecture/types'
 import { ApiRequestError } from '@/shared/api/client'
 import { formatDateOnly, formatDateTime } from '@/shared/lib/format'
 import { Badge } from '@/shared/ui/badge'
@@ -230,27 +231,31 @@ export function ParticipantMePage() {
           )}
           {!!lectures.data?.length && (
             <div className="divide-y divide-border">
-              {lectures.data.map(({ lecture, attendance }) => (
-                <div
-                  key={lecture.id}
-                  className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                >
-                  <div>
-                    <p className="text-[14px] font-medium text-ink">{lecture.title}</p>
-                    <p className="mt-0.5 text-[12px] text-muted">
-                      {lecture.starts_at ? formatDateTime(lecture.starts_at) : 'Время не задано'} ·
-                      +{lecture.points} баллов
-                    </p>
+              {lectures.data.map(({ lecture, attendance }) => {
+                const people = lecturePeopleLine(lecture)
+                return (
+                  <div
+                    key={lecture.id}
+                    className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="text-[14px] font-medium text-ink">{lecture.title}</p>
+                      <p className="mt-0.5 text-[12px] text-muted">
+                        {lecture.starts_at ? formatDateTime(lecture.starts_at) : 'Время не задано'} ·
+                        +{lecture.points} баллов
+                      </p>
+                      {people && <p className="mt-0.5 text-[12px] text-muted">{people}</p>}
+                    </div>
+                    {attendance ? (
+                      <Badge tone="success">
+                        <CheckCircle2 className="h-3 w-3" /> Посещено
+                      </Badge>
+                    ) : (
+                      <Badge>{lecture.status === 'ACTIVE' ? 'Активна' : 'Завершена'}</Badge>
+                    )}
                   </div>
-                  {attendance ? (
-                    <Badge tone="success">
-                      <CheckCircle2 className="h-3 w-3" /> Посещено
-                    </Badge>
-                  ) : (
-                    <Badge>{lecture.status === 'ACTIVE' ? 'Активна' : 'Завершена'}</Badge>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardBody>

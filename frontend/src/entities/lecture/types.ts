@@ -14,6 +14,8 @@ export interface Lecture {
   status: LectureStatus
   direction_ids: string[]
   directions: LectureDirection[]
+  speakers: string[]
+  moderators: string[]
   created_at: string
   updated_at: string
 }
@@ -32,6 +34,8 @@ export interface LectureInput {
   attendance_starts_at: string | null
   attendance_ends_at: string | null
   direction_ids: string[]
+  speakers: string[]
+  moderators: string[]
 }
 
 export interface LectureAttendance {
@@ -60,4 +64,13 @@ export interface ParticipantQRCode {
 export interface ParticipantLecture {
   lecture: Lecture
   attendance: LectureAttendance | null
+}
+
+export function lecturePeopleLine(lecture: Pick<Lecture, 'speakers' | 'moderators'>): string | null {
+  const speakers = lecture.speakers ?? []
+  const moderators = lecture.moderators ?? []
+  const parts: string[] = []
+  if (speakers.length) parts.push(`спикеры: ${speakers.join(', ')}`)
+  if (moderators.length) parts.push(`модераторы: ${moderators.join(', ')}`)
+  return parts.length ? parts.join(' · ') : null
 }

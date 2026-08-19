@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { CalendarClock, Check, Flag, Pencil, Plus, QrCode, Tags, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Lecture } from '@/entities/lecture/types'
+import { lecturePeopleLine } from '@/entities/lecture/types'
 import {
   useAdminLectures,
   useDeleteLecture,
@@ -73,7 +74,7 @@ export function LecturesSection({
         <div>
           <h2 className="text-[20px] font-semibold text-ink">Лекции и посещаемость</h2>
           <p className="mt-1 text-[13px] text-muted">
-            Расписание, окно сканирования и направления, для которых открыта лекция.
+            Расписание, окно сканирования, спикеры и направления, для которых открыта лекция.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -100,6 +101,7 @@ export function LecturesSection({
         <div className="flex flex-col gap-2">
           {lectures.data.map((lecture) => {
             const status = statusMeta[lecture.status]
+            const people = lecturePeopleLine(lecture)
             return (
               <Card key={lecture.id}>
                 <CardBody className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center">
@@ -122,6 +124,7 @@ export function LecturesSection({
                       {lecture.attendance_starts_at &&
                         ` · регистрация с ${formatDateTime(lecture.attendance_starts_at)}`}
                     </p>
+                    {people && <p className="mt-1 text-[13px] text-muted">{people}</p>}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {canManage && lecture.status !== 'FINISHED' && (

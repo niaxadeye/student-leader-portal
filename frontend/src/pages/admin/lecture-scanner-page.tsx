@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
 import { useAdminLecture, useLectureAttendance, useScanLecture } from '@/entities/lecture/queries'
 import type { ScanResult, ScannerType } from '@/entities/lecture/types'
+import { lecturePeopleLine } from '@/entities/lecture/types'
 import { ApiRequestError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
 import { Badge } from '@/shared/ui/badge'
@@ -196,6 +197,7 @@ export function LectureScannerPage() {
   if (lecture.isError || !lecture.data) return <ErrorState onRetry={() => lecture.refetch()} />
 
   const canScan = lecture.data.status === 'ACTIVE'
+  const people = lecturePeopleLine(lecture.data)
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -218,6 +220,7 @@ export function LectureScannerPage() {
               {(lecture.data.directions?.length ?? 0) === 0
                 ? ' · все направления'
                 : ` · ${lecture.data.directions.map((item) => item.name).join(', ')}`}
+              {people ? ` · ${people}` : ''}
             </p>
           </div>
           {canScan && isMobileCamera && (

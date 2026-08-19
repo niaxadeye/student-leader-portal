@@ -29,6 +29,9 @@ const (
 	ScannerUSB    = "USB"
 	ScannerManual = "MANUAL"
 
+	RoleSpeaker   = "SPEAKER"
+	RoleModerator = "MODERATOR"
+
 	PermissionManage = "event.attendance.manage"
 	PermissionScan   = "event.attendance.scan"
 )
@@ -56,6 +59,8 @@ type Lecture struct {
 	Status             string         `json:"status"`
 	DirectionIDs       []string       `json:"direction_ids"`
 	Directions         []DirectionRef `json:"directions"`
+	Speakers           []string       `json:"speakers"`
+	Moderators         []string       `json:"moderators"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }
@@ -69,6 +74,8 @@ type LectureInput struct {
 	AttendanceStartsAt *time.Time `json:"attendance_starts_at"`
 	AttendanceEndsAt   *time.Time `json:"attendance_ends_at"`
 	DirectionIDs       []string   `json:"direction_ids"`
+	Speakers           []string   `json:"speakers"`
+	Moderators         []string   `json:"moderators"`
 }
 
 type Attendance struct {

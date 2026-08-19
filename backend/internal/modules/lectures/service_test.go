@@ -37,12 +37,14 @@ func (f *fakeRepo) Create(_ context.Context, contestID string, input LectureInpu
 	return &Lecture{
 		ID: "lecture-1", ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft,
 		DirectionIDs: uniqueDirectionIDs(input.DirectionIDs), Directions: []DirectionRef{},
+		Speakers: append([]string{}, input.Speakers...), Moderators: append([]string{}, input.Moderators...),
 	}, nil
 }
 func (f *fakeRepo) Update(_ context.Context, contestID, lectureID string, input LectureInput) (*Lecture, error) {
 	return &Lecture{
 		ID: lectureID, ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft,
 		DirectionIDs: uniqueDirectionIDs(input.DirectionIDs), Directions: []DirectionRef{},
+		Speakers: append([]string{}, input.Speakers...), Moderators: append([]string{}, input.Moderators...),
 	}, nil
 }
 func (f *fakeRepo) Transition(_ context.Context, contestID, lectureID, _, to string) (*Lecture, error) {
@@ -159,6 +161,47 @@ func TestLectureAllowsParticipant(t *testing.T) {
 				t.Fatalf("got %v want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestNormalizePeopleNames(t *testing.T) {
+	t.Parallel()
+	got, err := normalizePeopleNames([]string{"  Иванов  Иван ", "", "иванов иван", "Петрова"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != "Иванов Иван" || got[1] != "Петрова" {
+		t.Fatalf("got %#v", got)
+	}
+	if _, err := normalizePeopleNames([]string{strings.Repeat("я", maxPeopleNameRunes+1)}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("long name: got %v", err)
+	}
+	tooMany := make([]string, maxPeoplePerRole+1)
+	for i := range tooMany {
+		tooMany[i] = "Человек " + strings.Repeat("x", i+1)
+	}
+	if _, err := normalizePeopleNames(tooMany); !errors.Is(err, ErrValidation) {
+		t.Fatalf("too many: got %v", err)
+	}
+}
+
+func TestCreateLectureKeepsSpeakersAndModerators(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fakeRepo{allowed: true}
+	service := NewService(repo, newTestCodes(&now), nil)
+	lecture, err := service.Create(context.Background(), Actor{UserID: "staff"}, "event", LectureInput{
+		Title: "Лекция", Points: 50,
+		Speakers:   []string{"  Анна  Спикер ", "анна спикер", ""},
+		Moderators: []string{"Модератор Один", "модератор один"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lecture.Speakers) != 1 || lecture.Speakers[0] != "Анна Спикер" {
+		t.Fatalf("speakers: %#v", lecture.Speakers)
+	}
+	if len(lecture.Moderators) != 1 || lecture.Moderators[0] != "Модератор Один" {
+		t.Fatalf("moderators: %#v", lecture.Moderators)
 	}
 }
 

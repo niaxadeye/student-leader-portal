@@ -214,6 +214,16 @@ func validateInput(input LectureInput) (LectureInput, error) {
 		}
 	}
 	input.DirectionIDs = uniqueDirectionIDs(cleaned)
+	speakers, err := normalizePeopleNames(input.Speakers)
+	if err != nil {
+		return LectureInput{}, err
+	}
+	moderators, err := normalizePeopleNames(input.Moderators)
+	if err != nil {
+		return LectureInput{}, err
+	}
+	input.Speakers = speakers
+	input.Moderators = moderators
 	return input, nil
 }
 
