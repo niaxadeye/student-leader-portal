@@ -45,5 +45,5 @@ export function TelegramLoginButton({
   }, [botUsername])
 
   if (!botUsername) return null
-  return <div ref={container} className="flex justify-center [&_iframe]:!w-full" />
+  return <div ref={container} className="flex min-h-[40px] justify-center" />
 }

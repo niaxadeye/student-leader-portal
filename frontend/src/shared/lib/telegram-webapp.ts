@@ -43,13 +43,15 @@ export function telegramWebApp(): TelegramWebApp | null {
   return app
 }
 
-/** Повод подождать initData. В вебвью Telegram user-agent обычно обычный,
- *  поэтому опираемся на инжектированный мост и параметры запуска. */
+/** Скрипт SDK подключён на всех страницах, поэтому сам по себе объект
+ *  window.Telegram.WebApp признаком запуска не является: без параметров
+ *  запуска он поднимается с platform "unknown". */
 export function maybeTelegramMiniApp(): boolean {
-  if (window.Telegram?.WebApp) return true
+  const app = window.Telegram?.WebApp
+  if (app?.initData) return true
+  if (app?.platform && app.platform !== 'unknown') return true
   if (window.TelegramWebviewProxy) return true
-  if (telegramLaunchParams()) return true
-  return /Telegram/i.test(navigator.userAgent)
+  return Boolean(telegramLaunchParamsAtLoad())
 }
 
 /** Ссылку на Mini App собирают организаторы, поэтому префикс необязателен. */
