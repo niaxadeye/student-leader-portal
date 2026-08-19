@@ -67,7 +67,6 @@ type Service struct {
 type SocialAuth struct {
 	TelegramBotToken    string
 	TelegramBotUsername string
-	TelegramMiniAppName string
 	VKClientID          string
 	VKClientSecret      string
 	VKServiceToken      string

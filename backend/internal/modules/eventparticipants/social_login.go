@@ -18,7 +18,6 @@ type LoginOptions struct {
 	Telegram struct {
 		Enabled     bool   `json:"enabled"`
 		BotUsername string `json:"bot_username,omitempty"`
-		MiniAppURL  string `json:"mini_app_url,omitempty"`
 	} `json:"telegram"`
 	VK struct {
 		Enabled     bool   `json:"enabled"`
@@ -42,9 +41,6 @@ func (s *Service) LoginOptions(ctx context.Context) (*LoginOptions, error) {
 	options := &LoginOptions{}
 	options.Telegram.Enabled = s.social.TelegramEnabled()
 	options.Telegram.BotUsername = strings.TrimPrefix(strings.TrimSpace(s.social.TelegramBotUsername), "@")
-	if options.Telegram.Enabled {
-		options.Telegram.MiniAppURL = s.TelegramMiniAppURL()
-	}
 	options.VK.Enabled = s.social.VKEnabled()
 	if options.VK.Enabled {
 		options.VK.AppID = strings.TrimSpace(s.social.VKClientID)
@@ -59,20 +55,6 @@ func (s *Service) LoginOptions(ctx context.Context) (*LoginOptions, error) {
 		options.Events = append(options.Events, PublicEvent{Slug: event.Slug, Name: event.Name})
 	}
 	return options, nil
-}
-
-// TelegramMiniAppURL — единственный вход через Telegram: данные берём из Mini App.
-// Параметр startapp добавляет клиент, он же знает про выбранное мероприятие.
-func (s *Service) TelegramMiniAppURL() string {
-	bot := strings.TrimPrefix(strings.TrimSpace(s.social.TelegramBotUsername), "@")
-	if bot == "" {
-		return ""
-	}
-	target := "https://t.me/" + bot
-	if app := strings.TrimSpace(s.social.TelegramMiniAppName); app != "" {
-		target += "/" + app
-	}
-	return target
 }
 
 func (s *Service) VKStartURL(eventSlug string, now time.Time) (string, string, error) {

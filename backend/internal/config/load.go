@@ -54,7 +54,6 @@ func Load() (*Config, error) {
 		},
 		Telegram: Telegram{
 			BotToken: env("TELEGRAM_BOT_TOKEN", ""), BotUsername: env("TELEGRAM_BOT_USERNAME", ""),
-			MiniAppName:     env("TELEGRAM_MINIAPP_NAME", ""),
 			DefaultChatID:   env("TELEGRAM_DEFAULT_CHAT_ID", ""),
 			DefaultThreadID: env("TELEGRAM_DEFAULT_THREAD_ID", ""), Enabled: envBool("TELEGRAM_NOTIFICATIONS_ENABLED", false),
 		},

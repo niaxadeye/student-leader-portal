@@ -42,7 +42,7 @@ export async function participantApiRequest<T>(
 }
 
 export interface LoginOptions {
-  telegram: { enabled: boolean; bot_username?: string; mini_app_url?: string }
+  telegram: { enabled: boolean; bot_username?: string }
   vk: { enabled: boolean; app_id?: string; redirect_url?: string }
   events: Array<{ slug: string; name: string }>
 }

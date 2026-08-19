@@ -178,18 +178,6 @@ func TestSocialLoginPreferredSlugPicksAmongSeveral(t *testing.T) {
 	}
 }
 
-func TestTelegramMiniAppURL(t *testing.T) {
-	t.Parallel()
-	svc := &Service{social: SocialAuth{TelegramBotUsername: "@eazytech_bot", TelegramMiniAppName: "cabinet"}}
-	if got := svc.TelegramMiniAppURL(); got != "https://t.me/eazytech_bot/cabinet" {
-		t.Fatalf("with app name = %q", got)
-	}
-	bare := &Service{social: SocialAuth{TelegramBotUsername: "eazytech_bot"}}
-	if got := bare.TelegramMiniAppURL(); got != "https://t.me/eazytech_bot" {
-		t.Fatalf("without app name = %q", got)
-	}
-}
-
 // telegramWebAppInitData собирает initData так, как его присылает Mini App.
 func telegramWebAppInitData(token string, userID int64, username string, now time.Time) string {
 	values := url.Values{}

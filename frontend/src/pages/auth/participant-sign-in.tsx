@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ChevronDown, IdCard, Loader2, ScanLine, Send, UserRound } from 'lucide-react'
+import { ChevronDown, IdCard, Loader2, ScanLine, UserRound } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -216,16 +216,8 @@ export function ParticipantSignIn({
     setAuthError('')
   }
 
-  const telegramOn = options?.telegram.enabled ?? false
   const vkOn = options?.vk.enabled ?? false
   const choosing = matchedEvents.length > 0 && Boolean(continueToken)
-  const telegramMiniAppLink = useMemo(() => {
-    const base = options?.telegram.mini_app_url
-    if (!telegramOn || !base) return ''
-    // startapp обязателен, иначе ссылка открывает чат бота, а не Mini App.
-    const startParam = preferredSlug ? `event_${preferredSlug}` : 'login'
-    return `${base}?startapp=${encodeURIComponent(startParam)}`
-  }, [options, preferredSlug, telegramOn])
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-subtle">
@@ -256,22 +248,9 @@ export function ParticipantSignIn({
             setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')
           }}
         />
-        {!miniApp && telegramMiniAppLink && (
-          <Button
-            type="button"
-            className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
-            onClick={() => {
-              // Вход через Telegram работает только из Mini App, поэтому открываем её.
-              window.open(telegramMiniAppLink, '_blank', 'noopener')
-            }}
-          >
-            <Send className="h-4 w-4" aria-hidden />
-            Войти через Telegram
-          </Button>
-        )}
-        {!vkOn && !telegramOn && (
+        {!vkOn && (
           <p className="text-[13px] text-muted">
-            Социальный вход ещё не подключён. Используйте резервный способ ниже.
+            Вход через VK ещё не подключён. Используйте резервный способ ниже.
           </p>
         )}
       </div>

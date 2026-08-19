@@ -35,10 +35,10 @@ export function maybeTelegramMiniApp(): boolean {
   return /Telegram/i.test(navigator.userAgent)
 }
 
-/** startapp может нести не только слаг, поэтому мероприятие помечено префиксом. */
+/** Ссылку на Mini App собирают организаторы, поэтому префикс необязателен. */
 export function miniAppEventSlug(startParam?: string): string {
   const value = startParam?.trim() ?? ''
-  return value.startsWith('event_') ? value.slice('event_'.length) : ''
+  return value.startsWith('event_') ? value.slice('event_'.length) : value
 }
 
 export function ensureTelegramWebAppScript(): void {

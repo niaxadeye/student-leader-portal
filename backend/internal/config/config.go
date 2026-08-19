@@ -64,8 +64,8 @@ type ParticipantAuth struct {
 }
 
 type Telegram struct {
-	BotToken, BotUsername, MiniAppName, DefaultChatID, DefaultThreadID string
-	Enabled                                                            bool
+	BotToken, BotUsername, DefaultChatID, DefaultThreadID string
+	Enabled                                               bool
 }
 
 type VK struct {
