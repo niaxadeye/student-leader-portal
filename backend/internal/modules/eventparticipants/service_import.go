@@ -18,8 +18,9 @@ func (s *Service) Import(
 	}
 	result := &ImportResult{Rows: make([]ImportRowResult, 0, len(records))}
 	directions := map[string]*Direction{}
+	vkIDs := s.resolveImportedVKIDs(ctx, records)
 	for _, record := range records {
-		row := s.importOne(ctx, contestID, record, directions)
+		row := s.importOne(ctx, contestID, record, directions, vkIDs)
 		switch row.Status {
 		case "added":
 			result.Added++
@@ -39,11 +40,31 @@ func (s *Service) Import(
 	return result, nil
 }
 
+// resolveImportedVKIDs разрешает все ссылки файла заранее: построчные запросы
+// к VK упёрлись бы в лимит частоты и растянули импорт.
+func (s *Service) resolveImportedVKIDs(ctx context.Context, records []ImportRecord) vkIDCache {
+	slugs := make([]string, 0, len(records))
+	for _, record := range records {
+		normalized, err := normalizeOptionalSocialURL(socialVK, optionalString(record.VKURL))
+		if err != nil {
+			continue
+		}
+		if slug := vkSlugFromURL(normalized); slug != "" {
+			slugs = append(slugs, slug)
+		}
+	}
+	if len(slugs) == 0 {
+		return nil
+	}
+	return s.resolveVKSlugs(ctx, slugs)
+}
+
 func (s *Service) importOne(
 	ctx context.Context,
 	contestID string,
 	record ImportRecord,
 	directions map[string]*Direction,
+	vkIDs vkIDCache,
 ) ImportRowResult {
 	row := ImportRowResult{Line: record.Line, FullName: cleanFullName(record.FullName)}
 	birthDate, err := parseBirthDate(record.BirthDate)
@@ -120,6 +141,7 @@ func (s *Service) importOne(
 	}
 
 	if existing == nil {
+		s.fillVKUserID(ctx, incoming, nil, vkIDs)
 		id, err := s.repo.Create(ctx, incoming)
 		if err != nil {
 			return importFailure(row, err)
@@ -158,6 +180,7 @@ func (s *Service) importOne(
 		row.Status, row.Message = "duplicate", "Участник уже существует без изменений"
 		return row
 	}
+	s.fillVKUserID(ctx, incoming, existing, vkIDs)
 	if err := s.repo.Update(ctx, incoming); err != nil {
 		return importFailure(row, err)
 	}

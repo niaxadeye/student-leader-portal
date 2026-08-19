@@ -74,6 +74,7 @@ func (a *App) build() *deps {
 		TelegramMiniAppName: a.cfg.Telegram.MiniAppName,
 		VKClientID:          a.cfg.VK.ClientID,
 		VKClientSecret:      a.cfg.VK.ClientSecret,
+		VKServiceToken:      a.cfg.VK.ServiceToken,
 		VKRedirectURL:       vkRedirect,
 		PublicBaseURL:       strings.TrimRight(a.cfg.App.BaseURL, "/"),
 		StateSecret:         a.cfg.ParticipantAuth.QRSecret,

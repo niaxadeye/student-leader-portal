@@ -327,9 +327,7 @@ func (s *Service) userInfoFromVKAccessToken(ctx context.Context, accessToken str
 		return vkIdentity{}, ErrInvalidCredentials
 	}
 	identity := vkIdentity{UserID: userID}
-	if screen, err := s.fetchVKProfile(ctx, accessToken); err == nil {
-		identity.ScreenName = screen
-	}
+	identity.ScreenName = s.vkScreenName(ctx, userID)
 	return identity, nil
 }
 
@@ -382,43 +380,15 @@ func (s *Service) exchangeVKCode(ctx context.Context, code string) (vkIdentity, 
 		return vkIdentity{}, ErrInvalidCredentials
 	}
 	identity := vkIdentity{UserID: token.UserID}
-	profile, err := s.fetchVKProfile(ctx, token.AccessToken)
-	if err == nil {
-		identity.ScreenName = profile
-	}
+	identity.ScreenName = s.vkScreenName(ctx, token.UserID)
 	return identity, nil
 }
 
-func (s *Service) fetchVKProfile(ctx context.Context, accessToken string) (string, error) {
-	profileURL := "https://api.vk.com/method/users.get?" + url.Values{
-		"access_token": {accessToken},
-		"fields":       {"screen_name"},
-		"v":            {"5.199"},
-	}.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, profileURL, nil)
+// vkScreenName нужен, чтобы сопоставить проверенный id со ссылкой из базы.
+func (s *Service) vkScreenName(ctx context.Context, userID int64) string {
+	_, screenName, err := s.vkUsersGet(ctx, strconv.FormatInt(userID, 10))
 	if err != nil {
-		return "", err
+		return ""
 	}
-	resp, err := s.http.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	var payload struct {
-		Response []struct {
-			ScreenName string `json:"screen_name"`
-		} `json:"response"`
-		Error struct {
-			Code int    `json:"error_code"`
-			Msg  string `json:"error_msg"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil || len(payload.Response) == 0 {
-		// Токен VK ID не всегда допущен к users.get — без screen_name ссылку не сопоставить.
-		slog.WarnContext(ctx, "vk_screen_name_unavailable",
-			"status", resp.StatusCode, "vk_error_code", payload.Error.Code, "vk_error", payload.Error.Msg)
-		return "", ErrInvalidCredentials
-	}
-	return payload.Response[0].ScreenName, nil
+	return screenName
 }

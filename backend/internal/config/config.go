@@ -69,7 +69,7 @@ type Telegram struct {
 }
 
 type VK struct {
-	ClientID, ClientSecret, RedirectURL string
+	ClientID, ClientSecret, RedirectURL, ServiceToken string
 }
 
 type Limits struct {

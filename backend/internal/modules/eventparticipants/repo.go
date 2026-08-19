@@ -108,10 +108,10 @@ func (r *Repo) Create(ctx context.Context, p *Participant) (string, error) {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO event_participants
 		  (contest_id, full_name, full_name_normalized, birth_date,
-		   union_card_number, sks_barcode, vk_url, telegram_url, status, direction_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACTIVE',$9) RETURNING id`,
+		   union_card_number, sks_barcode, vk_url, telegram_url, status, direction_id, vk_user_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACTIVE',$9,$10) RETURNING id`,
 		p.ContestID, p.FullName, p.FullNameNormalized, p.BirthDate,
-		p.UnionCardNumber, p.SKSBarcode, p.VKURL, p.TelegramURL, p.DirectionID).Scan(&id)
+		p.UnionCardNumber, p.SKSBarcode, p.VKURL, p.TelegramURL, p.DirectionID, p.VKUserID).Scan(&id)
 	if isUniqueViolation(err) {
 		return "", ErrIdentifierTaken
 	}
@@ -123,10 +123,10 @@ func (r *Repo) Update(ctx context.Context, p *Participant) error {
 		UPDATE event_participants SET
 		  full_name=$3, full_name_normalized=$4, birth_date=$5,
 		  union_card_number=$6, sks_barcode=$7, vk_url=$8, telegram_url=$9,
-		  direction_id=$10, updated_at=now()
+		  direction_id=$10, vk_user_id=$11, updated_at=now()
 		WHERE contest_id=$1 AND id=$2`,
 		p.ContestID, p.ID, p.FullName, p.FullNameNormalized, p.BirthDate,
-		p.UnionCardNumber, p.SKSBarcode, p.VKURL, p.TelegramURL, p.DirectionID)
+		p.UnionCardNumber, p.SKSBarcode, p.VKURL, p.TelegramURL, p.DirectionID, p.VKUserID)
 	if isUniqueViolation(err) {
 		return ErrIdentifierTaken
 	}

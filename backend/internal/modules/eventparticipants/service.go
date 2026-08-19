@@ -70,6 +70,7 @@ type SocialAuth struct {
 	TelegramMiniAppName string
 	VKClientID          string
 	VKClientSecret      string
+	VKServiceToken      string
 	VKRedirectURL       string
 	PublicBaseURL       string
 	StateSecret         string
@@ -178,6 +179,7 @@ func (s *Service) Create(ctx context.Context, actor Actor, contestID string, inp
 	if err != nil {
 		return nil, err
 	}
+	s.fillVKUserID(ctx, p, nil, nil)
 	id, err := s.repo.Create(ctx, p)
 	if err != nil {
 		return nil, err
@@ -199,6 +201,11 @@ func (s *Service) Update(ctx context.Context, actor Actor, contestID, participan
 	if err != nil {
 		return nil, err
 	}
+	previous, err := s.repo.ByID(ctx, contestID, participantID)
+	if err != nil {
+		return nil, err
+	}
+	s.fillVKUserID(ctx, p, previous, nil)
 	if err := s.repo.Update(ctx, p); err != nil {
 		return nil, err
 	}

@@ -60,7 +60,7 @@ func Load() (*Config, error) {
 		},
 		VK: VK{
 			ClientID: env("VK_CLIENT_ID", ""), ClientSecret: env("VK_CLIENT_SECRET", ""),
-			RedirectURL: env("VK_REDIRECT_URL", ""),
+			RedirectURL: env("VK_REDIRECT_URL", ""), ServiceToken: env("VK_SERVICE_TOKEN", ""),
 		},
 		Limits: Limits{
 			MaxJSONBodyMB: envInt("MAX_JSON_BODY_MB", 2), MaxFileSizeMB: envInt("DEFAULT_MAX_FILE_SIZE_MB", 1024),
