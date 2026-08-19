@@ -52,6 +52,7 @@ export function LectureDialog({
   const [directionIds, setDirectionIds] = useState<string[]>([])
   const [speakers, setSpeakers] = useState<string[]>([''])
   const [moderators, setModerators] = useState<string[]>([''])
+  const [location, setLocation] = useState('')
   const [error, setError] = useState<string>()
   const directions = useEventDirections(open ? contestId : undefined)
   const create = useCreateLecture(contestId)
@@ -69,6 +70,7 @@ export function LectureDialog({
     setDirectionIds(lecture?.direction_ids ?? [])
     setSpeakers(namesOrBlank(lecture?.speakers))
     setModerators(namesOrBlank(lecture?.moderators))
+    setLocation(lecture?.location ?? '')
     setError(undefined)
   }, [lecture, open])
 
@@ -102,6 +104,7 @@ export function LectureDialog({
       direction_ids: directionIds,
       speakers: cleanedNames(speakers),
       moderators: cleanedNames(moderators),
+      location: location.trim() || null,
     }
     const mutation = lecture ? update : create
     mutation.mutate(input, {
@@ -137,6 +140,17 @@ export function LectureDialog({
                 {...props}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Место проведения" description="Аудитория, зал или площадка.">
+            {(props) => (
+              <Input
+                {...props}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                maxLength={300}
+                placeholder="Например, зал А"
               />
             )}
           </Field>

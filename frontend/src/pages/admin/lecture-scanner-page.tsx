@@ -217,6 +217,7 @@ export function LectureScannerPage() {
             </div>
             <p className="mt-1 text-muted">
               {lecture.data.title} · +{lecture.data.points} баллов
+              {lecture.data.location ? ` · ${lecture.data.location}` : ''}
               {(lecture.data.directions?.length ?? 0) === 0
                 ? ' · все направления'
                 : ` · ${lecture.data.directions.map((item) => item.name).join(', ')}`}

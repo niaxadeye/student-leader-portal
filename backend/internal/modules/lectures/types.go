@@ -61,6 +61,7 @@ type Lecture struct {
 	Directions         []DirectionRef `json:"directions"`
 	Speakers           []string       `json:"speakers"`
 	Moderators         []string       `json:"moderators"`
+	Location           *string        `json:"location"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }
@@ -76,6 +77,7 @@ type LectureInput struct {
 	DirectionIDs       []string   `json:"direction_ids"`
 	Speakers           []string   `json:"speakers"`
 	Moderators         []string   `json:"moderators"`
+	Location           *string    `json:"location"`
 }
 
 type Attendance struct {

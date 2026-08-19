@@ -50,11 +50,25 @@ export function LecturesSection({
   }
 
   function changeStatus(lecture: Lecture, action: 'activate' | 'finish') {
+    if (
+      action === 'finish' &&
+      !window.confirm(
+        `Завершить лекцию «${lecture.title}»? Регистрация посещений остановится, пока лекцию снова не активируют.`,
+      )
+    ) {
+      return
+    }
     transition.mutate(
       { lectureId: lecture.id, action },
       {
         onSuccess: () =>
-          toast.success(action === 'activate' ? 'Регистрация активирована' : 'Лекция завершена'),
+          toast.success(
+            action === 'activate'
+              ? lecture.status === 'FINISHED'
+                ? 'Лекция снова активна'
+                : 'Регистрация активирована'
+              : 'Лекция завершена',
+          ),
         onError: () => toast.error('Не удалось изменить статус лекции'),
       },
     )
@@ -121,6 +135,7 @@ export function LecturesSection({
                     </div>
                     <p className="mt-1 text-[13px] text-muted">
                       {lecture.starts_at ? formatDateTime(lecture.starts_at) : 'Время не задано'}
+                      {lecture.location && ` · ${lecture.location}`}
                       {lecture.attendance_starts_at &&
                         ` · регистрация с ${formatDateTime(lecture.attendance_starts_at)}`}
                     </p>
@@ -172,11 +187,23 @@ export function LecturesSection({
                       </>
                     )}
                     {lecture.status === 'FINISHED' && (
-                      <Button asChild size="sm" variant="secondary">
-                        <Link to={`/admin/contests/${contestId}/lectures/${lecture.id}/scanner`}>
-                          Посещения
-                        </Link>
-                      </Button>
+                      <>
+                        {canManage && (
+                          <Button
+                            size="sm"
+                            variant="subtle"
+                            loading={transition.isPending}
+                            onClick={() => changeStatus(lecture, 'activate')}
+                          >
+                            <Check className="h-4 w-4" /> Снова активировать
+                          </Button>
+                        )}
+                        <Button asChild size="sm" variant="secondary">
+                          <Link to={`/admin/contests/${contestId}/lectures/${lecture.id}/scanner`}>
+                            Посещения
+                          </Link>
+                        </Button>
+                      </>
                     )}
                   </div>
                 </CardBody>

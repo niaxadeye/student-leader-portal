@@ -33,6 +33,9 @@ func NewRepo(pool *pgxpool.Pool, pointRepo pointAppender, auditor txAuditor) *Re
 	return &Repo{pool: pool, points: pointRepo, audit: auditor}
 }
 
+const lectureCols = `id, contest_id, title, description, location, points, starts_at, ends_at,
+		attendance_starts_at, attendance_ends_at, status, created_at, updated_at`
+
 func (r *Repo) Can(ctx context.Context, userID, contestID, permission string) (bool, error) {
 	var allowed bool
 	err := r.pool.QueryRow(ctx, `
@@ -49,8 +52,7 @@ func (r *Repo) Can(ctx context.Context, userID, contestID, permission string) (b
 
 func (r *Repo) List(ctx context.Context, contestID string) ([]Lecture, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, contest_id, title, description, points, starts_at, ends_at,
-		       attendance_starts_at, attendance_ends_at, status, created_at, updated_at
+		SELECT `+lectureCols+`
 		FROM lectures WHERE contest_id=$1
 		ORDER BY starts_at NULLS LAST, created_at DESC`, contestID)
 	if err != nil {
@@ -73,8 +75,7 @@ func (r *Repo) List(ctx context.Context, contestID string) ([]Lecture, error) {
 
 func (r *Repo) Get(ctx context.Context, contestID, lectureID string) (*Lecture, error) {
 	lecture, err := scanLecture(r.pool.QueryRow(ctx, `
-		SELECT id, contest_id, title, description, points, starts_at, ends_at,
-		       attendance_starts_at, attendance_ends_at, status, created_at, updated_at
+		SELECT `+lectureCols+`
 		FROM lectures WHERE contest_id=$1 AND id=$2`, contestID, lectureID))
 	if err != nil {
 		return nil, err
@@ -91,12 +92,11 @@ func (r *Repo) Create(ctx context.Context, contestID string, input LectureInput)
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		created, err := scanLecture(tx.QueryRow(ctx, `
 			INSERT INTO lectures
-			  (contest_id, title, description, points, starts_at, ends_at,
+			  (contest_id, title, description, location, points, starts_at, ends_at,
 			   attendance_starts_at, attendance_ends_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-			RETURNING id, contest_id, title, description, points, starts_at, ends_at,
-			          attendance_starts_at, attendance_ends_at, status, created_at, updated_at`,
-			contestID, input.Title, input.Description, input.Points, input.StartsAt, input.EndsAt,
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			RETURNING `+lectureCols, contestID, input.Title, input.Description, input.Location,
+			input.Points, input.StartsAt, input.EndsAt,
 			input.AttendanceStartsAt, input.AttendanceEndsAt))
 		if err != nil {
 			return err
@@ -124,13 +124,11 @@ func (r *Repo) Update(ctx context.Context, contestID, lectureID string, input Le
 	var lecture *Lecture
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		updated, err := scanLecture(tx.QueryRow(ctx, `
-			UPDATE lectures SET title=$3, description=$4, points=$5, starts_at=$6, ends_at=$7,
-			       attendance_starts_at=$8, attendance_ends_at=$9, updated_at=now()
+			UPDATE lectures SET title=$3, description=$4, location=$5, points=$6, starts_at=$7, ends_at=$8,
+			       attendance_starts_at=$9, attendance_ends_at=$10, updated_at=now()
 			WHERE contest_id=$1 AND id=$2 AND status <> 'FINISHED'
-			RETURNING id, contest_id, title, description, points, starts_at, ends_at,
-			          attendance_starts_at, attendance_ends_at, status, created_at, updated_at`,
-			contestID, lectureID, input.Title, input.Description, input.Points,
-			input.StartsAt, input.EndsAt, input.AttendanceStartsAt, input.AttendanceEndsAt))
+			RETURNING `+lectureCols, contestID, lectureID, input.Title, input.Description, input.Location,
+			input.Points, input.StartsAt, input.EndsAt, input.AttendanceStartsAt, input.AttendanceEndsAt))
 		if errors.Is(err, ErrNotFound) {
 			return r.notFoundOrTransition(ctx, contestID, lectureID)
 		}
@@ -160,9 +158,7 @@ func (r *Repo) Transition(ctx context.Context, contestID, lectureID, from, to st
 	lecture, err := scanLecture(r.pool.QueryRow(ctx, `
 		UPDATE lectures SET status=$4, updated_at=now()
 		WHERE contest_id=$1 AND id=$2 AND status=$3
-		RETURNING id, contest_id, title, description, points, starts_at, ends_at,
-		          attendance_starts_at, attendance_ends_at, status, created_at, updated_at`,
-		contestID, lectureID, from, to))
+		RETURNING `+lectureCols, contestID, lectureID, from, to))
 	if errors.Is(err, ErrNotFound) {
 		return nil, r.notFoundOrTransition(ctx, contestID, lectureID)
 	}
@@ -254,8 +250,7 @@ func (r *Repo) CreateCode(
 func (r *Repo) ScanAttendance(ctx context.Context, params ScanParams) (result *ScanResult, err error) {
 	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		lecture, err := scanLecture(tx.QueryRow(ctx, `
-			SELECT id, contest_id, title, description, points, starts_at, ends_at,
-			       attendance_starts_at, attendance_ends_at, status, created_at, updated_at
+			SELECT `+lectureCols+`
 			FROM lectures WHERE contest_id=$1 AND id=$2 FOR SHARE`,
 			params.ContestID, params.LectureID))
 		if err != nil {
@@ -412,7 +407,7 @@ func (r *Repo) ListAttendance(ctx context.Context, contestID, lectureID string) 
 
 func (r *Repo) ParticipantLectures(ctx context.Context, contestID, participantID string) ([]ParticipantLecture, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT l.id, l.contest_id, l.title, l.description, l.points, l.starts_at, l.ends_at,
+		SELECT l.id, l.contest_id, l.title, l.description, l.location, l.points, l.starts_at, l.ends_at,
 		       l.attendance_starts_at, l.attendance_ends_at, l.status, l.created_at, l.updated_at,
 		       a.id, a.scanned_by_user_id, a.scanner_type, a.points_awarded, a.created_at
 		FROM lectures l
@@ -440,7 +435,7 @@ func (r *Repo) ParticipantLectures(ctx context.Context, contestID, participantID
 		var pointsAwarded *int64
 		var attendanceAt *time.Time
 		if err := rows.Scan(&item.Lecture.ID, &item.Lecture.ContestID, &item.Lecture.Title,
-			&item.Lecture.Description, &item.Lecture.Points, &item.Lecture.StartsAt,
+			&item.Lecture.Description, &item.Lecture.Location, &item.Lecture.Points, &item.Lecture.StartsAt,
 			&item.Lecture.EndsAt, &item.Lecture.AttendanceStartsAt,
 			&item.Lecture.AttendanceEndsAt, &item.Lecture.Status,
 			&item.Lecture.CreatedAt, &item.Lecture.UpdatedAt, &attendanceID,
@@ -481,7 +476,7 @@ type rowScanner interface {
 func scanLecture(row rowScanner) (*Lecture, error) {
 	var lecture Lecture
 	err := row.Scan(&lecture.ID, &lecture.ContestID, &lecture.Title, &lecture.Description,
-		&lecture.Points, &lecture.StartsAt, &lecture.EndsAt, &lecture.AttendanceStartsAt,
+		&lecture.Location, &lecture.Points, &lecture.StartsAt, &lecture.EndsAt, &lecture.AttendanceStartsAt,
 		&lecture.AttendanceEndsAt, &lecture.Status, &lecture.CreatedAt, &lecture.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound

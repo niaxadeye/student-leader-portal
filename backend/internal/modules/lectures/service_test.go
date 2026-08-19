@@ -38,6 +38,7 @@ func (f *fakeRepo) Create(_ context.Context, contestID string, input LectureInpu
 		ID: "lecture-1", ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft,
 		DirectionIDs: uniqueDirectionIDs(input.DirectionIDs), Directions: []DirectionRef{},
 		Speakers: append([]string{}, input.Speakers...), Moderators: append([]string{}, input.Moderators...),
+		Location: input.Location,
 	}, nil
 }
 func (f *fakeRepo) Update(_ context.Context, contestID, lectureID string, input LectureInput) (*Lecture, error) {
@@ -45,6 +46,7 @@ func (f *fakeRepo) Update(_ context.Context, contestID, lectureID string, input 
 		ID: lectureID, ContestID: contestID, Title: input.Title, Points: input.Points, Status: StatusDraft,
 		DirectionIDs: uniqueDirectionIDs(input.DirectionIDs), Directions: []DirectionRef{},
 		Speakers: append([]string{}, input.Speakers...), Moderators: append([]string{}, input.Moderators...),
+		Location: input.Location,
 	}, nil
 }
 func (f *fakeRepo) Transition(_ context.Context, contestID, lectureID, _, to string) (*Lecture, error) {
@@ -202,6 +204,45 @@ func TestCreateLectureKeepsSpeakersAndModerators(t *testing.T) {
 	}
 	if len(lecture.Moderators) != 1 || lecture.Moderators[0] != "Модератор Один" {
 		t.Fatalf("moderators: %#v", lecture.Moderators)
+	}
+}
+
+func TestLectureLocationNormalized(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fakeRepo{allowed: true}
+	service := NewService(repo, newTestCodes(&now), nil)
+	raw := "  Зал  A  "
+	lecture, err := service.Create(context.Background(), Actor{UserID: "staff"}, "event", LectureInput{
+		Title: "Лекция", Points: 50, Location: &raw,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lecture.Location == nil || *lecture.Location != "Зал A" {
+		t.Fatalf("location: %#v", lecture.Location)
+	}
+	tooLong := strings.Repeat("я", maxLocationRunes+1)
+	if _, err := service.Create(context.Background(), Actor{UserID: "staff"}, "event", LectureInput{
+		Title: "Лекция", Points: 50, Location: &tooLong,
+	}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("long location: got %v", err)
+	}
+}
+
+func TestActivateFinishedLecture(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fakeRepo{allowed: true, lecture: &Lecture{ID: "lecture-1", Status: StatusFinished}}
+	service := NewService(repo, newTestCodes(&now), nil)
+	lecture, err := service.Activate(context.Background(), Actor{UserID: "staff"}, "event", "lecture-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lecture.Status != StatusActive {
+		t.Fatalf("status: %s", lecture.Status)
+	}
+	repo.lecture.Status = StatusActive
+	if _, err := service.Activate(context.Background(), Actor{UserID: "staff"}, "event", "lecture-1"); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("already active: got %v", err)
 	}
 }
 

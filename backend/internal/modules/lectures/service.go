@@ -107,7 +107,17 @@ func (s *Service) Update(ctx context.Context, actor Actor, contestID, lectureID 
 }
 
 func (s *Service) Activate(ctx context.Context, actor Actor, contestID, lectureID string) (*Lecture, error) {
-	return s.transition(ctx, actor, contestID, lectureID, StatusDraft, StatusActive)
+	if err := s.ensure(ctx, actor, contestID, PermissionManage); err != nil {
+		return nil, err
+	}
+	current, err := s.repo.Get(ctx, contestID, lectureID)
+	if err != nil {
+		return nil, err
+	}
+	if current.Status != StatusDraft && current.Status != StatusFinished {
+		return nil, ErrInvalidTransition
+	}
+	return s.applyTransition(ctx, actor, contestID, lectureID, current.Status, StatusActive)
 }
 
 func (s *Service) Finish(ctx context.Context, actor Actor, contestID, lectureID string) (*Lecture, error) {
@@ -118,6 +128,10 @@ func (s *Service) transition(ctx context.Context, actor Actor, contestID, lectur
 	if err := s.ensure(ctx, actor, contestID, PermissionManage); err != nil {
 		return nil, err
 	}
+	return s.applyTransition(ctx, actor, contestID, lectureID, from, to)
+}
+
+func (s *Service) applyTransition(ctx context.Context, actor Actor, contestID, lectureID, from, to string) (*Lecture, error) {
 	lecture, err := s.repo.Transition(ctx, contestID, lectureID, from, to)
 	if err == nil && s.audit != nil {
 		s.audit.Log(ctx, actor.UserID, "EVENT_LECTURE_STATUS_CHANGED", "lecture", lectureID,
@@ -224,6 +238,11 @@ func validateInput(input LectureInput) (LectureInput, error) {
 	}
 	input.Speakers = speakers
 	input.Moderators = moderators
+	location, err := normalizeOptionalText(input.Location, maxLocationRunes)
+	if err != nil {
+		return LectureInput{}, err
+	}
+	input.Location = location
 	return input, nil
 }
 

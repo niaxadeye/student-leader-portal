@@ -241,8 +241,8 @@ export function ParticipantMePage() {
                     <div>
                       <p className="text-[14px] font-medium text-ink">{lecture.title}</p>
                       <p className="mt-0.5 text-[12px] text-muted">
-                        {lecture.starts_at ? formatDateTime(lecture.starts_at) : 'Время не задано'} ·
-                        +{lecture.points} баллов
+                      {lecture.starts_at ? formatDateTime(lecture.starts_at) : 'Время не задано'}
+                      {lecture.location ? ` · ${lecture.location}` : ''} · +{lecture.points} баллов
                       </p>
                       {people && <p className="mt-0.5 text-[12px] text-muted">{people}</p>}
                     </div>

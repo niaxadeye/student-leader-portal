@@ -16,6 +16,7 @@ export interface Lecture {
   directions: LectureDirection[]
   speakers: string[]
   moderators: string[]
+  location: string | null
   created_at: string
   updated_at: string
 }
@@ -36,6 +37,7 @@ export interface LectureInput {
   direction_ids: string[]
   speakers: string[]
   moderators: string[]
+  location: string | null
 }
 
 export interface LectureAttendance {

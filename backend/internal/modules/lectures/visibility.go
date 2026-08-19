@@ -8,6 +8,7 @@ import (
 const (
 	maxPeopleNameRunes = 120
 	maxPeoplePerRole   = 20
+	maxLocationRunes   = 300
 )
 
 func lectureAllowsParticipant(restrictedDirectionIDs []string, participantDirectionID *string) bool {
@@ -63,4 +64,18 @@ func normalizePeopleNames(names []string) ([]string, error) {
 		return nil, ErrValidation
 	}
 	return out, nil
+}
+
+func normalizeOptionalText(value *string, maxRunes int) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	text := strings.Join(strings.Fields(strings.TrimSpace(*value)), " ")
+	if text == "" {
+		return nil, nil
+	}
+	if utf8.RuneCountInString(text) > maxRunes {
+		return nil, ErrValidation
+	}
+	return &text, nil
 }
