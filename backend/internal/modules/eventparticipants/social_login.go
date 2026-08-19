@@ -76,6 +76,23 @@ func (s *Service) VKStartURL(eventSlug string, now time.Time) (string, string, e
 	return "https://oauth.vk.com/authorize?" + values.Encode(), state, nil
 }
 
+// LoginByTelegramValues — вход с сайта через Telegram Login Widget.
+func (s *Service) LoginByTelegramValues(
+	ctx context.Context,
+	eventSlug string,
+	values url.Values,
+	client ClientInfo,
+) (*SocialAuthResult, error) {
+	if !s.social.TelegramEnabled() {
+		return nil, ErrSocialUnavailable
+	}
+	identity, err := verifyTelegramLogin(values, s.social.TelegramBotToken, s.now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	return s.loginByTelegramIdentity(ctx, eventSlug, false, identity, client, "telegram")
+}
+
 func (s *Service) LoginByTelegramWebApp(
 	ctx context.Context,
 	eventSlug, initData string,
@@ -354,11 +371,14 @@ func (s *Service) exchangeVKCode(ctx context.Context, code string) (vkIdentity, 
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	var token struct {
-		UserID      int64  `json:"user_id"`
-		AccessToken string `json:"access_token"`
-		Error       string `json:"error"`
+		UserID           int64  `json:"user_id"`
+		AccessToken      string `json:"access_token"`
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
 	}
 	if err := json.Unmarshal(body, &token); err != nil || token.UserID <= 0 || token.AccessToken == "" {
+		slog.WarnContext(ctx, "vk_code_exchange_failed",
+			"status", resp.StatusCode, "vk_error", token.Error, "vk_error_description", token.ErrorDescription)
 		return vkIdentity{}, ErrInvalidCredentials
 	}
 	identity := vkIdentity{UserID: token.UserID}

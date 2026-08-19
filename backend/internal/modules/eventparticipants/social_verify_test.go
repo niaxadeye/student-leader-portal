@@ -12,6 +12,36 @@ import (
 	"time"
 )
 
+func TestVerifyTelegramLoginWidget(t *testing.T) {
+	t.Parallel()
+	token := "123456:ABCDEF"
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	values := telegramWidgetValues(telegramLoginRequest{
+		ID: 42, FirstName: "Иван", Username: "durov", AuthDate: now.Unix(),
+	})
+	values.Set("hash", telegramWidgetHash(token, values))
+
+	got, err := verifyTelegramLogin(values, token, now)
+	if err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if got.UserID != 42 || got.Username != "durov" {
+		t.Fatalf("identity = %#v", got)
+	}
+
+	values.Set("hash", "deadbeef")
+	if _, err := verifyTelegramLogin(values, token, now); err == nil {
+		t.Fatal("bad hash must fail")
+	}
+}
+
+func telegramWidgetHash(token string, values url.Values) string {
+	secret := sha256.Sum256([]byte(token))
+	mac := hmac.New(sha256.New, secret[:])
+	mac.Write([]byte(telegramCheckString(values)))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 func TestVerifyTelegramWebApp(t *testing.T) {
 	t.Parallel()
 	token := "123456:ABCDEF"

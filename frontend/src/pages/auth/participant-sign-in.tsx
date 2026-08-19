@@ -10,6 +10,7 @@ import {
   loginParticipantByName,
   loginParticipantBySKS,
   loginParticipantByTelegramWebApp,
+  loginParticipantByTelegramWidget,
   loginParticipantByUnionCard,
   loginParticipantByVKToken,
   socialAuthStartURL,
@@ -26,6 +27,7 @@ import {
   type ParticipantNameLoginValues,
 } from '@/features/participant-auth/login-schema'
 import { BackButton } from '@/pages/auth/login-back-button'
+import { TelegramLoginButton } from '@/pages/auth/telegram-login-button'
 import { ApiRequestError } from '@/shared/api/client'
 import { miniAppEventSlug, telegramWebApp } from '@/shared/lib/telegram-webapp'
 import { exchangeVkOneTapCode, renderVkOneTap } from '@/shared/lib/vkid'
@@ -232,22 +234,53 @@ export function ParticipantSignIn({
       )}
       {/* Виджет VK держим смонтированным: размонтирование оборвёт обмен кода. */}
       <div className={busy || choosing ? 'hidden' : 'flex flex-col gap-3'}>
-        <VkOneTapButton
-          enabled={vkOn}
-          eventSlug={preferredSlug}
-          appId={options?.vk.app_id}
-          redirectUrl={options?.vk.redirect_url}
-          onStart={() => setBusy('vk')}
-          onToken={(token) =>
-            void completeSocial(() =>
-              loginParticipantByVKToken(token, preferredSlug || undefined),
-            ).finally(() => setBusy(null))
-          }
-          onError={() => {
-            setBusy(null)
-            setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')
-          }}
-        />
+        {miniApp ? (
+          <>
+            <p className="text-[13px] text-muted">
+              Не нашли вас по Telegram? Войдите через VK ID.
+            </p>
+            {vkOn && (
+              <Button
+                type="button"
+                className="w-full bg-[#0077FF] hover:bg-[#0066dd]"
+                onClick={() => {
+                  // В вебвью Telegram всплывающие окна ненадёжны, поэтому редирект.
+                  window.location.href = socialAuthStartURL('vk', preferredSlug || undefined)
+                }}
+              >
+                Войти через VK ID
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            <VkOneTapButton
+              enabled={vkOn}
+              eventSlug={preferredSlug}
+              appId={options?.vk.app_id}
+              redirectUrl={options?.vk.redirect_url}
+              onStart={() => setBusy('vk')}
+              onToken={(token) =>
+                void completeSocial(() =>
+                  loginParticipantByVKToken(token, preferredSlug || undefined),
+                ).finally(() => setBusy(null))
+              }
+              onError={() => {
+                setBusy(null)
+                setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')
+              }}
+            />
+            <TelegramLoginButton
+              botUsername={options?.telegram.enabled ? options.telegram.bot_username : undefined}
+              onAuth={(user) => {
+                setBusy('telegram')
+                void completeSocial(() =>
+                  loginParticipantByTelegramWidget(user, preferredSlug || undefined),
+                ).finally(() => setBusy(null))
+              }}
+            />
+          </>
+        )}
         {!vkOn && (
           <p className="text-[13px] text-muted">
             Вход через VK ещё не подключён. Используйте резервный способ ниже.

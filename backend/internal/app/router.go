@@ -245,6 +245,7 @@ func (a *App) Router() http.Handler {
 				r.Post("/fio", d.eventParticipantsHandler.LoginByName)
 				r.Post("/union-card", d.eventParticipantsHandler.LoginByUnionCard)
 				r.Post("/sks", d.eventParticipantsHandler.LoginBySKSBarcode)
+				r.Post("/telegram", d.eventParticipantsHandler.LoginByTelegram)
 				r.Post("/telegram/webapp", d.eventParticipantsHandler.LoginByTelegramWebApp)
 				r.Post("/vk", d.eventParticipantsHandler.LoginByVKToken)
 			})
@@ -255,6 +256,7 @@ func (a *App) Router() http.Handler {
 			r.Get("/vk/callback", d.eventParticipantsHandler.VKCallback)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.CSRFOrigin(origins...))
+				r.Post("/telegram", d.eventParticipantsHandler.LoginByTelegram)
 				r.Post("/telegram/webapp", d.eventParticipantsHandler.LoginByTelegramWebApp)
 				r.Post("/vk", d.eventParticipantsHandler.LoginByVKToken)
 				r.Post("/continue", d.eventParticipantsHandler.ContinueSocialLogin)

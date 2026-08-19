@@ -18,6 +18,22 @@ type telegramIdentity struct {
 	Username string
 }
 
+// verifyTelegramLogin — подпись Login Widget: ключ это SHA256 от токена бота.
+func verifyTelegramLogin(values url.Values, botToken string, now time.Time) (telegramIdentity, error) {
+	identity, checkString, hash, authDate, err := parseTelegramPayload(values)
+	if err != nil || hash == "" {
+		return telegramIdentity{}, ErrInvalidCredentials
+	}
+	secret := sha256.Sum256([]byte(botToken))
+	if !hmacSHA256Hex(secret[:], checkString, hash) {
+		return telegramIdentity{}, ErrInvalidCredentials
+	}
+	if now.Sub(authDate) > socialAuthMaxAge || authDate.After(now.Add(5*time.Minute)) {
+		return telegramIdentity{}, ErrInvalidCredentials
+	}
+	return identity, nil
+}
+
 func verifyTelegramWebApp(initData, botToken string, now time.Time) (telegramIdentity, error) {
 	values, err := url.ParseQuery(initData)
 	if err != nil {

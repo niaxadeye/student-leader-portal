@@ -89,6 +89,26 @@ export function loginParticipantByTelegramWebApp(
   })
 }
 
+export interface TelegramWidgetUser {
+  id: number
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}
+
+export function loginParticipantByTelegramWidget(
+  user: TelegramWidgetUser,
+  eventSlug?: string,
+): Promise<SocialLoginResult> {
+  return participantApiRequest(socialAuthPath('telegram'), {
+    method: 'POST',
+    body: { ...user, event_slug: eventSlug || undefined },
+  })
+}
+
 export function loginParticipantByVKToken(
   accessToken: string,
   eventSlug?: string,
