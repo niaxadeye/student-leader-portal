@@ -7,6 +7,7 @@ import {
   useTaskModeration,
   useTransitionTask,
 } from '@/entities/event-task/queries'
+import { TaskIcon } from '@/entities/event-task/icon'
 import type { EventTask, TaskSubmission, TaskSubmissionStatus } from '@/entities/event-task/types'
 import { formatDateTime } from '@/shared/lib/format'
 import { Badge } from '@/shared/ui/badge'
@@ -99,13 +100,7 @@ export function EventTasksSection({
           {tasks.data.map((task) => (
             <Card key={task.id}>
               <CardBody className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center">
-                {task.image_url ? (
-                  <img src={task.image_url} alt="" className="h-14 w-20 rounded-lg object-cover" />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-brand-subtle text-2xl">
-                    {task.icon || '🎯'}
-                  </div>
-                )}
+                <TaskIcon url={task.image_url} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-ink">{task.title}</p>

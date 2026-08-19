@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { ArrowLeft, CheckCircle2, ExternalLink, Image, Link2, Send, Upload } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ExternalLink, Image, Link2, Send } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useParticipantAuth } from '@/entities/event-participant/auth-context'
 import { getParticipantTaskAssetURL } from '@/entities/event-task/api'
+import { TaskIcon } from '@/entities/event-task/icon'
 import { useParticipantTask, useSubmitParticipantTask } from '@/entities/event-task/queries'
 import type { TaskAsset } from '@/entities/event-task/types'
 import { formatDateTime } from '@/shared/lib/format'
@@ -11,8 +12,11 @@ import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardBody, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Field } from '@/shared/ui/field'
-import { Input, Textarea } from '@/shared/ui/input'
+import { FileUpload, type UploadedFile } from '@/shared/ui/file-upload'
+import { Textarea } from '@/shared/ui/input'
 import { ErrorState, Skeleton } from '@/shared/ui/states'
+
+type PendingImage = { id: string; file: File }
 
 async function openAsset(asset: TaskAsset) {
   if (asset.type === 'LINK' && asset.url) {
@@ -38,7 +42,7 @@ export function ParticipantTaskPage() {
   )
   const [comment, setComment] = useState('')
   const [links, setLinks] = useState('')
-  const [images, setImages] = useState<File[]>([])
+  const [images, setImages] = useState<PendingImage[]>([])
 
   if (!session) return null
   const back = `/event/${encodeURIComponent(session.event.slug)}/tasks`
@@ -61,7 +65,7 @@ export function ParticipantTaskPage() {
     const form = new FormData()
     form.append('participant_comment', comment)
     normalizedLinks.forEach((value) => form.append('links', value))
-    images.forEach((value) => form.append('images', value))
+    images.forEach((value) => form.append('images', value.file))
     try {
       await submit.mutateAsync(form)
       setComment('')
@@ -87,16 +91,11 @@ export function ParticipantTaskPage() {
       >
         <ArrowLeft className="h-4 w-4" /> Все задания
       </Link>
-      <Card className="overflow-hidden">
-        {value.image_url && (
-          <img src={value.image_url} alt="" className="max-h-72 w-full object-cover" />
-        )}
+      <Card>
         <CardBody className="p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-brand-subtle text-2xl">
-                {value.icon || '🎯'}
-              </div>
+            <div className="flex items-center gap-4">
+              <TaskIcon url={value.image_url} />
               <div>
                 <h1 className="text-[26px] font-bold text-ink">{value.title}</h1>
                 <p className="mt-0.5 text-[13px] text-muted">
@@ -240,19 +239,42 @@ export function ParticipantTaskPage() {
                   label="Изображения"
                   description="До 10 файлов JPG, PNG, WEBP или GIF, каждый до 20 МБ."
                 >
-                  {(props) => (
-                    <Input
-                      {...props}
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      onChange={(e) => setImages(Array.from(e.target.files ?? []))}
-                    />
-                  )}
+                  {() => {
+                    const files: UploadedFile[] = images.map((item) => ({
+                      id: item.id,
+                      name: item.file.name,
+                      size: item.file.size,
+                      status: 'READY',
+                      progress: 100,
+                    }))
+                    return (
+                      <FileUpload
+                        files={files}
+                        hint="JPG, PNG, WEBP или GIF"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onAdd={(list) => {
+                          const incoming = Array.from(list)
+                          setImages((current) => {
+                            const room = Math.max(0, 10 - current.length)
+                            return [
+                              ...current,
+                              ...incoming.slice(0, room).map((file) => ({
+                                id: crypto.randomUUID(),
+                                file,
+                              })),
+                            ]
+                          })
+                        }}
+                        onRemove={(id) =>
+                          setImages((current) => current.filter((item) => item.id !== id))
+                        }
+                      />
+                    )
+                  }}
                 </Field>
               )}
               <Button type="submit" loading={submit.isPending} className="self-start">
-                <Upload className="h-4 w-4" /> <Send className="h-4 w-4" /> Отправить на проверку
+                <Send className="h-4 w-4" /> Отправить на проверку
               </Button>
             </form>
           </CardBody>

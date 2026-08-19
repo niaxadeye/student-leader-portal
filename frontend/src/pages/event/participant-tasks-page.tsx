@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw, Target } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useParticipantAuth } from '@/entities/event-participant/auth-context'
+import { TaskIcon } from '@/entities/event-task/icon'
 import { useParticipantTasks } from '@/entities/event-task/queries'
 import type { TaskSubmissionStatus } from '@/entities/event-task/types'
 import { formatDateTime } from '@/shared/lib/format'
@@ -58,15 +59,10 @@ export function ParticipantTasksPage() {
                 to={`/event/${encodeURIComponent(session.event.slug)}/tasks/${task.id}`}
                 className="group"
               >
-                <Card className="h-full overflow-hidden transition-colors group-hover:border-brand">
-                  {task.image_url && (
-                    <img src={task.image_url} alt="" className="h-32 w-full object-cover" />
-                  )}
+                <Card className="h-full transition-colors group-hover:border-brand">
                   <CardBody className="flex h-full flex-col p-5">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-brand-subtle text-xl">
-                        {task.icon || '🎯'}
-                      </div>
+                      <TaskIcon url={task.image_url} />
                       <Badge tone="brand">+{task.points} баллов</Badge>
                     </div>
                     <h2 className="mt-3 text-[17px] font-semibold text-ink">{task.title}</h2>

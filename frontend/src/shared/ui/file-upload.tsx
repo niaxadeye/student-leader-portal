@@ -17,6 +17,7 @@ interface FileUploadProps {
   files: UploadedFile[]
   hint?: string
   accept?: string
+  multiple?: boolean
   onAdd: (files: FileList) => void
   onRemove: (id: string) => void
 }
@@ -27,7 +28,14 @@ const statusIcon = {
   REJECTED: <AlertCircle className="h-4 w-4 text-danger" />,
 }
 
-export function FileUpload({ files, hint, accept, onAdd, onRemove }: FileUploadProps) {
+export function FileUpload({
+  files,
+  hint,
+  accept,
+  multiple = true,
+  onAdd,
+  onRemove,
+}: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="flex flex-col gap-3">
@@ -43,10 +51,13 @@ export function FileUpload({ files, hint, accept, onAdd, onRemove }: FileUploadP
       <input
         ref={inputRef}
         type="file"
-        multiple
+        multiple={multiple}
         accept={accept}
         className="sr-only"
-        onChange={(e) => e.target.files && onAdd(e.target.files)}
+        onChange={(e) => {
+          if (e.target.files) onAdd(e.target.files)
+          e.target.value = ''
+        }}
       />
       {files.length > 0 && (
         <ul className="flex flex-col gap-2">
