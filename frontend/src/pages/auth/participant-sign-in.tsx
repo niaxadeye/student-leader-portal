@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ChevronDown, IdCard, ScanLine, Send, UserRound } from 'lucide-react'
+import { ChevronDown, IdCard, Loader2, ScanLine, Send, UserRound } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -34,6 +34,25 @@ import { Field } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 
 type BackupMethod = 'name' | 'union' | 'sks'
+
+// Обмен кода VK и проверка на бэкенде занимают несколько секунд — без явного
+// ожидания страница выглядит так, будто вход не сработал.
+type SocialProgressKind = 'vk' | 'telegram' | 'session'
+
+const socialProgressText: Record<SocialProgressKind, string> = {
+  vk: 'Входим через VK ID…',
+  telegram: 'Входим через Telegram…',
+  session: 'Завершаем вход…',
+}
+
+function SocialProgress({ kind }: { kind: SocialProgressKind }) {
+  return (
+    <div role="status" className="flex items-center gap-2.5 py-2 text-[14px] text-muted">
+      <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden />
+      {socialProgressText[kind]}
+    </div>
+  )
+}
 
 const backupMethods: Array<{
   id: BackupMethod
@@ -88,7 +107,10 @@ export function ParticipantSignIn({
   const [authError, setAuthError] = useState(socialErrorFromQuery(params.get('error')))
   const [backupOpen, setBackupOpen] = useState(false)
   const [backupMethod, setBackupMethod] = useState<BackupMethod>('name')
-  const [socialBusy, setSocialBusy] = useState(miniApp)
+  const [busy, setBusy] = useState<SocialProgressKind | null>(() => {
+    if (miniApp) return 'telegram'
+    return params.get('continue')?.trim() ? 'session' : null
+  })
   const [continueToken, setContinueToken] = useState(params.get('continue')?.trim() ?? '')
   const [matchedEvents, setMatchedEvents] = useState<PublicEvent[]>([])
   const miniAppAttempted = useRef(false)
@@ -118,11 +140,14 @@ export function ParticipantSignIn({
     const token = params.get('continue')?.trim()
     if (!token || status === 'loading' || continueAttempted.current) return
     continueAttempted.current = true
-    void completeSocial(() => continueSocialLogin(token)).then(() => {
-      const next = new URLSearchParams(params)
-      next.delete('continue')
-      setParams(next, { replace: true })
-    })
+    setBusy('session')
+    void completeSocial(() => continueSocialLogin(token))
+      .then(() => {
+        const next = new URLSearchParams(params)
+        next.delete('continue')
+        setParams(next, { replace: true })
+      })
+      .finally(() => setBusy(null))
     // OAuth вернул несколько мероприятий — добираем список.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
@@ -132,7 +157,7 @@ export function ParticipantSignIn({
     miniAppAttempted.current = true
     const app = telegramWebApp()
     if (!app) {
-      setSocialBusy(false)
+      setBusy(null)
       return
     }
     app.ready()
@@ -140,7 +165,7 @@ export function ParticipantSignIn({
     const startEvent = miniAppEventSlug(app.initDataUnsafe?.start_param) || preferredSlug
     void completeSocial(() =>
       loginParticipantByTelegramWebApp(app.initData, startEvent || undefined),
-    ).finally(() => setSocialBusy(false))
+    ).finally(() => setBusy(null))
     // Mini App: один автологин на запуск.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [miniApp, status])
@@ -204,45 +229,52 @@ export function ParticipantSignIn({
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-subtle">
-      {socialBusy ? (
-        <p className="text-[14px] text-muted">Входим через Telegram…</p>
-      ) : choosing ? (
+      {busy && <SocialProgress kind={busy} />}
+      {!busy && choosing && (
         <EventPicker
           title="Выберите мероприятие"
           events={matchedEvents}
           loading={false}
           onPick={chooseMatchedEvent}
         />
-      ) : (
-        <div className="flex flex-col gap-3">
-          <VkOneTapButton
-            enabled={vkOn}
-            eventSlug={preferredSlug}
-            appId={options?.vk.app_id}
-            redirectUrl={options?.vk.redirect_url}
-            onToken={(token) => completeSocial(() => loginParticipantByVKToken(token, preferredSlug || undefined))}
-            onError={() => setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')}
-          />
-          {!miniApp && telegramMiniAppLink && (
-            <Button
-              type="button"
-              className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
-              onClick={() => {
-                // Вход через Telegram работает только из Mini App, поэтому открываем её.
-                window.open(telegramMiniAppLink, '_blank', 'noopener')
-              }}
-            >
-              <Send className="h-4 w-4" aria-hidden />
-              Войти через Telegram
-            </Button>
-          )}
-          {!vkOn && !telegramOn && (
-            <p className="text-[13px] text-muted">
-              Социальный вход ещё не подключён. Используйте резервный способ ниже.
-            </p>
-          )}
-        </div>
       )}
+      {/* Виджет VK держим смонтированным: размонтирование оборвёт обмен кода. */}
+      <div className={busy || choosing ? 'hidden' : 'flex flex-col gap-3'}>
+        <VkOneTapButton
+          enabled={vkOn}
+          eventSlug={preferredSlug}
+          appId={options?.vk.app_id}
+          redirectUrl={options?.vk.redirect_url}
+          onStart={() => setBusy('vk')}
+          onToken={(token) =>
+            void completeSocial(() =>
+              loginParticipantByVKToken(token, preferredSlug || undefined),
+            ).finally(() => setBusy(null))
+          }
+          onError={() => {
+            setBusy(null)
+            setAuthError('Не удалось войти через VK. Попробуйте ещё раз.')
+          }}
+        />
+        {!miniApp && telegramMiniAppLink && (
+          <Button
+            type="button"
+            className="w-full bg-[#229ED9] hover:bg-[#1b8dc3]"
+            onClick={() => {
+              // Вход через Telegram работает только из Mini App, поэтому открываем её.
+              window.open(telegramMiniAppLink, '_blank', 'noopener')
+            }}
+          >
+            <Send className="h-4 w-4" aria-hidden />
+            Войти через Telegram
+          </Button>
+        )}
+        {!vkOn && !telegramOn && (
+          <p className="text-[13px] text-muted">
+            Социальный вход ещё не подключён. Используйте резервный способ ниже.
+          </p>
+        )}
+      </div>
 
       {authError && (
         <div role="alert" className="rounded-[10px] bg-danger/10 px-3.5 py-2.5 text-[14px] text-danger">
@@ -250,7 +282,7 @@ export function ParticipantSignIn({
         </div>
       )}
 
-      {!choosing && !socialBusy && (
+      {!choosing && !busy && (
         <div className="border-t border-border pt-3">
           <button
             type="button"
@@ -331,6 +363,7 @@ function VkOneTapButton({
   eventSlug,
   appId,
   redirectUrl,
+  onStart,
   onToken,
   onError,
 }: {
@@ -338,13 +371,16 @@ function VkOneTapButton({
   eventSlug?: string
   appId?: string
   redirectUrl?: string
+  onStart: () => void
   onToken: (accessToken: string) => void
   onError: () => void
 }) {
   const container = useRef<HTMLDivElement>(null)
+  const onStartRef = useRef(onStart)
   const onTokenRef = useRef(onToken)
   const onErrorRef = useRef(onError)
   const [failed, setFailed] = useState(false)
+  onStartRef.current = onStart
   onTokenRef.current = onToken
   onErrorRef.current = onError
 
@@ -358,6 +394,7 @@ function VkOneTapButton({
       appId,
       redirectUrl,
       onCode: (code, deviceId) => {
+        onStartRef.current()
         void exchangeVkOneTapCode(code, deviceId)
           .then((token) => {
             if (!disposed) onTokenRef.current(token)
