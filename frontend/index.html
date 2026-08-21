@@ -4,9 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Student Leader Cabinet</title>
-    <!-- Telegram требует подключать скрипт до остальных: он читает параметры
-         запуска из URL, которые роутер успевает затереть. -->
-    <script src="https://telegram.org/js/telegram-web-app.js?63" data-telegram-web-app="1"></script>
+    <!-- Снимок hash до роутера. Сам telegram-web-app.js грузим только внутри
+         Mini App: иначе обычный браузер блокирует SPA, пока telegram.org
+         не ответит или не отвалится по таймауту. -->
+    <script>
+      (function () {
+        var hash = String(location.hash || '').replace(/^#/, '')
+        window.__TG_LAUNCH_HASH__ = hash.indexOf('tgWebApp') !== -1 ? hash : ''
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

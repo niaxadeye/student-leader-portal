@@ -21,8 +21,11 @@ declare global {
   interface Window {
     Telegram?: { WebApp?: TelegramWebApp }
     TelegramWebviewProxy?: unknown
+    __TG_LAUNCH_HASH__?: string
   }
 }
+
+const SDK_SRC = 'https://telegram.org/js/telegram-web-app.js?63'
 
 /** Telegram передаёт параметры запуска во фрагменте, оттуда же их читает SDK. */
 export function telegramLaunchParams(): string {
@@ -30,8 +33,14 @@ export function telegramLaunchParams(): string {
   return hash.includes('tgWebApp') ? hash : ''
 }
 
-// Снимок на момент загрузки бандла: навигация роутера стирает фрагмент.
-const launchParamsAtLoad = telegramLaunchParams()
+function snapshotLaunchHash(): string {
+  const injected = window.__TG_LAUNCH_HASH__
+  if (typeof injected === 'string' && injected.includes('tgWebApp')) return injected
+  return telegramLaunchParams()
+}
+
+// Снимок на момент загрузки: навигация роутера стирает фрагмент.
+const launchParamsAtLoad = snapshotLaunchHash()
 
 export function telegramLaunchParamsAtLoad(): string {
   return launchParamsAtLoad
@@ -43,9 +52,8 @@ export function telegramWebApp(): TelegramWebApp | null {
   return app
 }
 
-/** Скрипт SDK подключён на всех страницах, поэтому сам по себе объект
- *  window.Telegram.WebApp признаком запуска не является: без параметров
- *  запуска он поднимается с platform "unknown". */
+/** Скрипт SDK больше не висит на всех страницах. Mini App определяем по
+ *  initData, platform, WebView-прокси или снимку hash при загрузке. */
 export function maybeTelegramMiniApp(): boolean {
   const app = window.Telegram?.WebApp
   if (app?.initData) return true
@@ -54,13 +62,31 @@ export function maybeTelegramMiniApp(): boolean {
   return Boolean(telegramLaunchParamsAtLoad())
 }
 
+function restoreLaunchHash(): void {
+  if (!launchParamsAtLoad || window.location.hash.includes('tgWebApp')) return
+  const url = `${window.location.pathname}${window.location.search}#${launchParamsAtLoad}`
+  window.history.replaceState(window.history.state, '', url)
+}
+
+function ensureTelegramSdk(): void {
+  if (!maybeTelegramMiniApp()) return
+  if (document.querySelector('script[data-telegram-web-app]')) return
+  restoreLaunchHash()
+  const script = document.createElement('script')
+  script.src = SDK_SRC
+  script.async = true
+  script.setAttribute('data-telegram-web-app', '1')
+  document.head.appendChild(script)
+}
+
+ensureTelegramSdk()
+
 /** Ссылку на Mini App собирают организаторы, поэтому префикс необязателен. */
 export function miniAppEventSlug(startParam?: string): string {
   const value = startParam?.trim() ?? ''
   return value.startsWith('event_') ? value.slice('event_'.length) : value
 }
 
-// Скрипт подключён в index.html, здесь только ждём, пока он отработает.
 export function waitForTelegramWebApp(timeoutMs = 2500): Promise<TelegramWebApp | null> {
   const existing = telegramWebApp()
   if (existing) return Promise.resolve(existing)

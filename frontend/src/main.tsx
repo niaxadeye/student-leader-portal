@@ -7,6 +7,7 @@ import { queryClient } from '@/app/query-client'
 import { AppToaster } from '@/shared/ui/toast'
 import { AuthProvider } from '@/entities/auth/auth-context'
 import { markModuleReloadAttempt } from '@/shared/lib/module-reload'
+import '@/shared/lib/telegram-webapp'
 import './app/styles/global.css'
 
 // Vite emits this event when a lazy route still references a chunk from the
