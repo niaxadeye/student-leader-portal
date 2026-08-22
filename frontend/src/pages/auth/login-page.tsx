@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { GraduationCap, Shield, Users } from 'lucide-react'
+import { GraduationCap, Scale, Shield, Users } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Field } from '@/shared/ui/field'
@@ -16,8 +16,9 @@ import { BackButton } from '@/pages/auth/login-back-button'
 import { MiniAppDebug } from '@/pages/auth/mini-app-debug'
 import { ParticipantSignIn } from '@/pages/auth/participant-sign-in'
 import { telegramWebApp, maybeTelegramMiniApp, waitForTelegramWebApp } from '@/shared/lib/telegram-webapp'
+import { useAppConfig } from '@/shared/config/use-app-config'
 
-export type LoginAudience = 'admin' | 'contestant' | 'participant'
+export type LoginAudience = 'admin' | 'contestant' | 'participant' | 'jury'
 
 function authMessage(e: unknown): string {
   if (e instanceof ApiRequestError) {
@@ -47,6 +48,12 @@ const roles: Array<{
     icon: GraduationCap,
   },
   {
+    id: 'jury',
+    title: 'Жюри',
+    description: 'Оценивание испытаний на live-сессии',
+    icon: Scale,
+  },
+  {
     id: 'participant',
     title: 'Участник',
     description: 'Вход в платформу мероприятия через VK или Telegram',
@@ -58,6 +65,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { status, user, setUser } = useAuth()
+  const { data: appConfig } = useAppConfig()
   const [audience, setAudienceState] = useState<LoginAudience | null>(parseAudience(params.get('as')))
   // Mini App подтверждается только наличием initData, UA даёт лишь повод подождать SDK.
   const [miniApp, setMiniApp] = useState<'probing' | 'yes' | 'no'>(() => {
@@ -108,7 +116,7 @@ export function LoginPage() {
         </div>
 
         {!audience ? (
-          <RolePicker onPick={setAudience} />
+          <RolePicker onPick={setAudience} showJury={appConfig?.features.jury === true} />
         ) : audience === 'participant' ? (
           <ParticipantSignIn miniApp={miniApp === 'yes'} onBack={() => setAudience(null)} />
         ) : (
@@ -133,10 +141,11 @@ export function LoginPage() {
   )
 }
 
-function RolePicker({ onPick }: { onPick: (role: LoginAudience) => void }) {
+function RolePicker({ onPick, showJury }: { onPick: (role: LoginAudience) => void; showJury: boolean }) {
+  const items = showJury ? roles : roles.filter((r) => r.id !== 'jury')
   return (
     <div className="flex flex-col gap-3">
-      {roles.map(({ id, title, description, icon: Icon }) => (
+      {items.map(({ id, title, description, icon: Icon }) => (
         <button
           key={id}
           type="button"
@@ -161,7 +170,7 @@ function PasswordLogin({
   onBack,
   onLoggedIn,
 }: {
-  audience: 'admin' | 'contestant'
+  audience: 'admin' | 'contestant' | 'jury'
   onBack: () => void
   onLoggedIn: () => Promise<void>
 }) {
@@ -221,12 +230,13 @@ function PasswordLogin({
 
 function parseAudience(value: string | null): LoginAudience | null {
   if (value === 'admin' || value === 'staff') return 'admin'
-  if (value === 'contestant' || value === 'participant') return value
+  if (value === 'contestant' || value === 'participant' || value === 'jury') return value
   return null
 }
 
 function subtitleFor(audience: LoginAudience): string {
   if (audience === 'admin') return 'Вход администратора и сотрудников'
   if (audience === 'contestant') return 'Вход конкурсанта'
+  if (audience === 'jury') return 'Вход члена жюри'
   return 'Вход участника мероприятия'
 }

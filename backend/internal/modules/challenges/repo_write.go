@@ -14,13 +14,15 @@ func (r *Repo) Create(ctx context.Context, c *Challenge, actorID string) (string
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO contest_challenges
 		  (contest_id, title, slug, short_description, full_description, instructions,
-		   status, sort_order, open_at, deadline_at, close_at, created_by, updated_by)
+		   status, sort_order, open_at, deadline_at, close_at, held_at, venue, accepts_submissions,
+		   created_by, updated_by)
 		VALUES ($1,$2,$3,$4,$5,$6,'DRAFT',
 		  (SELECT coalesce(max(sort_order),0)+1 FROM contest_challenges WHERE contest_id=$1),
-		  $7,$8,$9,$10,$10)
+		  $7,$8,$9,$10,$11,$12,$13,$13)
 		RETURNING id`,
 		c.ContestID, c.Title, c.Slug, c.ShortDescription, c.FullDescription,
-		c.Instructions, c.OpenAt, c.DeadlineAt, c.CloseAt, actorID).Scan(&id)
+		c.Instructions, c.OpenAt, c.DeadlineAt, c.CloseAt, c.HeldAt, c.Venue, c.AcceptsSubmissions,
+		actorID).Scan(&id)
 	if isUniqueViolation(err) {
 		return "", ErrSlugTaken
 	}
@@ -32,10 +34,11 @@ func (r *Repo) Update(ctx context.Context, id string, c *Challenge, actorID stri
 	ct, err := r.pool.Exec(ctx, `
 		UPDATE contest_challenges SET title=$2, short_description=$3, full_description=$4,
 		       instructions=$5, open_at=$6, deadline_at=$7, close_at=$8,
-		       updated_by=$9, updated_at=now()
+		       held_at=$9, venue=$10, accepts_submissions=$11,
+		       updated_by=$12, updated_at=now()
 		WHERE id=$1`,
 		id, c.Title, c.ShortDescription, c.FullDescription, c.Instructions,
-		c.OpenAt, c.DeadlineAt, c.CloseAt, actorID)
+		c.OpenAt, c.DeadlineAt, c.CloseAt, c.HeldAt, c.Venue, c.AcceptsSubmissions, actorID)
 	if err != nil {
 		return err
 	}

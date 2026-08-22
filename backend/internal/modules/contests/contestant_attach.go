@@ -37,4 +37,3 @@ func canAttachExistingContestant(actor Actor, acc existingAccount) error {
 	}
 	return ErrLoginConflict
 }
-

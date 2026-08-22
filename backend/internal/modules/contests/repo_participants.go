@@ -11,7 +11,7 @@ import (
 func (r *Repo) Participants(ctx context.Context, contestID string) ([]Participant, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.id, p.contest_id, p.user_id, p.participant_type,
-		       u.login, u.full_name, u.organization, u.status, p.joined_at, p.left_at
+		       u.login, u.full_name, u.organization, u.status, u.avatar_key, p.joined_at, p.left_at
 		FROM contest_participants p JOIN users u ON u.id = p.user_id
 		WHERE p.contest_id = $1 AND p.left_at IS NULL
 		ORDER BY p.joined_at`, contestID)
@@ -23,7 +23,7 @@ func (r *Repo) Participants(ctx context.Context, contestID string) ([]Participan
 	for rows.Next() {
 		var p Participant
 		if err := rows.Scan(&p.ID, &p.ContestID, &p.UserID, &p.ParticipantType,
-			&p.Login, &p.FullName, &p.Organization, &p.UserStatus,
+			&p.Login, &p.FullName, &p.Organization, &p.UserStatus, &p.AvatarKey,
 			&p.JoinedAt, &p.LeftAt); err != nil {
 			return nil, err
 		}
@@ -129,4 +129,30 @@ func (r *Repo) LoginExists(ctx context.Context, login string) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
+}
+
+func (r *Repo) IsActiveContestant(ctx context.Context, contestID, userID string) (bool, error) {
+	var ok bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM contest_participants
+			WHERE contest_id=$1 AND user_id=$2 AND left_at IS NULL AND participant_type='CONTESTANT'
+		)`, contestID, userID).Scan(&ok)
+	return ok, err
+}
+
+func (r *Repo) SetUserAvatarKey(ctx context.Context, userID string, key *string) (*string, error) {
+	var prev *string
+	err := r.pool.QueryRow(ctx, `
+		WITH old AS (SELECT avatar_key FROM users WHERE id=$1 AND deleted_at IS NULL)
+		UPDATE users SET avatar_key=$2, updated_at=now()
+		WHERE id=$1 AND deleted_at IS NULL
+		RETURNING (SELECT avatar_key FROM old)`, userID, key).Scan(&prev)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return prev, nil
 }

@@ -22,12 +22,16 @@ type ImageStore interface {
 }
 
 type Handler struct {
-	svc   *Service
-	store ImageStore
+	svc            *Service
+	store          ImageStore
+	maxUploadBytes int64
 }
 
-func NewHandler(svc *Service, store ImageStore) *Handler {
-	return &Handler{svc: svc, store: store}
+func NewHandler(svc *Service, store ImageStore, maxImageBytes int64) *Handler {
+	if maxImageBytes <= 0 {
+		maxImageBytes = 20 << 20
+	}
+	return &Handler{svc: svc, store: store, maxUploadBytes: maxImageBytes + (1 << 20)}
 }
 
 func actorOf(r *http.Request) Actor {
@@ -53,8 +57,8 @@ func (h *Handler) contestJSON(ctx context.Context, c *Contest) map[string]any {
 		"timezone": c.Timezone, "participants_count": c.ParticipantsCount,
 		"challenges_count": c.ChallengesCount,
 		"access_level":     emptyToNil(c.AccessLevel),
-		"image_url":  imageURL,
-		"created_at": c.CreatedAt, "updated_at": c.UpdatedAt, "archived_at": c.ArchivedAt,
+		"image_url":        imageURL,
+		"created_at":       c.CreatedAt, "updated_at": c.UpdatedAt, "archived_at": c.ArchivedAt,
 	}
 }
 
@@ -173,6 +177,8 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		httpserver.WriteError(w, r, http.StatusConflict, "INVALID_TRANSITION", "Недопустимый переход статуса", nil)
 	case errors.Is(err, ErrLoginConflict):
 		httpserver.WriteError(w, r, http.StatusConflict, "LOGIN_TAKEN", "Логин уже занят", nil)
+	case errors.Is(err, ErrStorageDisabled):
+		httpserver.WriteError(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "Хранилище изображений временно недоступно", nil)
 	case errors.Is(err, ErrValidation):
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Проверьте заполнение полей", nil)
 	default:

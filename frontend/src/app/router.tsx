@@ -162,8 +162,28 @@ const appRoutes: RouteObject[] = [
                   {
                     path: 'challenges/:challengeId',
                     lazy: async () => ({
+                      Component: (await import('@/pages/admin/challenge-hub-page')).ChallengeHubPage,
+                    }),
+                  },
+                  {
+                    path: 'challenges/:challengeId/intake',
+                    lazy: async () => ({
                       Component: (await import('@/pages/admin/challenge-builder-page'))
-                        .ChallengeBuilderPage,
+                        .ChallengeIntakePage,
+                    }),
+                  },
+                  {
+                    path: 'challenges/:challengeId/briefing',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/admin/challenge-briefing-page'))
+                        .ChallengeBriefingPage,
+                    }),
+                  },
+                  {
+                    path: 'challenges/:challengeId/run',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/admin/challenge-builder-page'))
+                        .ChallengeRunPage,
                     }),
                   },
                 ],
@@ -189,6 +209,31 @@ const appRoutes: RouteObject[] = [
                     }),
                   },
                 ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: '/jury',
+        element: <RequireRole roles={['JURY', 'REMOTE_JURY']} />,
+        children: [
+          {
+            lazy: async () => ({
+              Component: (await import('@/pages/jury/jury-layout')).JuryLayout,
+            }),
+            children: [
+              {
+                index: true,
+                lazy: async () => ({
+                  Component: (await import('@/pages/jury/jury-home-page')).JuryHomePage,
+                }),
+              },
+              {
+                path: 'challenges/:challengeId',
+                lazy: async () => ({
+                  Component: (await import('@/pages/jury/jury-trial-page')).JuryTrialPage,
+                }),
               },
             ],
           },

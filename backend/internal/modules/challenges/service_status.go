@@ -69,6 +69,7 @@ func (s *Service) Duplicate(ctx context.Context, a Actor, challengeID string) (*
 			ContestID: src.ContestID, Title: copyTitle, Slug: copySlug(src.Title, attempt),
 			ShortDescription: src.ShortDescription, FullDescription: src.FullDescription,
 			Instructions: src.Instructions, OpenAt: src.OpenAt, DeadlineAt: src.DeadlineAt, CloseAt: src.CloseAt,
+			HeldAt: src.HeldAt, Venue: src.Venue, AcceptsSubmissions: src.AcceptsSubmissions,
 		}
 		newID, err = s.repo.Create(ctx, nc, a.UserID)
 		if err == nil {

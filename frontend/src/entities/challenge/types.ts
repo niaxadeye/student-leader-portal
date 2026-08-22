@@ -41,6 +41,24 @@ export interface FormField {
 export type SubmissionStatus = 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED' | 'LOCKED'
 export type ChallengeStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'ARCHIVED'
 
+export interface BriefingFile {
+  file_id: string
+  original_name: string
+  size_bytes?: number | null
+  mime_type?: string | null
+  download_url?: string | null
+}
+
+export interface ChallengeBriefing {
+  visible: boolean
+  scheduled: boolean
+  hidden: boolean
+  personalized: boolean
+  publish_at?: string | null
+  body_text?: string
+  files: BriefingFile[]
+}
+
 export interface Challenge {
   id: string
   contestId: string
@@ -50,9 +68,11 @@ export interface Challenge {
   instructions?: string
   status: ChallengeStatus
   deadline_at?: string
+  accepts_submissions: boolean
   allow_edit_after_submission: boolean
   allow_late_submission: boolean
   schema_version: number
   my_submission_status?: SubmissionStatus
   fields: FormField[]
+  briefing?: ChallengeBriefing | null
 }

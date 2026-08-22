@@ -1,6 +1,14 @@
 // Админ-API конструктора испытаний (бэкенд: modules/challenges).
-import { apiRequest } from '@/shared/api/client'
-import type { AdminChallenge, AdminField, ChallengeInput, FieldInput } from './admin-types'
+import { apiPostForm, apiRequest } from '@/shared/api/client'
+import type {
+  AdminBriefing,
+  AdminChallenge,
+  AdminField,
+  BriefingInput,
+  ChallengeInput,
+  FieldInput,
+  OverrideInput,
+} from './admin-types'
 
 // ── Испытания ────────────────────────────────────────────────────────────
 export function listChallenges(contestId: string): Promise<AdminChallenge[]> {
@@ -64,4 +72,53 @@ export function reorderFields(challengeId: string, fieldIds: string[]): Promise<
     method: 'PATCH',
     body: { field_ids: fieldIds },
   })
+}
+
+export function getChallengeBriefing(challengeId: string): Promise<AdminBriefing> {
+  return apiRequest<AdminBriefing>(`/admin/challenges/${challengeId}/briefing`)
+}
+
+export function saveChallengeBriefing(challengeId: string, input: BriefingInput): Promise<AdminBriefing> {
+  return apiRequest<AdminBriefing>(`/admin/challenges/${challengeId}/briefing`, {
+    method: 'PUT',
+    body: input,
+  })
+}
+
+export function uploadBriefingFile(challengeId: string, file: File): Promise<AdminBriefing> {
+  const form = new FormData()
+  form.append('file', file)
+  return apiPostForm<AdminBriefing>(`/admin/challenges/${challengeId}/briefing/files`, form)
+}
+
+export function deleteBriefingFile(challengeId: string, fileId: string): Promise<AdminBriefing> {
+  return apiRequest<AdminBriefing>(`/admin/challenges/${challengeId}/briefing/files/${fileId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function saveBriefingOverride(
+  challengeId: string,
+  userId: string,
+  input: OverrideInput,
+): Promise<AdminBriefing> {
+  return apiRequest<AdminBriefing>(`/admin/challenges/${challengeId}/briefing/contestants/${userId}`, {
+    method: 'PUT',
+    body: input,
+  })
+}
+
+export function clearBriefingOverride(challengeId: string, userId: string): Promise<AdminBriefing> {
+  return apiRequest<AdminBriefing>(`/admin/challenges/${challengeId}/briefing/contestants/${userId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function uploadOverrideFile(challengeId: string, userId: string, file: File): Promise<AdminBriefing> {
+  const form = new FormData()
+  form.append('file', file)
+  return apiPostForm<AdminBriefing>(
+    `/admin/challenges/${challengeId}/briefing/contestants/${userId}/files`,
+    form,
+  )
 }

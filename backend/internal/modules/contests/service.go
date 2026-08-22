@@ -12,17 +12,25 @@ type Auditor interface {
 }
 
 type Service struct {
-	repo  *Repo
-	audit Auditor
+	repo     *Repo
+	audit    Auditor
+	maxImage int64
 }
 
 func NewService(repo *Repo, audit Auditor) *Service {
-	return &Service{repo: repo, audit: audit}
+	return &Service{repo: repo, audit: audit, maxImage: 20 << 20}
+}
+
+func (s *Service) SetMaxImage(n int64) {
+	if n > 0 {
+		s.maxImage = n
+	}
 }
 
 // Actor — субъект операции (из принципала запроса).
-//   IsSuper — роль SUPER_ADMIN (организатор-создатель).
-//   IsMega  — роль MEGA_ADMIN (полный кросс-арендный доступ, §3.1).
+//
+//	IsSuper — роль SUPER_ADMIN (организатор-создатель).
+//	IsMega  — роль MEGA_ADMIN (полный кросс-арендный доступ, §3.1).
 type Actor struct {
 	UserID  string
 	IsSuper bool

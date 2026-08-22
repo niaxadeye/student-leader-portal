@@ -4,7 +4,7 @@ import "time"
 
 // Валидные роли и scope для назначения (SITE.md §5, §21.2–21.3).
 var ValidRoles = map[string]bool{
-	"MEGA_ADMIN": true, "SUPER_ADMIN": true, "ADMIN": true, "STAFF": true, "CONTESTANT": true,
+	"MEGA_ADMIN": true, "SUPER_ADMIN": true, "ADMIN": true, "STAFF": true, "JURY": true, "REMOTE_JURY": true, "CONTESTANT": true,
 }
 
 // Уровни доступа ADMIN к конкурсу (user_roles.access_level, §1.2).

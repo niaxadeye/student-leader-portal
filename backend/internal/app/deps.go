@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/eazytech/student-leader-cabinet/internal/modules/auth"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/challenges"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/contests"
+	"github.com/eazytech/student-leader-cabinet/internal/modules/evaluation"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/eventparticipants"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/eventpermissions"
 	"github.com/eazytech/student-leader-cabinet/internal/modules/eventtasks"
@@ -37,6 +40,7 @@ type deps struct {
 	lecturesHandler          *lectures.Handler
 	eventTasksHandler        *eventtasks.Handler
 	merchHandler             *merch.Handler
+	evaluationHandler        *evaluation.Handler
 }
 
 func (a *App) build() *deps {
@@ -88,6 +92,7 @@ func (a *App) build() *deps {
 	if maxTaskImageBytes <= 0 || maxTaskImageBytes > 20<<20 {
 		maxTaskImageBytes = 20 << 20
 	}
+	contestsSvc.SetMaxImage(maxTaskImageBytes)
 	participantCookie := eventparticipants.CookieConfig{
 		Name: a.cfg.ParticipantAuth.CookieName, Domain: a.cfg.Cookie.Domain,
 		Secure: a.cfg.Cookie.Secure, SameSite: parseSameSite(a.cfg.Cookie.SameSite),
@@ -117,6 +122,10 @@ func (a *App) build() *deps {
 		merchFileStore = store
 	}
 
+	if store != nil {
+		challengesSvc.SetFiles(store, store.PresignGet, maxTaskImageBytes)
+	}
+
 	submissionsSvc := submissions.NewService(
 		submissions.NewRepo(a.pool),
 		submissions.NewChallengeAdapter(challengesRepo, contestsRepo),
@@ -138,11 +147,34 @@ func (a *App) build() *deps {
 		merchSvc.SetPresigner(store.PresignGet)
 	}
 
+	evaluationSvc := evaluation.NewService(
+		evaluation.NewRepo(a.pool), contestsRepo, auditSvc, a.cfg.Features.Jury,
+	)
+	evaluationSvc.SetPasswordVerifier(authSvc)
+	if store != nil {
+		evaluationSvc.SetPresigner(store.PresignGet)
+	}
+	juryRemote := func(ctx context.Context, userID, challengeID string, isMega bool) (bool, error) {
+		err := evaluationSvc.AssertRemoteJury(ctx, evaluation.Actor{UserID: userID, IsMega: isMega}, challengeID)
+		if err == nil {
+			return true, nil
+		}
+		if errors.Is(err, evaluation.ErrNotAssigned) || errors.Is(err, evaluation.ErrForbidden) ||
+			errors.Is(err, evaluation.ErrNotFound) || errors.Is(err, evaluation.ErrChallenge) ||
+			errors.Is(err, evaluation.ErrDisabled) {
+			return false, nil
+		}
+		return false, err
+	}
+	challengesSvc.SetJuryReview(juryRemote)
+	submissionsSvc.SetJuryReview(juryRemote)
+	authSvc.SetJuryAudienceCheck(evaluationSvc.UserHasRemoteJury)
+
 	return &deps{
 		authHandler:              auth.NewHandler(authSvc, cookie),
 		authn:                    middleware.NewAuthenticator(jwtMgr, repo),
-		contestsHandler:          contests.NewHandler(contestsSvc, imageStore),
-		challengesHandler:        challenges.NewHandler(challengesSvc),
+		contestsHandler:          contests.NewHandler(contestsSvc, imageStore, maxTaskImageBytes),
+		challengesHandler:        challenges.NewHandler(challengesSvc, a.cfg.Limits.MaxFileSizeMB),
 		userAdminHandler:         useradmin.NewHandler(userAdminSvc),
 		staffHandler:             eventpermissions.NewHandler(staffSvc),
 		submissionsHandler:       submissions.NewHandler(submissionsSvc, fileStore, a.cfg.Limits.MaxFileSizeMB),
@@ -152,6 +184,7 @@ func (a *App) build() *deps {
 		lecturesHandler:          lectures.NewHandler(lecturesSvc),
 		eventTasksHandler:        eventtasks.NewHandler(eventTasksSvc, taskFileStore, maxTaskImageBytes),
 		merchHandler:             merch.NewHandler(merchSvc, merchFileStore, maxTaskImageBytes),
+		evaluationHandler:        evaluation.NewHandler(evaluationSvc),
 	}
 }
 

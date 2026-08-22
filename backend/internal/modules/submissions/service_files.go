@@ -139,7 +139,12 @@ func (s *Service) PresignFile(ctx context.Context, a Actor, submissionID, fileID
 	}
 	if sub.ContestantUserID != a.UserID {
 		if err := s.ensureAdmin(ctx, a, sub.ChallengeID); err != nil {
-			return "", err
+			if err2 := s.ensureJuryReview(ctx, a, sub.ChallengeID); err2 != nil {
+				return "", err
+			}
+			if !submittedStatus(sub.Status) {
+				return "", ErrForbidden
+			}
 		}
 	}
 	_, objectKey, err := s.repo.FileByID(ctx, fileID)

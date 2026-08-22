@@ -76,13 +76,13 @@ type CreateResult struct {
 }
 
 // canCreateRole проверяет, вправе ли актор создать пользователя с данной ролью (§3.3):
-// MEGA_ADMIN — любую; SUPER_ADMIN — ADMIN/STAFF/CONTESTANT; прочие — никакую.
+// MEGA_ADMIN — любую; SUPER_ADMIN — ADMIN/STAFF/JURY/CONTESTANT; прочие — никакую.
 func canCreateRole(a Actor, role string) bool {
 	switch {
 	case a.IsMega():
 		return true
 	case a.IsSuper():
-		return role == "" || role == "ADMIN" || role == "STAFF" || role == "CONTESTANT"
+		return role == "" || role == "ADMIN" || role == "STAFF" || role == "JURY" || role == "REMOTE_JURY" || role == "CONTESTANT"
 	default:
 		return false
 	}

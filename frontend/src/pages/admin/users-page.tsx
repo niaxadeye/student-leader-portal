@@ -7,6 +7,7 @@ import { Input } from '@/shared/ui/input'
 import { Skeleton, ErrorState, EmptyState } from '@/shared/ui/states'
 import { CreateUserDialog } from './create-user-dialog'
 import { UsersTable } from './users-table'
+import { useAppConfig } from '@/shared/config/use-app-config'
 
 const PAGE = 20
 
@@ -29,6 +30,19 @@ export function AdminUsersPage() {
     setParams(p, { replace: true })
   }
 
+  const { data: appConfig } = useAppConfig()
+  const roleOptions: Array<[string, string]> = [
+    ['SUPER_ADMIN', 'Суперадмины'],
+    ['ADMIN', 'Админы'],
+    ['STAFF', 'Сотрудники'],
+    ...(appConfig?.features.jury
+      ? [
+          ['JURY', 'Жюри'] as [string, string],
+          ['REMOTE_JURY', 'Заочное жюри'] as [string, string],
+        ]
+      : []),
+    ['CONTESTANT', 'Конкурсанты'],
+  ]
   const { data, isLoading, isError, refetch } = useAdminUsers({
     search: search || undefined,
     role: role || undefined,
@@ -65,12 +79,7 @@ export function AdminUsersPage() {
             onChange={(e) => patch({ search: e.target.value })}
           />
         </div>
-        <FilterSelect value={role} onChange={(v) => patch({ role: v })} label="Все роли" options={[
-          ['SUPER_ADMIN', 'Суперадмины'],
-          ['ADMIN', 'Админы'],
-          ['STAFF', 'Сотрудники'],
-          ['CONTESTANT', 'Конкурсанты'],
-        ]} />
+        <FilterSelect value={role} onChange={(v) => patch({ role: v })} label="Все роли" options={roleOptions} />
         <FilterSelect value={status} onChange={(v) => patch({ status: v })} label="Все статусы" options={[
           ['ACTIVE', 'Активные'],
           ['BLOCKED', 'Заблокированные'],

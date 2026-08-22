@@ -57,10 +57,10 @@ type Submission struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	// Присоединяемые поля (не в таблице submissions):
-	Files       []SubmissionFile
-	ContestName string
-	FullName    string
-	Login       string
+	Files        []SubmissionFile
+	ContestName  string
+	FullName     string
+	Login        string
 	Organization *string
 }
 
@@ -99,6 +99,7 @@ type ChallengeInfo struct {
 	CloseAt              *time.Time
 	CurrentSchemaVersion int
 	Settings             map[string]any
+	AcceptsSubmissions   bool
 }
 
 // FieldInfo — поле схемы, нужное для валидации и снапшота.

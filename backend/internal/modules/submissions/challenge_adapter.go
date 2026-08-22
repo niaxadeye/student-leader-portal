@@ -36,6 +36,7 @@ func (a *challengeAdapter) ChallengeInfo(ctx context.Context, challengeID string
 		CloseAt:              c.CloseAt,
 		CurrentSchemaVersion: c.CurrentSchemaVersion,
 		Settings:             c.Settings,
+		AcceptsSubmissions:   c.AcceptsSubmissions,
 	}, nil
 }
 

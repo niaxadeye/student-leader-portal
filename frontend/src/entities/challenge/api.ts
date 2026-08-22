@@ -1,6 +1,6 @@
 // Контестант-API испытаний (бэкенд: modules/challenges, чтение по участию).
 import { apiRequest } from '@/shared/api/client'
-import type { Challenge, FormField, FieldOption } from './types'
+import type { Challenge, ChallengeBriefing, FormField, FieldOption } from './types'
 import type { MyContest } from './contest-types'
 
 // Сырое поле с бэкенда: options лежат в settings.options (админ-редактор).
@@ -26,10 +26,12 @@ interface RawChallenge {
   instructions?: string | null
   status: Challenge['status']
   deadline_at?: string | null
+  accepts_submissions?: boolean
   current_schema_version: number
   my_submission_status?: Challenge['my_submission_status']
   settings?: Record<string, unknown> | null
   fields?: RawField[]
+  briefing?: ChallengeBriefing | null
 }
 
 function mapField(f: RawField): FormField {
@@ -64,11 +66,13 @@ export function mapChallenge(c: RawChallenge): Challenge {
     instructions: c.instructions ?? undefined,
     status: c.status,
     deadline_at: c.deadline_at ?? undefined,
+    accepts_submissions: c.accepts_submissions !== false,
     allow_edit_after_submission: (s.allow_edit_after_submission as boolean) ?? true,
     allow_late_submission: (s.allow_late_submission as boolean) ?? false,
     schema_version: c.current_schema_version,
     my_submission_status: c.my_submission_status,
     fields: (c.fields ?? []).map(mapField),
+    briefing: c.briefing ?? null,
   }
 }
 

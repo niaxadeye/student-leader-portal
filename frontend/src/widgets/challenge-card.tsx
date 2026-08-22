@@ -6,11 +6,20 @@ import { formatDateTime, timeUntil } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/cn'
 import type { Challenge, SubmissionStatus } from '@/entities/challenge/types'
 
-export function ChallengeCard({ challenge }: { challenge: Challenge }) {
+export function ChallengeCard({
+  challenge,
+  drawNumber,
+  drawTotal,
+}: {
+  challenge: Challenge
+  drawNumber?: number | null
+  drawTotal?: number
+}) {
   const navigate = useNavigate()
+  const showForm = challenge.accepts_submissions && challenge.status === 'PUBLISHED'
   const status: SubmissionStatus = challenge.my_submission_status ?? 'NOT_STARTED'
   const deadline = challenge.deadline_at ? timeUntil(challenge.deadline_at) : null
-  const isOverdue = deadline?.overdue && status !== 'SUBMITTED'
+  const isOverdue = Boolean(showForm && deadline?.overdue && status !== 'SUBMITTED')
 
   return (
     <Card
@@ -19,12 +28,17 @@ export function ChallengeCard({ challenge }: { challenge: Challenge }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[18px] font-semibold text-ink">{challenge.title}</h3>
-            <StatusBadge status={isOverdue ? 'OVERDUE' : status} />
+            {showForm && <StatusBadge status={isOverdue ? 'OVERDUE' : status} />}
+            {drawNumber != null && (
+              <span className="rounded-full bg-brand-subtle px-2 py-0.5 text-[12px] font-medium text-brand">
+                №{drawNumber}
+                {drawTotal ? ` из ${drawTotal}` : ''}
+              </span>
+            )}
           </div>
-          <p className="text-[14px] text-muted">{challenge.short_description}</p>
-          {deadline && (
+          {showForm && deadline && (
             <div
               className={cn(
                 'mt-3 inline-flex items-center gap-1.5 text-[13px]',

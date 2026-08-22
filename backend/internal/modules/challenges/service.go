@@ -2,6 +2,7 @@ package challenges
 
 import (
 	"context"
+	"io"
 	"strings"
 	"time"
 )
@@ -18,14 +19,38 @@ type ContestAccess interface {
 	ContestEditable(ctx context.Context, userID, contestID string, isMega bool) (bool, error)
 }
 
-type Service struct {
-	repo   *Repo
-	access ContestAccess
-	audit  Auditor
+type FileStore interface {
+	Put(ctx context.Context, key string, r io.Reader, size int64, contentType string) error
+	Remove(ctx context.Context, key string) error
 }
 
+type Service struct {
+	repo       *Repo
+	access     ContestAccess
+	audit      Auditor
+	store      FileStore
+	presign    func(context.Context, string) (string, error)
+	maxBytes   int64
+	juryReview JuryReviewFn
+}
+
+// JuryReviewFn — проверка, что пользователь — заочное жюри испытания.
+type JuryReviewFn func(ctx context.Context, userID, challengeID string, isMega bool) (bool, error)
+
 func NewService(repo *Repo, access ContestAccess, audit Auditor) *Service {
-	return &Service{repo: repo, access: access, audit: audit}
+	return &Service{repo: repo, access: access, audit: audit, maxBytes: 20 << 20}
+}
+
+func (s *Service) SetJuryReview(fn JuryReviewFn) {
+	s.juryReview = fn
+}
+
+func (s *Service) SetFiles(store FileStore, presign func(context.Context, string) (string, error), maxBytes int64) {
+	s.store = store
+	s.presign = presign
+	if maxBytes > 0 {
+		s.maxBytes = maxBytes
+	}
 }
 
 // Actor — субъект операции (из принципала запроса).
@@ -93,14 +118,43 @@ func (s *Service) adminGetForEdit(ctx context.Context, a Actor, challengeID stri
 
 // CreateInput — поля создания/редактирования испытания.
 type CreateInput struct {
-	Title            string
-	Slug             string
-	ShortDescription *string
-	FullDescription  *string
-	Instructions     *string
-	OpenAt           *time.Time
-	DeadlineAt       *time.Time
-	CloseAt          *time.Time
+	Title              string
+	Slug               string
+	ShortDescription   *string
+	FullDescription    *string
+	Instructions       *string
+	OpenAt             *time.Time
+	DeadlineAt         *time.Time
+	CloseAt            *time.Time
+	HeldAt             *time.Time
+	Venue              *string
+	AcceptsSubmissions *bool
+}
+
+func trimOptional(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*s)
+	if t == "" {
+		return nil
+	}
+	return &t
+}
+
+func venueOrErr(s *string) (*string, error) {
+	v := trimOptional(s)
+	if v != nil && len([]rune(*v)) > 200 {
+		return nil, ErrValidation
+	}
+	return v, nil
+}
+
+func acceptsOrDefault(v *bool, fallback bool) bool {
+	if v == nil {
+		return fallback
+	}
+	return *v
 }
 
 // Create создаёт испытание в статусе DRAFT (нужен доступ к конкурсу).
@@ -119,10 +173,15 @@ func (s *Service) Create(ctx context.Context, a Actor, contestID string, in Crea
 	if slug == "" {
 		return nil, ErrValidation
 	}
+	venue, err := venueOrErr(in.Venue)
+	if err != nil {
+		return nil, err
+	}
 	c := &Challenge{
 		ContestID: contestID, Title: title, Slug: slug,
 		ShortDescription: in.ShortDescription, FullDescription: in.FullDescription,
 		Instructions: in.Instructions, OpenAt: in.OpenAt, DeadlineAt: in.DeadlineAt, CloseAt: in.CloseAt,
+		HeldAt: in.HeldAt, Venue: venue, AcceptsSubmissions: acceptsOrDefault(in.AcceptsSubmissions, true),
 	}
 	id, err := s.repo.Create(ctx, c, a.UserID)
 	if err != nil {
@@ -134,16 +193,23 @@ func (s *Service) Create(ctx context.Context, a Actor, contestID string, in Crea
 
 // Update редактирует мету испытания и, если оно опубликовано, версионирует схему.
 func (s *Service) Update(ctx context.Context, a Actor, challengeID string, in CreateInput) (*Challenge, error) {
-	if _, err := s.adminGetForEdit(ctx, a, challengeID); err != nil {
+	cur, err := s.adminGetForEdit(ctx, a, challengeID)
+	if err != nil {
 		return nil, err
 	}
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
 		return nil, ErrValidation
 	}
+	venue, err := venueOrErr(in.Venue)
+	if err != nil {
+		return nil, err
+	}
 	upd := &Challenge{
 		Title: title, ShortDescription: in.ShortDescription, FullDescription: in.FullDescription,
 		Instructions: in.Instructions, OpenAt: in.OpenAt, DeadlineAt: in.DeadlineAt, CloseAt: in.CloseAt,
+		HeldAt: in.HeldAt, Venue: venue,
+		AcceptsSubmissions: acceptsOrDefault(in.AcceptsSubmissions, cur.AcceptsSubmissions),
 	}
 	if err := s.repo.Update(ctx, challengeID, upd, a.UserID); err != nil {
 		return nil, err

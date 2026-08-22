@@ -50,3 +50,60 @@ func (s *Service) ensureAdmin(ctx context.Context, a Actor, challengeID string) 
 	}
 	return nil
 }
+
+func (s *Service) ensureJuryReview(ctx context.Context, a Actor, challengeID string) error {
+	if s.juryReview == nil {
+		return ErrForbidden
+	}
+	ok, err := s.juryReview(ctx, a.UserID, challengeID, a.IsMega)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrForbidden
+	}
+	return nil
+}
+
+func submittedStatus(status string) bool {
+	return status == StatusSubmitted || status == StatusLocked
+}
+
+func (s *Service) JuryList(ctx context.Context, a Actor, challengeID string) ([]AdminRow, error) {
+	if err := s.ensureJuryReview(ctx, a, challengeID); err != nil {
+		return nil, err
+	}
+	rows, _, err := s.repo.AdminList(ctx, AdminListFilter{
+		ChallengeID: challengeID, Status: "", Limit: 200, Offset: 0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]AdminRow, 0, len(rows))
+	for _, row := range rows {
+		if submittedStatus(row.Status) {
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}
+
+func (s *Service) JuryGet(ctx context.Context, a Actor, submissionID string) (*Submission, error) {
+	sub, err := s.repo.ByID(ctx, submissionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureJuryReview(ctx, a, sub.ChallengeID); err != nil {
+		return nil, err
+	}
+	if !submittedStatus(sub.Status) {
+		return nil, ErrNotFound
+	}
+	if err := s.repo.LoadContestant(ctx, sub); err != nil {
+		return nil, err
+	}
+	if _, err := s.withFiles(ctx, sub); err != nil {
+		return nil, err
+	}
+	return sub, nil
+}

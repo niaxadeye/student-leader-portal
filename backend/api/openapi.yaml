@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Student Leader Cabinet API
-    version: 0.8.0
+    version: 0.9.0
   description: >
     REST API личного кабинета студенческого лидера. Все ответы обёрнуты в envelope
     {data, meta, request_id} либо {error, request_id} (SITE.md §20, §50).
@@ -986,9 +986,276 @@ paths:
         '201': { $ref: '#/components/responses/Created' }
         default: { $ref: '#/components/responses/Error' }
 
+  /admin/challenges/{challengeId}/evaluation:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    get:
+      tags: [Evaluation]
+      summary: Схема оценивания испытания
+      operationId: adminGetEvaluation
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Evaluation]
+      summary: Создать или обновить схему оценивания
+      operationId: adminPutEvaluation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluationSchemeInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/evaluation/reset-results:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Сбросить результаты и оценки жюри испытания
+      operationId: adminResetEvaluationResults
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/evaluation/replace-jury:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Сбросить оценки и назначить жюри испытания
+      operationId: adminReplaceEvaluationJury
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+                jury_user_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/evaluation/criteria:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Добавить критерий
+      operationId: adminAddEvaluationCriterion
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluationCriterionInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/evaluation/criteria/reorder:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    patch:
+      tags: [Evaluation]
+      summary: Порядок критериев
+      operationId: adminReorderEvaluationCriteria
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/evaluation/criteria/{criterionId}:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+      - { $ref: '#/components/parameters/CriterionId' }
+    patch:
+      tags: [Evaluation]
+      summary: Обновить критерий
+      operationId: adminUpdateEvaluationCriterion
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluationCriterionInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Evaluation]
+      summary: Удалить критерий
+      operationId: adminDeleteEvaluationCriterion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /jury/contests:
+    get:
+      tags: [Evaluation]
+      summary: Конкурсы, где пользователь назначен жюри
+      operationId: juryContests
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/live:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    get:
+      tags: [Evaluation]
+      summary: Live-снимок испытания
+      operationId: adminGetLive
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/live/start:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Старт или продолжение live-сессии
+      operationId: adminLiveStart
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LiveCommandInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/live/pause:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Пауза live-сессии
+      operationId: adminLivePause
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LiveCommandInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/live/finish:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Завершить live-сессию
+      operationId: adminLiveFinish
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LiveCommandInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/live/current-contestant:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Выбрать текущего конкурсанта
+      operationId: adminLiveContestant
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/LiveCommandInput' }
+                - type: object
+                  required: [contestant_user_id]
+                  properties:
+                    contestant_user_id: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/challenges/{challengeId}/live/phase:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    post:
+      tags: [Evaluation]
+      summary: Сменить фазу
+      operationId: adminLivePhase
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/LiveCommandInput' }
+                - type: object
+                  required: [phase_id]
+                  properties:
+                    phase_id: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /jury/challenges/{challengeId}/live:
+    parameters:
+      - { $ref: '#/components/parameters/ChallengeId' }
+    get:
+      tags: [Evaluation]
+      summary: Live-снимок для жюри
+      operationId: juryGetLive
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        default: { $ref: '#/components/responses/Error' }
+
 components:
   parameters:
     ContestId: { name: contestId, in: path, required: true, schema: { type: string, format: uuid } }
+    ChallengeId: { name: challengeId, in: path, required: true, schema: { type: string, format: uuid } }
+    CriterionId: { name: criterionId, in: path, required: true, schema: { type: string, format: uuid } }
     ParticipantId: { name: participantId, in: path, required: true, schema: { type: string, format: uuid } }
     LectureId: { name: lectureId, in: path, required: true, schema: { type: string, format: uuid } }
     TaskId: { name: taskId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1269,6 +1536,44 @@ components:
             properties:
               product_id: { type: string, format: uuid }
               quantity: { type: integer, minimum: 1 }
+    EvaluationSchemeInput:
+      type: object
+      required: [type]
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [CRITERIA_SCORING, REMOTE_CRITERIA, NUMERIC_RESULT, QUESTION_SCORING, ELIMINATION_LIVES, HEAD_TO_HEAD_VOTING, COMPOSITE_SCORING, FOCUS_GROUP_SCORING]
+        scoring_unit: { type: string, enum: [POINTS, LIVES, VOTES, PERCENTAGE, SECONDS] }
+        min_score: { type: number, nullable: true }
+        max_score: { type: number, nullable: true }
+        corridor_mode: { type: string, enum: [NONE, WARN, STRICT] }
+        result_visibility: { type: string, enum: [ADMIN_ONLY, JURY, PUBLIC] }
+        edit_policy: { type: string, enum: [WHILE_TRIAL_ACTIVE, UNTIL_LOCK, ALWAYS] }
+    EvaluationCriterionInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        min_score: { type: number }
+        max_score: { type: number }
+        weight: { type: number }
+        is_required: { type: boolean }
+        bands:
+          type: array
+          items:
+            type: object
+            required: [min_score, max_score, description]
+            properties:
+              min_score: { type: number }
+              max_score: { type: number }
+              description: { type: string }
+    LiveCommandInput:
+      type: object
+      required: [base_revision]
+      properties:
+        base_revision: { type: integer, minimum: 0 }
 
   securitySchemes:
     bearerAuth:

@@ -15,6 +15,7 @@ import { useAuth } from '@/entities/auth/auth-context'
 import { isMega } from '@/entities/auth/roles'
 import { useCreateUser } from '@/entities/user/queries'
 import { useAdminContests } from '@/entities/contest/queries'
+import { useAppConfig } from '@/shared/config/use-app-config'
 import { TempPasswordNote } from './temp-password-note'
 import type { RoleCode } from '@/entities/auth/types'
 import type { AccessLevel } from '@/entities/user/types'
@@ -23,6 +24,8 @@ const allRoleOptions: Array<{ value: RoleCode; label: string }> = [
   { value: 'SUPER_ADMIN', label: 'Суперадмин' },
   { value: 'ADMIN', label: 'Админ' },
   { value: 'STAFF', label: 'Сотрудник' },
+  { value: 'JURY', label: 'Жюри (весь конкурс)' },
+  { value: 'REMOTE_JURY', label: 'Заочное жюри' },
   { value: 'CONTESTANT', label: 'Конкурсант' },
 ]
 
@@ -35,10 +38,13 @@ export function CreateUserDialog({
 }) {
   const { user } = useAuth()
   const contests = useAdminContests()
-  // SUPER_ADMIN не может создавать SUPER_ADMIN — только мега (§3.3).
-  const roleOptions = isMega(user)
+  const { data: appConfig } = useAppConfig()
+  const visibleRoles = appConfig?.features.jury
     ? allRoleOptions
-    : allRoleOptions.filter((o) => o.value !== 'SUPER_ADMIN')
+    : allRoleOptions.filter((o) => o.value !== 'JURY' && o.value !== 'REMOTE_JURY')
+  const roleOptions = isMega(user)
+    ? visibleRoles
+    : visibleRoles.filter((o) => o.value !== 'SUPER_ADMIN')
   const [login, setLogin] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -48,7 +54,8 @@ export function CreateUserDialog({
   const [error, setError] = useState<string>()
   const [temp, setTemp] = useState<{ login: string; password: string }>()
   const create = useCreateUser()
-  const needsContest = role === 'ADMIN'
+  const needsContest = role === 'ADMIN' || role === 'JURY' || role === 'REMOTE_JURY'
+  const needsAccessLevel = role === 'ADMIN'
 
   function reset() {
     setLogin('')
@@ -69,7 +76,11 @@ export function CreateUserDialog({
       return
     }
     if (needsContest && !scopeId) {
-      setError('Админу нужен конкурс и уровень EDIT или VIEW.')
+      setError(
+        role === 'ADMIN'
+          ? 'Админу нужен конкурс и уровень EDIT или VIEW.'
+          : 'Жюри нужен конкурс.',
+      )
       return
     }
     create.mutate(
@@ -80,7 +91,7 @@ export function CreateUserDialog({
         role,
         scope_type: needsContest ? 'CONTEST' : 'GLOBAL',
         scope_id: needsContest ? scopeId : undefined,
-        access_level: needsContest ? accessLevel : undefined,
+        access_level: needsAccessLevel ? accessLevel : undefined,
       },
       {
         onSuccess: (r) => {
@@ -119,7 +130,15 @@ export function CreateUserDialog({
             <Field label="Email">
               {(p) => <Input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
             </Field>
-            <Field label="Роль" required>
+            <Field
+              label="Роль"
+              required
+              helpText={
+                role === 'REMOTE_JURY'
+                  ? 'Не входит в жюри всего конкурса. После создания отметьте человека в схеме заочного испытания.'
+                  : undefined
+              }
+            >
               {(p) => (
                 <Select value={role} onValueChange={(v) => setRole(v as RoleCode)}>
                   <SelectTrigger id={p.id} aria-invalid={p['aria-invalid']}>
@@ -137,7 +156,17 @@ export function CreateUserDialog({
             </Field>
             {needsContest && (
               <>
-                <Field label="Конкурс" required helpText="Глобальный ADMIN запрещён — доступ только к выбранному конкурсу.">
+                <Field
+                  label="Конкурс"
+                  required
+                  helpText={
+                    role === 'JURY'
+                      ? 'Live-жюри всего конкурса. Заочных назначайте ролью «Заочное жюри».'
+                      : role === 'REMOTE_JURY'
+                        ? 'Пул заочного жюри этого конкурса. Они не видят live-испытания.'
+                        : 'Глобальный ADMIN запрещён — доступ только к выбранному конкурсу.'
+                  }
+                >
                   {(p) => (
                     <Select value={scopeId || ''} onValueChange={setScopeId}>
                       <SelectTrigger id={p.id}>
@@ -153,6 +182,7 @@ export function CreateUserDialog({
                     </Select>
                   )}
                 </Field>
+                {needsAccessLevel && (
                 <Field label="Уровень доступа">
                   {(p) => (
                     <Select value={accessLevel} onValueChange={(v) => setAccessLevel(v as AccessLevel)}>
@@ -166,6 +196,7 @@ export function CreateUserDialog({
                     </Select>
                   )}
                 </Field>
+                )}
               </>
             )}
             <div className="mt-1 flex justify-end gap-2">

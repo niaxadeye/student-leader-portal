@@ -15,6 +15,8 @@ const roleBadge: Record<RoleCode, { label: string; tone: 'brand' | 'neutral' | '
   SUPER_ADMIN: { label: 'Суперадмин', tone: 'brand' },
   ADMIN: { label: 'Админ', tone: 'success' },
   STAFF: { label: 'Сотрудник', tone: 'success' },
+  JURY: { label: 'Жюри', tone: 'brand' },
+  REMOTE_JURY: { label: 'Заочное жюри', tone: 'brand' },
   CONTESTANT: { label: 'Конкурсант', tone: 'neutral' },
 }
 

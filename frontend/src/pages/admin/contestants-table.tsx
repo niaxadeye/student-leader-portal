@@ -1,8 +1,16 @@
 import { useRef, useState } from 'react'
-import { KeyRound, Ban, UserPlus, Upload, Download, RotateCcw, Trash2 } from 'lucide-react'
-import { useContestants, useImportContestants, useRemoveContestant } from '@/entities/contestant/queries'
+import { ImagePlus, KeyRound, Ban, UserPlus, Upload, Download, RotateCcw, Trash2, X } from 'lucide-react'
+import {
+  useContestants,
+  useDeleteContestantAvatar,
+  useImportContestants,
+  useRemoveContestant,
+  useUploadContestantAvatar,
+} from '@/entities/contestant/queries'
 import { useResetPassword, useUserStatusMutation } from '@/entities/user/queries'
 import { exportContestants } from '@/entities/contestant/api'
+import { resizeImageToSquare } from '@/shared/lib/image'
+import { UserAvatar } from '@/shared/ui/avatar'
 import { Card } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
@@ -154,11 +162,16 @@ function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: 
   return (
     <tr className="border-b border-border last:border-0 hover:bg-muted/5">
       <td className="px-4 py-3">
-        <p className="font-medium text-ink">{c.full_name}</p>
-        <p className="text-[13px] text-muted-2">
-          {c.login}
-          {c.organization ? ` · ${c.organization}` : ''}
-        </p>
+        <div className="flex items-center gap-3">
+          <ContestantAvatarEditor c={c} contestId={contestId} canManage={canManage} />
+          <div className="min-w-0">
+            <p className="font-medium text-ink">{c.full_name}</p>
+            <p className="text-[13px] text-muted-2">
+              {c.login}
+              {c.organization ? ` · ${c.organization}` : ''}
+            </p>
+          </div>
+        </div>
       </td>
       <td className="px-4 py-3">
         {blocked ? <Badge tone="danger">Заблокирован</Badge> : <Badge tone="success">Активен</Badge>}
@@ -179,6 +192,84 @@ function ContestantRow({ c, contestId, canManage }: { c: Contestant; contestId: 
         </td>
       )}
     </tr>
+  )
+}
+
+function ContestantAvatarEditor({
+  c,
+  contestId,
+  canManage,
+}: {
+  c: Contestant
+  contestId: string
+  canManage: boolean
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const upload = useUploadContestantAvatar(contestId)
+  const remove = useDeleteContestantAvatar(contestId)
+  const busy = upload.isPending || remove.isPending
+
+  async function onPick(file: File | undefined) {
+    if (!file) return
+    try {
+      const square = await resizeImageToSquare(file, 512)
+      await upload.mutateAsync({ userId: c.user_id, image: square })
+      toast.success('Фото сохранено')
+    } catch {
+      toast.error('Не удалось загрузить фото. Нужен JPEG, PNG, WebP или GIF.')
+    }
+  }
+
+  function onRemove(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!c.avatar_url) return
+    if (!confirm(`Удалить фото конкурсанта ${c.full_name}?`)) return
+    remove.mutate(c.user_id, {
+      onSuccess: () => toast.info('Фото удалено'),
+      onError: () => toast.error('Не удалось удалить фото'),
+    })
+  }
+
+  if (!canManage) {
+    return <UserAvatar src={c.avatar_url} name={c.full_name} size={44} />
+  }
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        disabled={busy}
+        title="Загрузить фото"
+        onClick={() => fileRef.current?.click()}
+        className="group relative rounded-full disabled:opacity-50"
+      >
+        <UserAvatar src={c.avatar_url} name={c.full_name} size={44} />
+        <span className="absolute inset-0 flex items-center justify-center rounded-full bg-ink/50 opacity-0 transition-opacity group-hover:opacity-100">
+          <ImagePlus className="h-4 w-4 text-white" />
+        </span>
+      </button>
+      {c.avatar_url && (
+        <button
+          type="button"
+          disabled={busy}
+          title="Удалить фото"
+          onClick={onRemove}
+          className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-surface text-muted shadow-sm ring-1 ring-border hover:text-danger"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        hidden
+        onChange={(e) => {
+          void onPick(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
+    </div>
   )
 }
 

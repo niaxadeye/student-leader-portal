@@ -28,8 +28,8 @@ func normScope(in AssignRoleInput) (AssignRoleInput, bool) {
 	case ScopeGlobal:
 		in.ScopeID = nilUUID
 		in.AccessLevel = ""
-		// Глобальный ADMIN не утверждён: ADMIN только per-contest с EDIT|VIEW.
-		if in.Role == "ADMIN" {
+		// Глобальный ADMIN/JURY не утверждён: только per-contest.
+		if in.Role == "ADMIN" || in.Role == "JURY" || in.Role == "REMOTE_JURY" {
 			return in, false
 		}
 	case ScopeContest:

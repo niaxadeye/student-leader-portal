@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { useAdminUser, useAssignRole, useRemoveRole } from '@/entities/user/queries'
 import { useAdminContests } from '@/entities/contest/queries'
 import { ApiRequestError } from '@/shared/api/client'
+import { useAppConfig } from '@/shared/config/use-app-config'
 import type { RoleCode } from '@/entities/auth/types'
 import type { AccessLevel, RoleAssignment } from '@/entities/user/types'
 
@@ -24,11 +25,13 @@ const roleLabels: Record<RoleCode, string> = {
   SUPER_ADMIN: 'Суперадмин',
   ADMIN: 'Админ',
   STAFF: 'Сотрудник',
+  JURY: 'Жюри',
+  REMOTE_JURY: 'Заочное жюри',
   CONTESTANT: 'Конкурсант',
 }
 
 // Роли, назначаемые через этот диалог (мега/супер создаются иначе).
-const assignableRoles: RoleCode[] = ['ADMIN', 'STAFF', 'CONTESTANT']
+const allAssignableRoles: RoleCode[] = ['ADMIN', 'STAFF', 'JURY', 'REMOTE_JURY', 'CONTESTANT']
 
 export function ManageRolesDialog({
   userId,
@@ -60,6 +63,10 @@ function scopeLabel(a: RoleAssignment, contestName?: string): string {
 function RolesBody({ userId }: { userId: string }) {
   const { data: user, isLoading, isError, refetch } = useAdminUser(userId)
   const contests = useAdminContests()
+  const { data: appConfig } = useAppConfig()
+  const assignableRoles = appConfig?.features.jury
+    ? allAssignableRoles
+    : allAssignableRoles.filter((r) => r !== 'JURY' && r !== 'REMOTE_JURY')
   const assign = useAssignRole(userId)
   const remove = useRemoveRole(userId)
 
@@ -72,6 +79,7 @@ function RolesBody({ userId }: { userId: string }) {
   // Глобальный ADMIN запрещён.
   const needsAccessLevel = role === 'ADMIN'
   const staffGlobal = role === 'STAFF'
+  const contestOnly = role === 'ADMIN' || role === 'JURY' || role === 'REMOTE_JURY'
 
   const contestName = (id: string) => contests.data?.find((c) => c.id === id)?.name
 
@@ -87,8 +95,12 @@ function RolesBody({ userId }: { userId: string }) {
 
   function onAssign() {
     setError(undefined)
-    if (role === 'ADMIN' && !scopeId) {
-      setError('Админу нужен конкурс и уровень EDIT или VIEW.')
+    if (contestOnly && !scopeId) {
+      setError(
+        role === 'JURY' || role === 'REMOTE_JURY'
+          ? 'Жюри назначается на конкретный конкурс.'
+          : 'Админу нужен конкурс и уровень EDIT или VIEW.',
+      )
       return
     }
     const scopeType = staffGlobal || !scopeId ? 'GLOBAL' : 'CONTEST'
@@ -162,14 +174,14 @@ function RolesBody({ userId }: { userId: string }) {
             )}
           </Field>
           {!staffGlobal && (
-          <Field label="Область" helpText={role === 'ADMIN' ? 'Админ действует только в выбранном конкурсе.' : 'Пусто — глобально. Иначе роль действует в выбранном конкурсе.'}>
+          <Field label="Область" helpText={contestOnly ? 'Роль действует только в выбранном конкурсе.' : 'Пусто — глобально. Иначе роль действует в выбранном конкурсе.'}>
             {(p) => (
-              <Select value={scopeId || (role === 'ADMIN' ? '' : 'GLOBAL')} onValueChange={(v) => setScopeId(v === 'GLOBAL' ? '' : v)}>
+              <Select value={scopeId || (contestOnly ? '' : 'GLOBAL')} onValueChange={(v) => setScopeId(v === 'GLOBAL' ? '' : v)}>
                 <SelectTrigger id={p.id}>
-                  <SelectValue placeholder={role === 'ADMIN' ? 'Выберите конкурс' : undefined} />
+                  <SelectValue placeholder={contestOnly ? 'Выберите конкурс' : undefined} />
                 </SelectTrigger>
                 <SelectContent>
-                  {role !== 'ADMIN' && <SelectItem value="GLOBAL">Глобально</SelectItem>}
+                  {!contestOnly && <SelectItem value="GLOBAL">Глобально</SelectItem>}
                   {contests.data?.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}

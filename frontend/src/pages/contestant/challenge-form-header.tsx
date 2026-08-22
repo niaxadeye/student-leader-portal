@@ -12,15 +12,17 @@ export function ChallengeFormHeader({
   saveState,
   revision,
   revisionAt,
+  showStatus = true,
 }: {
   challenge: Challenge
   status: SubmissionStatus
   saveState: SaveState
   revision: number
   revisionAt?: string | null
+  showStatus?: boolean
 }) {
   const navigate = useNavigate()
-  const deadline = challenge.deadline_at ? timeUntil(challenge.deadline_at) : null
+  const deadline = showStatus && challenge.deadline_at ? timeUntil(challenge.deadline_at) : null
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,7 +37,7 @@ export function ChallengeFormHeader({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[28px] font-bold text-ink">{challenge.title}</h1>
-            <StatusBadge status={status} />
+            {showStatus && <StatusBadge status={status} />}
           </div>
           {challenge.full_description && (
             <p className="mt-1.5 max-w-2xl text-[15px] text-muted">{challenge.full_description}</p>

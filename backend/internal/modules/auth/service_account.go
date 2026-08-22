@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 
 	"github.com/eazytech/student-leader-cabinet/internal/modules/eventpermissions"
 	"github.com/eazytech/student-leader-cabinet/internal/platform/security"
@@ -17,6 +18,25 @@ func (s *Service) Logout(ctx context.Context, userID, sessionID string) error {
 func (s *Service) LogoutAll(ctx context.Context, userID string) error {
 	s.audit.Log(ctx, userID, "AUTH_LOGOUT_ALL", "user", userID, nil)
 	return s.repo.RevokeAllSessions(ctx, userID, "logout_all")
+}
+
+// VerifyUserPassword подтверждает пароль уже вошедшего пользователя (опасные действия).
+func (s *Service) VerifyUserPassword(ctx context.Context, userID, password string) error {
+	if strings.TrimSpace(password) == "" {
+		return ErrWrongOldPassword
+	}
+	u, err := s.repo.UserByID(ctx, userID)
+	if err != nil {
+		return ErrWrongOldPassword
+	}
+	if u.Status == StatusBlocked {
+		return ErrAccountBlocked
+	}
+	if err := security.VerifyPassword(password, u.PasswordHash); err != nil {
+		s.audit.Log(ctx, userID, "AUTH_STEPUP_FAILED", "user", userID, nil)
+		return ErrWrongOldPassword
+	}
+	return nil
 }
 
 // ChangePassword меняет пароль после проверки старого и отзывает все сессии (SITE.md §16).
@@ -79,6 +99,18 @@ func (s *Service) Me(ctx context.Context, userID string) (*User, []Role, []event
 		}
 		if grants == nil {
 			grants = []eventpermissions.Grant{}
+		}
+	}
+	if s.hasRemoteJury(ctx, userID) {
+		hasJury := false
+		for _, role := range roles {
+			if role.Code == "JURY" {
+				hasJury = true
+				break
+			}
+		}
+		if !hasJury {
+			roles = append(roles, Role{Code: "JURY"})
 		}
 	}
 	return u, roles, grants, nil

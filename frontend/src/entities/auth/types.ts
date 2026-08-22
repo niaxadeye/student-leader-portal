@@ -1,4 +1,4 @@
-export type RoleCode = 'MEGA_ADMIN' | 'SUPER_ADMIN' | 'ADMIN' | 'STAFF' | 'CONTESTANT'
+export type RoleCode = 'MEGA_ADMIN' | 'SUPER_ADMIN' | 'ADMIN' | 'STAFF' | 'JURY' | 'REMOTE_JURY' | 'CONTESTANT'
 
 export type StaffPermission =
   | 'event.participants.manage'
@@ -35,7 +35,7 @@ export interface LoginResult {
 export interface LoginInput {
   login: string
   password: string
-  audience?: 'admin' | 'contestant'
+  audience?: 'admin' | 'contestant' | 'jury'
 }
 
 export interface ChangePasswordInput {

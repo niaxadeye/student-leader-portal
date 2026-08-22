@@ -29,6 +29,8 @@ func roleRank(role string) int {
 		return 3
 	case "STAFF":
 		return 2
+	case "JURY", "REMOTE_JURY":
+		return 2
 	case "CONTESTANT":
 		return 1
 	default:

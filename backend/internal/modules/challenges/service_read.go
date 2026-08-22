@@ -23,14 +23,28 @@ func (s *Service) AdminSchemaPreview(ctx context.Context, a Actor, challengeID s
 	return s.SchemaJSON(ctx, challengeID)
 }
 
-// ContestantGet возвращает опубликованное испытание с полями для участника конкурса.
+// ContestantGet возвращает испытание с полями для участника конкурса.
 func (s *Service) ContestantGet(ctx context.Context, a Actor, challengeID string) (*Challenge, []Field, error) {
 	c, err := s.repo.ByID(ctx, challengeID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.ensureParticipant(ctx, a, c); err != nil {
+	if err := s.ensureContestantChallenge(ctx, a, c); err != nil {
 		return nil, nil, err
+	}
+	_, _, briefing, err := s.loadResolved(ctx, challengeID, a.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if contestantSeesBriefing(briefing) {
+		if !briefing.Visible {
+			briefing.BodyText = ""
+			briefing.Files = []BriefingFile{}
+		}
+		c.Briefing = &briefing
+	}
+	if !(c.Status == StatusPublished && c.AcceptsSubmissions) {
+		return c, []Field{}, nil
 	}
 	fields, err := s.repo.Fields(ctx, challengeID)
 	if err != nil {
@@ -39,7 +53,7 @@ func (s *Service) ContestantGet(ctx context.Context, a Actor, challengeID string
 	return c, fields, nil
 }
 
-// ContestantList возвращает опубликованные испытания конкурса для участника.
+// ContestantList возвращает видимые испытания конкурса для участника.
 func (s *Service) ContestantList(ctx context.Context, a Actor, contestID string) ([]Challenge, error) {
 	if !a.IsSuper {
 		ok, err := s.repo.IsParticipant(ctx, a.UserID, contestID)
@@ -50,12 +64,29 @@ func (s *Service) ContestantList(ctx context.Context, a Actor, contestID string)
 			return nil, ErrForbidden
 		}
 	}
-	return s.repo.ListForContestant(ctx, contestID, a.UserID)
+	list, err := s.repo.ListForContestant(ctx, contestID, a.UserID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		_, _, briefing, err := s.loadResolved(ctx, list[i].ID, a.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if contestantSeesBriefing(briefing) {
+			if !briefing.Visible {
+				briefing.BodyText = ""
+				briefing.Files = []BriefingFile{}
+			}
+			list[i].Briefing = &briefing
+		}
+	}
+	return list, nil
 }
 
-// ensureParticipant: испытание видно только PUBLISHED и только участнику (или суперадмину).
-func (s *Service) ensureParticipant(ctx context.Context, a Actor, c *Challenge) error {
-	if c.Status != StatusPublished {
+// ensureContestantChallenge: не архив, участник конкурса (или суперадмин).
+func (s *Service) ensureContestantChallenge(ctx context.Context, a Actor, c *Challenge) error {
+	if c.Status == StatusArchived {
 		return ErrNotFound
 	}
 	if a.IsSuper {
@@ -68,7 +99,17 @@ func (s *Service) ensureParticipant(ctx context.Context, a Actor, c *Challenge) 
 	if !ok {
 		return ErrForbidden
 	}
-	return nil
+	if c.Status == StatusPublished && c.AcceptsSubmissions {
+		return nil
+	}
+	_, _, briefing, err := s.loadResolved(ctx, c.ID, a.UserID)
+	if err != nil {
+		return err
+	}
+	if contestantSeesBriefing(briefing) {
+		return nil
+	}
+	return ErrNotFound
 }
 
 // FieldMap сериализует поле в JSON-совместимую структуру (SITE.md §11.3).

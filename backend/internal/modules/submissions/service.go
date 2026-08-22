@@ -6,17 +6,23 @@ import (
 )
 
 type Service struct {
-	repo   *Repo
-	source ChallengeSource
-	audit  Auditor
-	// presign превращает object_key в скачиваемую ссылку (nil → отдаём key как есть).
-	presign func(ctx context.Context, objectKey string) (string, error)
-	// now — для тестируемости; в проде time.Now.
-	now func() time.Time
+	repo       *Repo
+	source     ChallengeSource
+	audit      Auditor
+	presign    func(ctx context.Context, objectKey string) (string, error)
+	now        func() time.Time
+	juryReview JuryReviewFn
 }
+
+// JuryReviewFn — проверка, что пользователь — заочное жюри испытания.
+type JuryReviewFn func(ctx context.Context, userID, challengeID string, isMega bool) (bool, error)
 
 func NewService(repo *Repo, source ChallengeSource, audit Auditor) *Service {
 	return &Service{repo: repo, source: source, audit: audit, now: time.Now}
+}
+
+func (s *Service) SetJuryReview(fn JuryReviewFn) {
+	s.juryReview = fn
 }
 
 // SetPresigner подключает функцию подписи ссылок на файлы (из storage).
@@ -36,6 +42,9 @@ func (s *Service) GetOrCreateDraft(ctx context.Context, a Actor, challengeID str
 	}
 	// Черновик можно открыть только на опубликованном (или закрытом — читать/просматривать) испытании.
 	if info.Status == "DRAFT" || info.Status == "ARCHIVED" {
+		return nil, ErrNotFound
+	}
+	if !info.AcceptsSubmissions {
 		return nil, ErrNotFound
 	}
 	sub, err := s.repo.EnsureDraft(ctx, challengeID, a.UserID, info.CurrentSchemaVersion)
@@ -88,6 +97,9 @@ func (s *Service) loadForWrite(ctx context.Context, a Actor, challengeID string)
 	}
 	if err := s.ensureParticipant(ctx, a, info.ContestID); err != nil {
 		return nil, nil, err
+	}
+	if !info.AcceptsSubmissions {
+		return nil, nil, ErrClosed
 	}
 	sub, err := s.repo.EnsureDraft(ctx, challengeID, a.UserID, info.CurrentSchemaVersion)
 	if err != nil {

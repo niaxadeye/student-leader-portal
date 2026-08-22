@@ -20,13 +20,16 @@ type staffDirectory interface {
 	GrantsForUser(ctx context.Context, userID string) ([]eventpermissions.Grant, error)
 }
 
+type juryAudienceCheck func(ctx context.Context, userID string) (bool, error)
+
 type Service struct {
-	repo   *Repo
-	jwt    *security.JWTManager
-	audit  Auditor
-	staff  staffDirectory
-	refTTL time.Duration
-	now    func() time.Time
+	repo      *Repo
+	jwt       *security.JWTManager
+	audit     Auditor
+	staff     staffDirectory
+	refTTL    time.Duration
+	now       func() time.Time
+	juryExtra juryAudienceCheck
 }
 
 func NewService(repo *Repo, jwt *security.JWTManager, audit Auditor, refreshTTL time.Duration) *Service {
@@ -34,6 +37,8 @@ func NewService(repo *Repo, jwt *security.JWTManager, audit Auditor, refreshTTL 
 }
 
 func (s *Service) SetStaffDirectory(d staffDirectory) { s.staff = d }
+
+func (s *Service) SetJuryAudienceCheck(fn juryAudienceCheck) { s.juryExtra = fn }
 
 // LoginInput — параметры входа с контекстом клиента для сессии/аудита.
 type LoginInput struct {
@@ -59,10 +64,10 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*TokenPair, *User, 
 	}
 
 	roles, _ := s.repo.RolesByUser(ctx, u.ID)
-	if !roleAllowedForAudience(in.Audience, roles) {
+	if !s.audienceAllowed(ctx, in.Audience, u.ID, roles) {
 		return nil, nil, ErrInvalidCredentials
 	}
-	role := primaryRole(roles)
+	role := s.tokenRole(ctx, in.Audience, u.ID, roles)
 	pair, err := s.issueSession(ctx, u.ID, role, in.UserAgent, in.IP)
 	if err != nil {
 		return nil, nil, err
@@ -110,16 +115,47 @@ func (s *Service) mintTokenPair(userID, role, sessionID, jti, refresh string, re
 
 func (s *Service) primaryRole(ctx context.Context, userID string) string {
 	roles, _ := s.repo.RolesByUser(ctx, userID)
+	if s.hasRemoteJury(ctx, userID) {
+		roles = append(roles, Role{Code: "JURY"})
+	}
+	return primaryRole(roles)
+}
+
+func (s *Service) hasRemoteJury(ctx context.Context, userID string) bool {
+	if s.juryExtra == nil {
+		return false
+	}
+	ok, err := s.juryExtra(ctx, userID)
+	return err == nil && ok
+}
+
+func (s *Service) audienceAllowed(ctx context.Context, audience, userID string, roles []Role) bool {
+	if roleAllowedForAudience(audience, roles) {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(audience), "jury") && s.hasRemoteJury(ctx, userID) {
+		return true
+	}
+	return false
+}
+
+func (s *Service) tokenRole(_ context.Context, audience, _ string, roles []Role) string {
+	if strings.EqualFold(strings.TrimSpace(audience), "jury") {
+		return "JURY"
+	}
 	return primaryRole(roles)
 }
 
 func primaryRole(roles []Role) string {
-	rank := map[string]int{"MEGA_ADMIN": 5, "SUPER_ADMIN": 4, "ADMIN": 3, "STAFF": 2, "CONTESTANT": 1}
+	rank := map[string]int{"MEGA_ADMIN": 5, "SUPER_ADMIN": 4, "ADMIN": 3, "STAFF": 2, "JURY": 2, "REMOTE_JURY": 2, "CONTESTANT": 1}
 	best, bestRank := "CONTESTANT", 0
 	for _, r := range roles {
 		if rank[r.Code] > bestRank {
 			best, bestRank = r.Code, rank[r.Code]
 		}
+	}
+	if best == "REMOTE_JURY" {
+		return "JURY"
 	}
 	return best
 }
@@ -142,6 +178,8 @@ func roleAllowedForAudience(audience string, roles []Role) bool {
 		return has("MEGA_ADMIN") || has("SUPER_ADMIN") || has("ADMIN") || has("STAFF")
 	case "contestant":
 		return has("CONTESTANT")
+	case "jury":
+		return has("JURY") || has("REMOTE_JURY")
 	default:
 		return false
 	}

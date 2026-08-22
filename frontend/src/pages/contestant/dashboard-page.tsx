@@ -1,7 +1,10 @@
 import { FileText, FileEdit, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react'
 import { useChallenges, useContest } from '@/entities/challenge/queries'
+import { useContestDraws } from '@/entities/evaluation/contestant-queries'
+import { useAppConfig } from '@/shared/config/use-app-config'
 import { StatCard } from '@/widgets/stat-card'
 import { ChallengeCard } from '@/widgets/challenge-card'
+import { ChallengeMaterialsCard } from '@/widgets/challenge-materials-card'
 import { Card } from '@/shared/ui/card'
 import { Skeleton, EmptyState } from '@/shared/ui/states'
 import { timeUntil } from '@/shared/lib/format'
@@ -9,25 +12,28 @@ import { timeUntil } from '@/shared/lib/format'
 export function DashboardPage() {
   const { data: contest } = useContest()
   const { data: challenges, isLoading } = useChallenges()
+  const { data: appConfig } = useAppConfig()
+  const drawsQ = useContestDraws(contest?.id, appConfig?.features.jury === true)
+  const drawsByChallenge = new Map((drawsQ.data ?? []).map((d) => [d.challenge_id, d]))
 
-  const nearest = challenges
-    ?.filter((c) => c.deadline_at && !timeUntil(c.deadline_at).overdue)
+  const intake = challenges?.filter((c) => c.accepts_submissions && c.status === 'PUBLISHED') ?? []
+  const materials = challenges?.filter((c) => c.briefing?.visible || c.briefing?.scheduled) ?? []
+
+  const nearest = intake
+    .filter((c) => c.deadline_at && !timeUntil(c.deadline_at).overdue)
     .sort((a, b) => (a.deadline_at! < b.deadline_at! ? -1 : 1))[0]
 
-  // Сводка по статусам работ конкурсанта.
-  const drafts = challenges?.filter((c) => c.my_submission_status === 'DRAFT').length ?? 0
-  const submitted =
-    challenges?.filter(
-      (c) => c.my_submission_status === 'SUBMITTED' || c.my_submission_status === 'LOCKED',
-    ).length ?? 0
-  const overdue =
-    challenges?.filter(
-      (c) =>
-        c.deadline_at &&
-        timeUntil(c.deadline_at).overdue &&
-        c.my_submission_status !== 'SUBMITTED' &&
-        c.my_submission_status !== 'LOCKED',
-    ).length ?? 0
+  const drafts = intake.filter((c) => c.my_submission_status === 'DRAFT').length
+  const submitted = intake.filter(
+    (c) => c.my_submission_status === 'SUBMITTED' || c.my_submission_status === 'LOCKED',
+  ).length
+  const overdue = intake.filter(
+    (c) =>
+      c.deadline_at &&
+      timeUntil(c.deadline_at).overdue &&
+      c.my_submission_status !== 'SUBMITTED' &&
+      c.my_submission_status !== 'LOCKED',
+  ).length
 
   return (
     <div className="flex flex-col gap-8">
@@ -36,7 +42,6 @@ export function DashboardPage() {
         <h1 className="mt-1 text-[32px] font-bold text-ink">Мой кабинет</h1>
       </div>
 
-      {/* Предупреждение о ближайшем дедлайне */}
       {nearest && (
         <Card className="flex items-center gap-3 border-amber-200 bg-amber-50 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
@@ -47,7 +52,7 @@ export function DashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Испытаний" value={challenges?.length ?? '—'} icon={FileText} accent />
+        <StatCard label="Испытаний" value={isLoading ? '—' : intake.length} icon={FileText} accent />
         <StatCard label="Черновики" value={drafts} icon={FileEdit} />
         <StatCard label="Отправлено" value={submitted} icon={CheckCircle2} />
         <StatCard label="Просрочено" value={overdue} icon={AlertTriangle} />
@@ -66,16 +71,35 @@ export function DashboardPage() {
             <Skeleton className="h-28 w-full" />
             <Skeleton className="h-28 w-full" />
           </div>
-        ) : challenges && challenges.length > 0 ? (
+        ) : intake.length > 0 ? (
           <div className="flex flex-col gap-3">
-            {challenges.map((c) => (
-              <ChallengeCard key={c.id} challenge={c} />
-            ))}
+            {intake.map((c) => {
+              const draw = drawsByChallenge.get(c.id)
+              return (
+                <ChallengeCard
+                  key={c.id}
+                  challenge={c}
+                  drawNumber={draw?.my_draw_number}
+                  drawTotal={draw?.total}
+                />
+              )
+            })}
           </div>
         ) : (
           <EmptyState title="Пока нет испытаний" description="Испытания появятся, когда дирекция их опубликует." />
         )}
       </section>
+
+      {!isLoading && materials.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-[22px] font-semibold text-ink">Материалы испытаний</h2>
+          <div className="flex flex-col gap-3">
+            {materials.map((c) => (
+              <ChallengeMaterialsCard key={c.id} challenge={c} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

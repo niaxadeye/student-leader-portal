@@ -9,6 +9,7 @@ export function landingPath(roles: RoleCode[]): string {
     roles.includes('STAFF')
   )
     return '/admin'
+  if (roles.includes('JURY') || roles.includes('REMOTE_JURY')) return '/jury'
   if (roles.includes('CONTESTANT')) return '/contestant'
   return '/contestant'
 }

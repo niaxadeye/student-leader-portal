@@ -86,3 +86,51 @@ func (h *Handler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	httpserver.WriteJSON(w, r, http.StatusOK, map[string]string{"download_url": url}, nil)
 }
+
+func (h *Handler) JuryList(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.svc.JuryList(r.Context(), actorOf(r), chi.URLParam(r, "challengeId"))
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, adminRowJSON(row))
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, out, map[string]any{"total": len(out)})
+}
+
+func (h *Handler) JuryGet(w http.ResponseWriter, r *http.Request) {
+	sub, err := h.svc.JuryGet(r.Context(), actorOf(r), chi.URLParam(r, "submissionId"))
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	files := make([]map[string]any, 0, len(sub.Files))
+	for _, f := range sub.Files {
+		files = append(files, fileJSON(f))
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, map[string]any{
+		"id": sub.ID, "challenge_id": sub.ChallengeID,
+		"contestant": map[string]any{
+			"user_id": sub.ContestantUserID, "full_name": sub.FullName,
+			"login": sub.Login, "organization": sub.Organization,
+		},
+		"status": sub.Status, "answers": sub.Answers,
+		"schema_version": sub.SchemaVersion, "version": sub.Version,
+		"current_revision_number": sub.CurrentRevisionNumber,
+		"submitted_at":            sub.SubmittedAt, "last_resubmitted_at": sub.LastResubmittedAt,
+		"last_saved_at": sub.LastSavedAt, "locked": sub.LockedAt != nil, "lock_reason": sub.LockReason,
+		"files": files, "revisions": []any{},
+	}, nil)
+}
+
+func (h *Handler) JuryDownloadFile(w http.ResponseWriter, r *http.Request) {
+	url, err := h.svc.PresignFile(r.Context(), actorOf(r),
+		chi.URLParam(r, "submissionId"), chi.URLParam(r, "fileId"))
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	httpserver.WriteJSON(w, r, http.StatusOK, map[string]string{"download_url": url}, nil)
+}

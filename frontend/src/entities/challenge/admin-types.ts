@@ -18,6 +18,11 @@ export interface AdminChallenge {
   open_at: string | null
   deadline_at: string | null
   close_at: string | null
+  held_at: string | null
+  venue: string | null
+  accepts_submissions: boolean
+  scheme_type: string | null
+  live_state: string | null
   current_schema_version: number
   fields_count: number
   created_at: string
@@ -51,6 +56,9 @@ export interface ChallengeInput {
   open_at?: string | null
   deadline_at?: string | null
   close_at?: string | null
+  held_at?: string | null
+  venue?: string | null
+  accepts_submissions?: boolean
 }
 
 export interface FieldInput {
@@ -64,4 +72,55 @@ export interface FieldInput {
   settings?: Record<string, unknown>
   validation?: Record<string, unknown>
   visibility?: Record<string, unknown>
+}
+
+export interface AdminBriefingFile {
+  file_id: string
+  original_name: string
+  size_bytes?: number | null
+  mime_type?: string | null
+  download_url?: string | null
+}
+
+export interface AdminBriefingOverride {
+  custom_text: boolean
+  body_text: string
+  custom_publish: boolean
+  publish_at: string | null
+  hidden: boolean
+  replace_files: boolean
+  files: AdminBriefingFile[]
+}
+
+export interface AdminBriefingContestant {
+  user_id: string
+  login: string
+  full_name: string
+  organization: string | null
+  visible: boolean
+  publish_at: string | null
+  personalized: boolean
+  override: AdminBriefingOverride | null
+}
+
+export interface AdminBriefing {
+  body_text: string
+  publish_at: string | null
+  updated_at: string
+  files: AdminBriefingFile[]
+  contestants: AdminBriefingContestant[]
+}
+
+export interface BriefingInput {
+  body_text: string
+  publish_at: string | null
+}
+
+export interface OverrideInput {
+  custom_text: boolean
+  body_text: string
+  custom_publish: boolean
+  publish_at: string | null
+  hidden: boolean
+  replace_files: boolean
 }

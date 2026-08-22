@@ -30,4 +30,6 @@ export const roleMeta: Record<RoleCode, { label: string; icon: typeof Shield }> 
   ADMIN: { label: 'Администратор', icon: Shield },
   STAFF: { label: 'Сотрудник', icon: IdCard },
   CONTESTANT: { label: 'Конкурсант', icon: Users },
+  JURY: { label: 'Жюри', icon: Users },
+  REMOTE_JURY: { label: 'Заочное жюри', icon: Users },
 }

@@ -73,6 +73,7 @@ func (r *Repo) AccessLevel(ctx context.Context, userID, contestID string, isMega
 // ListForPrincipal — конкурсы в области видимости актора (§3.5):
 //   - MEGA_ADMIN — все конкурсы;
 //   - иначе — владелец, назначенный ADMIN, либо STAFF с event_staff_permissions.
+//
 // SUPER_ADMIN попадает сюда как владелец своих конкурсов.
 func (r *Repo) ListForPrincipal(ctx context.Context, userID string, isMega bool, status string) ([]Contest, error) {
 	// access_level в выборке: мега/владелец → OWNER; иначе уровень из user_roles (EDIT|VIEW).

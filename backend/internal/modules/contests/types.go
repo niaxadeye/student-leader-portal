@@ -8,12 +8,13 @@ import (
 
 // Доменные ошибки — маппятся на error codes API (SITE.md §50).
 var (
-	ErrNotFound     = errors.New("contest not found")
-	ErrForbidden    = errors.New("no access to contest")
-	ErrSlugTaken    = errors.New("slug already taken")
-	ErrValidation   = errors.New("validation error")
-	ErrBadStatus    = errors.New("invalid status transition")
-	ErrUserNotFound = errors.New("user not found")
+	ErrNotFound        = errors.New("contest not found")
+	ErrForbidden       = errors.New("no access to contest")
+	ErrSlugTaken       = errors.New("slug already taken")
+	ErrValidation      = errors.New("validation error")
+	ErrBadStatus       = errors.New("invalid status transition")
+	ErrUserNotFound    = errors.New("user not found")
+	ErrStorageDisabled = errors.New("image storage unavailable")
 )
 
 // Статусы конкурса (SITE.md §9).
@@ -63,6 +64,7 @@ type Participant struct {
 	FullName        string
 	Organization    *string
 	UserStatus      string
+	AvatarKey       *string
 	JoinedAt        time.Time
 	LeftAt          *time.Time
 }

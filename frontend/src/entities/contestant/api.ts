@@ -1,4 +1,4 @@
-import { apiRequest, apiGetText, apiPostText } from '@/shared/api/client'
+import { apiRequest, apiGetText, apiPostForm, apiPostText } from '@/shared/api/client'
 import type {
   AddContestantInput,
   AddContestantResult,
@@ -32,4 +32,18 @@ export function importContestants(contestId: string, csv: string): Promise<Impor
 /** Экспорт активных конкурсантов в CSV (текст). */
 export function exportContestants(contestId: string): Promise<string> {
   return apiGetText(`/admin/contests/${contestId}/contestants/export`)
+}
+
+export function uploadContestantAvatar(
+  contestId: string,
+  userId: string,
+  image: File,
+): Promise<{ avatar_url: string | null }> {
+  const form = new FormData()
+  form.append('image', image)
+  return apiPostForm(`/admin/contests/${contestId}/contestants/${userId}/avatar`, form)
+}
+
+export function deleteContestantAvatar(contestId: string, userId: string): Promise<{ avatar_url: string | null }> {
+  return apiRequest(`/admin/contests/${contestId}/contestants/${userId}/avatar`, { method: 'DELETE' })
 }

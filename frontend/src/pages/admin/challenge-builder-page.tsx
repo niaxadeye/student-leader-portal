@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Rocket, Lock, Archive, Eye, PencilRuler, Inbox, Pencil, Copy } from 'lucide-react'
+import { ArrowLeft, Plus, Rocket, Lock, Archive, Eye, PencilRuler, Inbox, Pencil, Copy, Scale, Radio, ClipboardList } from 'lucide-react'
 import {
   useAdminChallenge,
   useChallengeFields,
@@ -9,12 +9,14 @@ import {
 } from '@/entities/challenge/admin-queries'
 import { useAdminContest } from '@/entities/contest/queries'
 import { canEditContest } from '@/entities/contest/types'
+import { schemeHasLive } from '@/entities/evaluation/types'
+import { useAppConfig } from '@/shared/config/use-app-config'
 import { Card, CardBody } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { EmptyState, Skeleton, ErrorState } from '@/shared/ui/states'
 import { toast } from 'sonner'
-import { formatDate } from '@/shared/lib/format'
+import { formatDateTime } from '@/shared/lib/format'
 import { ApiRequestError } from '@/shared/api/client'
 import type { AdminField, ChallengeStatus } from '@/entities/challenge/admin-types'
 import { challengeStatusMeta } from './challenge-status'
@@ -23,6 +25,10 @@ import { FieldEditorDialog } from './field-editor-dialog'
 import { EditChallengeDialog } from './edit-challenge-dialog'
 import { ChallengePreview } from './challenge-preview'
 import { SubmissionsSection } from './submissions-section'
+import { EvaluationSection } from './evaluation-section'
+import { EvaluationLiveSection } from './evaluation-live-section'
+import { EvaluationScoresSection } from './evaluation-scores-section'
+import { ChallengeDangerZone } from './challenge-danger-zone'
 
 /** Доступные переходы по статусу (зеркалит матрицу бэкенда). */
 const actionsByStatus: Record<ChallengeStatus, Array<'publish' | 'close' | 'archive'>> = {
@@ -33,20 +39,36 @@ const actionsByStatus: Record<ChallengeStatus, Array<'publish' | 'close' | 'arch
 }
 
 const actionMeta = {
-  publish: { label: 'Опубликовать', icon: Rocket, variant: 'primary' as const },
+  publish: { label: 'Опубликовать приём', icon: Rocket, variant: 'primary' as const },
   close: { label: 'Закрыть приём', icon: Lock, variant: 'secondary' as const },
   archive: { label: 'В архив', icon: Archive, variant: 'secondary' as const },
 }
 
+export function ChallengeIntakePage() {
+  return <ChallengeWorkspace section="intake" />
+}
+
+export function ChallengeRunPage() {
+  return <ChallengeWorkspace section="run" />
+}
+
 export function ChallengeBuilderPage() {
+  return <ChallengeWorkspace section="intake" />
+}
+
+function ChallengeWorkspace({ section }: { section: 'intake' | 'run' }) {
   const { challengeId } = useParams()
   const challengeQ = useAdminChallenge(challengeId)
   const fieldsQ = useChallengeFields(challengeId)
   const { data: contest } = useAdminContest(challengeQ.data?.contest_id)
+  const { data: appConfig } = useAppConfig()
+  const juryEnabled = appConfig?.features.jury === true
   const transition = useTransitionChallenge(challengeId!, challengeQ.data?.contest_id ?? '')
   const duplicate = useDuplicateChallenge(challengeQ.data?.contest_id ?? '')
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'build' | 'preview' | 'submissions'>('build')
+  const [tab, setTab] = useState<'build' | 'preview' | 'submissions' | 'evaluation' | 'live' | 'scores'>(
+    section === 'run' ? 'evaluation' : 'build',
+  )
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<AdminField | null>(null)
   const [metaOpen, setMetaOpen] = useState(false)
@@ -67,6 +89,8 @@ export function ChallengeBuilderPage() {
   const fields = fieldsQ.data ?? []
   // Уровень доступа берём с родительского конкурса (испытание его не несёт).
   const canEdit = canEditContest(contest?.access_level)
+  const hasLive = schemeHasLive(challenge.scheme_type)
+  const runTab = tab === 'live' && !hasLive ? 'scores' : tab
 
   function runTransition(action: 'publish' | 'close' | 'archive') {
     transition.mutate(action, {
@@ -93,24 +117,25 @@ export function ChallengeBuilderPage() {
   return (
     <div>
       <Link
-        to={`/admin/contests/${challenge.contest_id}`}
+        to={`/admin/challenges/${challenge.id}`}
         className="mb-4 inline-flex items-center gap-1 text-[14px] text-muted hover:text-ink"
       >
-        <ArrowLeft className="h-4 w-4" /> К конкурсу
+        <ArrowLeft className="h-4 w-4" /> К испытанию
       </Link>
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[28px] font-bold tracking-tight text-ink">{challenge.title}</h1>
-            <Badge tone={meta.tone}>{meta.label}</Badge>
+            {section === 'intake' && <Badge tone={meta.tone}>{meta.label}</Badge>}
           </div>
           <p className="mt-1 text-[14px] text-muted">
-            Версия схемы {challenge.current_schema_version}
-            {challenge.deadline_at ? ` · дедлайн ${formatDate(challenge.deadline_at)}` : ''}
+            {section === 'intake' ? 'Приём файлов и ТЗ' : 'Проведение испытания'}
+            {challenge.held_at ? ` · ${formatDateTime(challenge.held_at)}` : ''}
+            {challenge.venue ? ` · ${challenge.venue}` : ''}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canEdit && (
             <Button
               size="sm"
@@ -134,7 +159,8 @@ export function ChallengeBuilderPage() {
               <Pencil className="h-4 w-4" /> Редактировать
             </Button>
           )}
-          {canEdit &&
+          {section === 'intake' &&
+            canEdit &&
             actions.map((a) => {
               const Icon = actionMeta[a].icon
               return (
@@ -152,13 +178,13 @@ export function ChallengeBuilderPage() {
         </div>
       </header>
 
-      {challenge.status === 'PUBLISHED' && (
+      {section === 'intake' && challenge.status === 'PUBLISHED' && (
         <div className="mb-4 rounded-card bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
-          Испытание опубликовано. Изменение полей создаёт новую версию схемы.
+          Приём опубликован. Изменение полей создаёт новую версию схемы.
         </div>
       )}
 
-      {/* Вкладки: конструктор / превью */}
+      {section === 'intake' ? (
       <div className="mb-4 flex gap-1 border-b border-border">
         <TabButton active={tab === 'build'} onClick={() => setTab('build')} icon={PencilRuler}>
           Конструктор
@@ -170,8 +196,32 @@ export function ChallengeBuilderPage() {
           Ответы
         </TabButton>
       </div>
+      ) : (
+      <div className="mb-4 flex gap-1 border-b border-border">
+        {juryEnabled && (
+          <TabButton active={runTab === 'evaluation'} onClick={() => setTab('evaluation')} icon={Scale}>
+            Оценивание
+          </TabButton>
+        )}
+        {juryEnabled && hasLive && (
+          <TabButton active={runTab === 'live'} onClick={() => setTab('live')} icon={Radio}>
+            Live
+          </TabButton>
+        )}
+        {juryEnabled && (
+          <TabButton active={runTab === 'scores'} onClick={() => setTab('scores')} icon={ClipboardList}>
+            Оценки
+          </TabButton>
+        )}
+      </div>
+      )}
 
-      {tab === 'build' ? (
+      {section === 'run' && !juryEnabled ? (
+        <EmptyState
+          title="Оценивание выключено"
+          description="Раздел проведения станет доступен, когда включите жюри."
+        />
+      ) : tab === 'build' ? (
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[18px] font-semibold text-ink">Поля формы</h2>
@@ -197,8 +247,20 @@ export function ChallengeBuilderPage() {
             <ChallengePreview fields={fields} />
           </CardBody>
         </Card>
+      ) : runTab === 'evaluation' ? (
+        <EvaluationSection challengeId={challenge.id} canEdit={canEdit} />
+      ) : runTab === 'live' ? (
+        <EvaluationLiveSection challengeId={challenge.id} canEdit={canEdit} />
+      ) : runTab === 'scores' ? (
+        <EvaluationScoresSection challengeId={challenge.id} canEdit={canEdit} />
       ) : (
         <SubmissionsSection challengeId={challenge.id} />
+      )}
+
+      {section === 'run' && canEdit && juryEnabled && (
+        <div className="mt-8">
+          <ChallengeDangerZone challengeId={challenge.id} />
+        </div>
       )}
 
       <FieldEditorDialog

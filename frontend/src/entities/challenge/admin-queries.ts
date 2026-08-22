@@ -1,18 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addField,
+  clearBriefingOverride,
   createChallenge,
+  deleteBriefingFile,
   deleteField,
   duplicateChallenge,
   getChallenge,
+  getChallengeBriefing,
   listChallenges,
   listFields,
   reorderFields,
+  saveBriefingOverride,
+  saveChallengeBriefing,
   transitionChallenge,
   updateChallenge,
   updateField,
+  uploadBriefingFile,
+  uploadOverrideFile,
 } from './admin-api'
-import type { ChallengeInput, FieldInput } from './admin-types'
+import type { BriefingInput, ChallengeInput, FieldInput, OverrideInput } from './admin-types'
 
 const listKey = (contestId: string) => ['admin', 'challenges', contestId]
 const oneKey = (challengeId: string) => ['admin', 'challenge', challengeId]
@@ -122,4 +129,64 @@ export function useReorderFields(challengeId: string) {
 function invalidateFields(qc: ReturnType<typeof useQueryClient>, challengeId: string) {
   qc.invalidateQueries({ queryKey: fieldsKey(challengeId) })
   qc.invalidateQueries({ queryKey: oneKey(challengeId) })
+}
+
+const briefingKey = (challengeId: string) => ['admin', 'challenge-briefing', challengeId]
+
+export function useAdminBriefing(challengeId: string | undefined) {
+  return useQuery({
+    queryKey: briefingKey(challengeId ?? ''),
+    queryFn: () => getChallengeBriefing(challengeId!),
+    enabled: !!challengeId,
+  })
+}
+
+export function useSaveBriefing(challengeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: BriefingInput) => saveChallengeBriefing(challengeId, input),
+    onSuccess: (data) => qc.setQueryData(briefingKey(challengeId), data),
+  })
+}
+
+export function useUploadBriefingFile(challengeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => uploadBriefingFile(challengeId, file),
+    onSuccess: (data) => qc.setQueryData(briefingKey(challengeId), data),
+  })
+}
+
+export function useDeleteBriefingFile(challengeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (fileId: string) => deleteBriefingFile(challengeId, fileId),
+    onSuccess: (data) => qc.setQueryData(briefingKey(challengeId), data),
+  })
+}
+
+export function useSaveBriefingOverride(challengeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, input }: { userId: string; input: OverrideInput }) =>
+      saveBriefingOverride(challengeId, userId, input),
+    onSuccess: (data) => qc.setQueryData(briefingKey(challengeId), data),
+  })
+}
+
+export function useClearBriefingOverride(challengeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => clearBriefingOverride(challengeId, userId),
+    onSuccess: (data) => qc.setQueryData(briefingKey(challengeId), data),
+  })
+}
+
+export function useUploadOverrideFile(challengeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, file }: { userId: string; file: File }) =>
+      uploadOverrideFile(challengeId, userId, file),
+    onSuccess: (data) => qc.setQueryData(briefingKey(challengeId), data),
+  })
 }

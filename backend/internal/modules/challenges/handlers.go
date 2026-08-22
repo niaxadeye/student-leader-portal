@@ -13,10 +13,17 @@ import (
 )
 
 type Handler struct {
-	svc *Service
+	svc            *Service
+	maxUploadBytes int64
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *Service, maxFileSizeMB int) *Handler {
+	max := int64(maxFileSizeMB) << 20
+	if max <= 0 {
+		max = 20 << 20
+	}
+	return &Handler{svc: svc, maxUploadBytes: max}
+}
 
 func actorOf(r *http.Request) Actor {
 	p := middleware.PrincipalFrom(r.Context())
@@ -32,22 +39,28 @@ func challengeJSON(c *Challenge) map[string]any {
 		"short_description": c.ShortDescription, "full_description": c.FullDescription,
 		"instructions": c.Instructions, "status": c.Status, "sort_order": c.SortOrder,
 		"open_at": c.OpenAt, "deadline_at": c.DeadlineAt, "close_at": c.CloseAt,
+		"held_at": c.HeldAt, "venue": c.Venue, "accepts_submissions": c.AcceptsSubmissions,
+		"scheme_type": c.SchemeType, "live_state": c.LiveState,
 		"current_schema_version": c.CurrentSchemaVersion, "fields_count": c.FieldsCount,
 		"my_submission_status": c.MySubmissionStatus,
 		"created_at":           c.CreatedAt, "updated_at": c.UpdatedAt,
 		"published_at": c.PublishedAt, "archived_at": c.ArchivedAt,
+		"briefing": resolvedBriefingJSON(c.Briefing),
 	}
 }
 
 type challengeReq struct {
-	Title            string     `json:"title"`
-	Slug             string     `json:"slug"`
-	ShortDescription *string    `json:"short_description"`
-	FullDescription  *string    `json:"full_description"`
-	Instructions     *string    `json:"instructions"`
-	OpenAt           *time.Time `json:"open_at"`
-	DeadlineAt       *time.Time `json:"deadline_at"`
-	CloseAt          *time.Time `json:"close_at"`
+	Title              string     `json:"title"`
+	Slug               string     `json:"slug"`
+	ShortDescription   *string    `json:"short_description"`
+	FullDescription    *string    `json:"full_description"`
+	Instructions       *string    `json:"instructions"`
+	OpenAt             *time.Time `json:"open_at"`
+	DeadlineAt         *time.Time `json:"deadline_at"`
+	CloseAt            *time.Time `json:"close_at"`
+	HeldAt             *time.Time `json:"held_at"`
+	Venue              *string    `json:"venue"`
+	AcceptsSubmissions *bool      `json:"accepts_submissions"`
 }
 
 func (req challengeReq) toInput() CreateInput {
@@ -55,6 +68,7 @@ func (req challengeReq) toInput() CreateInput {
 		Title: req.Title, Slug: req.Slug, ShortDescription: req.ShortDescription,
 		FullDescription: req.FullDescription, Instructions: req.Instructions,
 		OpenAt: req.OpenAt, DeadlineAt: req.DeadlineAt, CloseAt: req.CloseAt,
+		HeldAt: req.HeldAt, Venue: req.Venue, AcceptsSubmissions: req.AcceptsSubmissions,
 	}
 }
 
@@ -149,6 +163,10 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		httpserver.WriteError(w, r, http.StatusConflict, "FIELD_KEY_TAKEN", "Ключ поля уже используется", nil)
 	case errors.Is(err, ErrBadStatus):
 		httpserver.WriteError(w, r, http.StatusConflict, "INVALID_TRANSITION", "Недопустимый переход статуса", nil)
+	case errors.Is(err, ErrNoStorage):
+		httpserver.WriteError(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "Хранилище файлов недоступно", nil)
+	case errors.Is(err, ErrBriefingFile):
+		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Файл не принят. Проверьте тип и размер.", nil)
 	case errors.Is(err, ErrValidation):
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Проверьте заполнение полей", nil)
 	default:

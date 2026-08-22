@@ -11,6 +11,7 @@ export interface Contestant {
   organization: string | null
   user_status: ContestantStatus
   joined_at: string
+  avatar_url: string | null
 }
 
 export interface AddContestantInput {

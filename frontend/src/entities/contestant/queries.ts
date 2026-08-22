@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addContestant,
+  deleteContestantAvatar,
   importContestants,
   listContestants,
   removeContestant,
+  uploadContestantAvatar,
 } from './api'
 import type { AddContestantInput } from './types'
 
@@ -46,5 +48,34 @@ export function useImportContestants(contestId: string) {
   return useMutation({
     mutationFn: (csv: string) => importContestants(contestId, csv),
     onSuccess: invalidate,
+  })
+}
+
+export function useUploadContestantAvatar(contestId: string) {
+  const qc = useQueryClient()
+  const invalidate = useInvalidate(contestId)
+  return useMutation({
+    mutationFn: ({ userId, image }: { userId: string; image: File }) =>
+      uploadContestantAvatar(contestId, userId, image),
+    onSuccess: () => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: ['admin', 'live'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'evaluation', 'scores'] })
+      qc.invalidateQueries({ queryKey: ['jury', 'live'] })
+    },
+  })
+}
+
+export function useDeleteContestantAvatar(contestId: string) {
+  const qc = useQueryClient()
+  const invalidate = useInvalidate(contestId)
+  return useMutation({
+    mutationFn: (userId: string) => deleteContestantAvatar(contestId, userId),
+    onSuccess: () => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: ['admin', 'live'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'evaluation', 'scores'] })
+      qc.invalidateQueries({ queryKey: ['jury', 'live'] })
+    },
   })
 }
