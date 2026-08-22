@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const scoringUICriteria = "CRITERIA"
@@ -108,6 +110,15 @@ func (s *Service) JurySetScore(ctx context.Context, a Actor, challengeID string,
 	if in.PerformanceID == "" || in.CriterionID == "" {
 		return nil, ErrValidation
 	}
+	if in.MutationID == "" || in.BaseRevision == nil {
+		return nil, ErrValidation
+	}
+	if _, err := uuid.Parse(in.MutationID); err != nil {
+		return nil, ErrValidation
+	}
+	if *in.BaseRevision < 0 {
+		return nil, ErrValidation
+	}
 	scheme, err := s.repo.SchemeByChallenge(ctx, challengeID)
 	if err != nil {
 		return nil, err
@@ -153,46 +164,15 @@ func (s *Service) JurySetScore(ctx context.Context, a Actor, challengeID string,
 			return nil, ErrValidation
 		}
 	}
-	if in.MutationID != "" {
-		existing, err := s.repo.ScoreValueByMutation(ctx, in.MutationID)
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			return nil, err
-		}
-		if err == nil {
-			total, err := s.repo.RefreshSheetTotal(ctx, existing.ScoreSheetID)
-			if err != nil {
-				return nil, err
-			}
-			return &ScoreWriteResult{
-				CriterionID: existing.CriterionID,
-				Score:       existing.Score,
-				Revision:    existing.Revision,
-				Total:       total,
-			}, nil
-		}
-	}
 	sheetID, err := s.repo.EnsureScoreSheet(ctx, perf.ID, a.UserID)
 	if err != nil {
 		return nil, err
 	}
-	var mut *string
-	if in.MutationID != "" {
-		mut = &in.MutationID
-	}
-	saved, err := s.repo.UpsertScoreValue(ctx, sheetID, in.CriterionID, in.Score, mut, a.UserID)
-	if err != nil {
-		return nil, err
-	}
-	total, err := s.repo.RefreshSheetTotal(ctx, sheetID)
-	if err != nil {
-		return nil, err
-	}
-	return &ScoreWriteResult{
-		CriterionID: saved.CriterionID,
-		Score:       saved.Score,
-		Revision:    saved.Revision,
-		Total:       total,
-	}, nil
+	return s.repo.ApplyScoreMutation(ctx, scoreMutationParams{
+		ChallengeID: ch.ID, PerformanceID: perf.ID, EvaluatorUserID: a.UserID,
+		ScoreSheetID: sheetID, CriterionID: in.CriterionID, Score: in.Score,
+		MutationID: in.MutationID, BaseRevision: in.BaseRevision,
+	})
 }
 
 func scoringEditable(policy, state string) bool {

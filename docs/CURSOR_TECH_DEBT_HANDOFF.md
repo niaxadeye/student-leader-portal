@@ -74,7 +74,7 @@
 
 ## 5. P1: высокий приоритет
 
-### P1.1. Обновить уязвимые backend-зависимости
+### P1.1. Обновить уязвимые зависимости — **сделано и задеплоено 2026-08-22**
 
 `govulncheck` нашёл достижимые уязвимости:
 
@@ -82,8 +82,12 @@
 - `github.com/golang-jwt/jwt/v5` 5.2.1 — GO-2025-3553, исправлено в 5.2.2;
 - `github.com/xuri/excelize/v2` 2.10.0 — GO-2026-5960, исправлено в 2.11.0.
 
-Обновлять по одной группе, изучая changelog. После обновления выполнить полный набор
-проверок из раздела 8 и повторить `govulncheck`.
+Обновлены `pgx` до 5.10.0, `golang-jwt` до 5.3.1, `excelize` до 2.11.0 и
+`chi` до 5.3.0. На фронтенде React Router обновлён до 7.18.2 с переносом
+`fallbackElement` на route-level `hydrateFallbackElement`; совместимые транзитивные
+npm-обновления применены без `--force`. `npm audit` — 0; `govulncheck` — 0
+достижимых уязвимостей (остаётся module-only предупреждение про неиспользуемый
+`x/crypto/openpgp`, для которого нет исправленной версии).
 
 ### P1.2. Ограничить JSON request body
 
@@ -100,30 +104,28 @@
 - тесты на boundary, over-limit, malformed JSON и неизвестные поля;
 - согласовать лимиты приложения и nginx.
 
-### P1.3. Сделать refresh rotation атомарным
+### P1.3. Сделать refresh rotation атомарным — **сделано и задеплоено 2026-08-22**
 
 `backend/internal/modules/auth/service_refresh.go` сначала отдельно читает refresh,
 затем вызывает rotation. В `repo_sessions.go` нет row lock и условного update по
 `used_at IS NULL`; нет уникальности `rotated_from_id`. Два параллельных запроса могут
 выдать два валидных дочерних refresh token.
 
-Целевое исправление:
+Ротация перенесена в одну транзакцию с `SELECT ... FOR UPDATE`, условным consume и
+отзывом семейства при reuse. Миграция `0034` добавляет уникальность
+`rotated_from_id`. PostgreSQL integration-тест с двумя goroutine подтверждает: child
+ровно один, второй запрос получает reuse, сессия и все токены семейства отозваны.
 
-- одна транзакция;
-- `SELECT ... FOR UPDATE` или атомарный conditional update;
-- ровно один успешный child token;
-- reuse detection и отзыв семейства/сессии в соответствии с ADR;
-- конкурентный тест с двумя goroutine.
-
-### P1.4. Закрыть file BOLA в submissions
+### P1.4. Закрыть file BOLA в submissions — **сделано и задеплоено 2026-08-22**
 
 `backend/internal/modules/submissions/service_files.go` проверяет доступ к переданному
 `submissionID`, но затем получает произвольный `fileID` без проверки связи файла с этой
 заявкой/испытанием/конкурсом.
 
-Запрос к репозиторию должен связывать как минимум `file_id + submission_id` и далее
-проверять contest access. Нужен тест, где пользователь с доступом к submission A
-пытается скачать file B из другого tenant.
+Presign и delete теперь выбирают файл только через пару `submission_id + file_id` и
+дополнительно сверяют `files.submission_id`. Soft-delete откатывается с `ErrNotFound`,
+если связь отсутствует. PostgreSQL integration-тест подтверждает запрет скачать и
+удалить file B через submission A и сохранность file B после попытки.
 
 ### P1.5. Переделать limiter входа участника
 

@@ -3,7 +3,16 @@
 Живой документ для передачи контекста между сессиями. Обновлять при заметных изменениях.
 Обзор этапов — в [README](../README.md). Спецификация — [SITE.md](../SITE.md).
 
-_Последнее обновление: 2026-08-17 (платформа мероприятий, этапы 1–6 + hardening)._
+_Последнее обновление: 2026-08-22 (evaluation autosave + security/dependency hardening в рабочем дереве)._
+
+**Evaluation autosave и security hardening (2026-08-22, задеплоено):** оценки жюри
+получили durable IndexedDB-очередь, retry/reconnect,
+optimistic revisions и серверные idempotency receipts. Добавлены Chromium E2E и
+PostgreSQL integration-тесты. Refresh rotation стала атомарной; file presign/delete
+проверяют связь файла с конкретной submission. Обновлены pgx/JWT/excelize/chi и React
+Router, `npm audit` и достижимые результаты `govulncheck` — 0. Миграции `0033`–`0034`
+применены в production; `eazytech-api` и `eazytech-worker` пересобраны и перезапущены
+через PM2, frontend опубликован в `frontend/dist`, public health/assets — 200.
 
 **Платформа мероприятий (2026-08-17, рабочее дерево):** добавлены независимые от
 `users` участники мероприятий и participant auth (`0011`), append-only PointsLedger

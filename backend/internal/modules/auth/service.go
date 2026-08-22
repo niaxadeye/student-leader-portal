@@ -92,7 +92,8 @@ func (s *Service) issueSession(ctx context.Context, userID, role, ua, ip string)
 }
 
 // newRefreshCredentials генерирует jti, сырой refresh-токен и срок его действия
-// для нового звена цепочки. Персистит его вызывающий (CreateSession/RotateRefresh).
+// для нового звена цепочки. Персистит его вызывающий
+// (CreateSession/RotateRefreshAtomically).
 func (s *Service) newRefreshCredentials() (jti, refresh string, exp time.Time, err error) {
 	refresh, err = security.GenerateRefreshToken()
 	if err != nil {

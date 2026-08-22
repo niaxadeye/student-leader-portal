@@ -490,7 +490,12 @@ func criterionJSON(c *Criterion) map[string]any {
 }
 
 func writeErr(w http.ResponseWriter, r *http.Request, err error) {
+	var scoreConflict *ScoreRevisionConflict
 	switch {
+	case errors.As(err, &scoreConflict):
+		httpserver.WriteError(w, r, http.StatusConflict, "EVALUATION_REVISION_CONFLICT", "Оценка была изменена на другом устройстве", map[string]any{
+			"current_score": scoreConflict.Score, "current_revision": scoreConflict.Revision,
+		})
 	case errors.Is(err, ErrDisabled), errors.Is(err, ErrNotFound), errors.Is(err, ErrChallenge):
 		httpserver.WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Не найдено", nil)
 	case errors.Is(err, ErrForbidden), errors.Is(err, ErrNotAssigned):

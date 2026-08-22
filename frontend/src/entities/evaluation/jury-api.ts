@@ -20,11 +20,19 @@ export function getJuryScorecard(challengeId: string, contestantUserId?: string 
 
 export function putJuryScore(
   challengeId: string,
-  body: { performance_id: string; criterion_id: string; score: number; mutation_id: string },
+  body: {
+    performance_id: string
+    criterion_id: string
+    score: number
+    mutation_id: string
+    base_revision: number
+  },
+  keepalive = false,
 ): Promise<JuryScoreWrite> {
   return apiRequest<JuryScoreWrite>(`/jury/challenges/${challengeId}/scorecard`, {
     method: 'PUT',
     body,
+    keepalive,
   })
 }
 

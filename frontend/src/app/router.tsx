@@ -268,6 +268,11 @@ export const router = createBrowserRouter([
   {
     element: <Outlet />,
     errorElement: <RouteErrorPage />,
+    hydrateFallbackElement: (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted">
+        Загрузка…
+      </div>
+    ),
     children: appRoutes,
   },
 ])

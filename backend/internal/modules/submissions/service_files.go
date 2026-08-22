@@ -116,7 +116,7 @@ func (s *Service) DeleteFile(ctx context.Context, a Actor, challengeID, fileID s
 	if err := s.ensureWindowOpen(info, sub); err != nil {
 		return err
 	}
-	ownerID, objectKey, err := s.repo.FileByID(ctx, fileID)
+	ownerID, objectKey, err := s.repo.FileForSubmission(ctx, sub.ID, fileID)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -147,7 +147,7 @@ func (s *Service) PresignFile(ctx context.Context, a Actor, submissionID, fileID
 			}
 		}
 	}
-	_, objectKey, err := s.repo.FileByID(ctx, fileID)
+	_, objectKey, err := s.repo.FileForSubmission(ctx, submissionID, fileID)
 	if err != nil {
 		return "", ErrNotFound
 	}

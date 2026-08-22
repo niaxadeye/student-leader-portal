@@ -110,14 +110,25 @@ func (r *Repo) InsertFile(ctx context.Context, f *FileRow, submissionID string, 
 // SoftDeleteFile помечает файл удалённым и снимает привязку (только владелец, только черновик — проверяет сервис).
 func (r *Repo) SoftDeleteFile(ctx context.Context, submissionID, fileID string) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx,
+		command, err := tx.Exec(ctx,
 			`DELETE FROM submission_files WHERE submission_id=$1 AND file_id=$2`,
-			submissionID, fileID); err != nil {
+			submissionID, fileID)
+		if err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx,
-			`UPDATE files SET status='DELETED', deleted_at=now(), updated_at=now() WHERE id=$1`, fileID)
-		return err
+		if command.RowsAffected() != 1 {
+			return ErrNotFound
+		}
+		command, err = tx.Exec(ctx, `
+			UPDATE files SET status='DELETED', deleted_at=now(), updated_at=now()
+			WHERE id=$1 AND submission_id=$2 AND deleted_at IS NULL`, fileID, submissionID)
+		if err != nil {
+			return err
+		}
+		if command.RowsAffected() != 1 {
+			return ErrNotFound
+		}
+		return nil
 	})
 }
 
@@ -135,11 +146,16 @@ type FileRow struct {
 	SizeBytes    int64
 }
 
-// FileByID возвращает object_key и владельца файла (для скачивания/удаления).
-func (r *Repo) FileByID(ctx context.Context, fileID string) (ownerID, objectKey string, err error) {
-	err = r.pool.QueryRow(ctx,
-		`SELECT owner_user_id, object_key FROM files WHERE id=$1 AND deleted_at IS NULL`,
-		fileID).Scan(&ownerID, &objectKey)
+// FileForSubmission возвращает только файл, действительно привязанный к
+// указанной работе. Проверяем и link-таблицу, и денормализованный submission_id.
+func (r *Repo) FileForSubmission(ctx context.Context, submissionID, fileID string) (ownerID, objectKey string, err error) {
+	err = r.pool.QueryRow(ctx, `
+		SELECT f.owner_user_id, f.object_key
+		FROM submission_files sf
+		JOIN files f ON f.id = sf.file_id
+		WHERE sf.submission_id=$1 AND sf.file_id=$2
+		  AND f.submission_id=$1 AND f.deleted_at IS NULL`,
+		submissionID, fileID).Scan(&ownerID, &objectKey)
 	return
 }
 

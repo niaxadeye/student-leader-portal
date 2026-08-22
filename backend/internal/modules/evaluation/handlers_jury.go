@@ -26,6 +26,7 @@ func (h *Handler) JurySetScore(w http.ResponseWriter, r *http.Request) {
 		CriterionID   string  `json:"criterion_id"`
 		Score         float64 `json:"score"`
 		MutationID    string  `json:"mutation_id"`
+		BaseRevision  *int    `json:"base_revision"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpserver.WriteError(w, r, http.StatusBadRequest, "VALIDATION_ERROR", "Некорректный запрос", nil)
@@ -36,6 +37,7 @@ func (h *Handler) JurySetScore(w http.ResponseWriter, r *http.Request) {
 		CriterionID:   req.CriterionID,
 		Score:         req.Score,
 		MutationID:    req.MutationID,
+		BaseRevision:  req.BaseRevision,
 	})
 	if err != nil {
 		writeErr(w, r, err)

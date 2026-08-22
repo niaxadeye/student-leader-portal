@@ -217,7 +217,18 @@ type ScoreMutation struct {
 	CriterionID   string
 	Score         float64
 	MutationID    string
+	BaseRevision  *int
 }
+
+// ScoreRevisionConflict carries the current server value so a local-first
+// client can rebase an unacknowledged mutation without silently dropping it.
+type ScoreRevisionConflict struct {
+	Score    *float64
+	Revision int
+}
+
+func (e *ScoreRevisionConflict) Error() string { return ErrRevision.Error() }
+func (e *ScoreRevisionConflict) Unwrap() error { return ErrRevision }
 
 type ScorecardCriterion struct {
 	Criterion

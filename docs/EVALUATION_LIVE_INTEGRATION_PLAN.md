@@ -344,9 +344,15 @@ Frontend routes:
 
 Маршруты `/jury`. Автоследование за live contestant. Ручной уход + баннер «сейчас выступает X». Без кнопки Submit (поля могут быть ещё read-only до Phase 5, но UX без submit).
 
-### Phase 5 — IndexedDB autosave
+### Phase 5 — IndexedDB autosave — **сделано и задеплоено 2026-08-22**
 
 `JuryScoreSyncService`: мгновенный local write, flush ~1 с, `visibilitychange` / `pagehide`, retry, ACK, conflict replay. Индикатор sync. Тесты ТЗ §86–§88.
+
+Реализованы durable IndexedDB queue, coalescing по слоту, exponential backoff,
+reconnect/pagehide flush, optimistic `base_revision`, durable server receipts и
+автоматический rebase `409`. Chromium E2E покрывает offline → reconnect → reload и
+конфликт двух ревизий; PostgreSQL integration покрывает idempotent retry, конфликт и
+конкурентные записи с корректным total.
 
 ### Phase 6 — «Автопортрет» E2E
 

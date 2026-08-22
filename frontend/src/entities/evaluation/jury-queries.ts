@@ -72,6 +72,7 @@ export function usePutJuryScore(challengeId: string) {
       criterion_id: string
       score: number
       mutation_id: string
+      base_revision: number
     }) => putJuryScore(challengeId, body),
     onSuccess: (res) => {
       qc.setQueriesData<JuryScorecard>({ queryKey: ['jury', 'scorecard', challengeId] }, (prev) => {
